@@ -22,17 +22,29 @@ namespace TankManager.Core.Models
 
         public BitmapSource FilePreview { get; set; }
 
-        public PartModel(IPart7 part, string detailType)
+        public PartModel(IPart7 part, KompasContext context)
         {
             Part = part;
             Name = part.Name;
             Marking = part.Marking;
-            DetailType = detailType;
+            DetailType = GetDetailType(part, context?.SpecificationSectionProperty);
             Material = part.Material;
             Mass = Part.Mass/1000;
             FilePath = part.FileName;
 
             LoadDocumentPreview();
+        }
+
+        private string GetDetailType(IPart7 part, IProperty property)
+        {
+            if (property == null)
+                return null;
+
+            object markingObj;
+            bool fromSource;
+            IPropertyKeeper propertyKeeper = (IPropertyKeeper)part;
+            propertyKeeper.GetPropertyValue((KompasAPI7._Property)property, out markingObj, false, out fromSource);
+            return markingObj?.ToString();
         }
 
         private void LoadDocumentPreview()

@@ -2,6 +2,8 @@
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using TankManager.Core.ViewModels;
 
 namespace TankManager
@@ -50,6 +52,57 @@ namespace TankManager
                 e.Effects = DragDropEffects.None;
             }
             e.Handled = true;
+        }
+
+        private void ClearFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel viewModel)
+            {
+                viewModel.SelectedMaterial = null;
+            }
+        }
+
+        private void MaterialsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // Получаем элемент под курсором
+            var listBox = sender as ListBox;
+            if (listBox == null)
+                return;
+
+            // Проверяем, кликнули ли мы на ListBoxItem
+            var clickedElement = e.OriginalSource as DependencyObject;
+            var listBoxItem = FindParent<ListBoxItem>(clickedElement);
+
+            if (listBoxItem != null)
+            {
+                // Клик по элементу списка
+                var clickedMaterial = listBoxItem.Content as string;
+                
+                // Если кликнули по уже выбранному материалу - сбрасываем фильтр
+                if (clickedMaterial != null && clickedMaterial == _viewModel.SelectedMaterial)
+                {
+                    _viewModel.SelectedMaterial = null;
+                    e.Handled = true;
+                }
+            }
+            else
+            {
+                // Клик в пустую область - сбрасываем фильтр
+                _viewModel.SelectedMaterial = null;
+            }
+        }
+
+        // Вспомогательный метод для поиска родительского элемента определенного типа
+        private T FindParent<T>(DependencyObject child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T parent)
+                    return parent;
+                
+                child = System.Windows.Media.VisualTreeHelper.GetParent(child);
+            }
+            return null;
         }
 
         private bool IsKompasFile(string filePath)

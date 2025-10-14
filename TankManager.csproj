@@ -101,6 +101,7 @@
     </Compile>
     <Compile Include="Core\Models\PartModel.cs" />
     <Compile Include="Core\Services\IKompasService.cs" />
+    <Compile Include="Core\Services\KompasContext.cs" />
     <Compile Include="Core\Services\KompasService.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />
     <Compile Include="Core\ViewModels\MainViewModel.cs" />

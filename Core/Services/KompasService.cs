@@ -9,35 +9,30 @@ namespace TankManager.Core.Services
 {
     public class KompasService : IKompasService
     {
-        private IApplication _app;
-        private IPart7 _part;
-        private IProperty _property;
-        private IChooseManager _chooseManager;
-        private ISelectionManager _selectionManager;
-        private IViewProjectionManager _viewProjectionManager;
+        private readonly KompasContext _context;
 
         public KompasService()
         {
-            _app = GetKompas();
+            _context = new KompasContext();
+        }
+
+        public KompasService(KompasContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public List<PartModel> LoadDocument(string filePath)
         {
             var result = new List<PartModel>();
 
-            if (_app == null)
+            if (!_context.IsInitialized)
                 throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
 
-            IKompasDocument3D kompasDocument3D = _app.Documents.Open(filePath) as IKompasDocument3D;
-            _chooseManager = kompasDocument3D.ChooseManager;
-            _selectionManager = kompasDocument3D.SelectionManager;
-            _viewProjectionManager = ((IKompasDocument3D1)kompasDocument3D).ViewProjectionManager;
+            _context.LoadDocument(filePath);
 
-            if (kompasDocument3D != null)
+            if (_context.IsDocumentLoaded)
             {
-                _part = kompasDocument3D.TopPart;
-                _property = ((IPropertyMng)_app).GetProperty(kompasDocument3D, "Раздел спецификации");
-                ExtractParts(_part, result);
+                ExtractParts(_context.TopPart, result);
             }
 
             return result;
@@ -45,37 +40,69 @@ namespace TankManager.Core.Services
 
         private void ExtractParts(IPart7 part, List<PartModel> details)
         {
-            foreach (IPart7 subPart in part.Parts)
+            object partsEnum = null;
+            try
             {
-                if (subPart.Detail == true)
+                // Получаем коллекцию безопасно
+                var partsCollection = part.Parts;
+                partsEnum = partsCollection.GetEnumerator();
+                
+                while (true)
                 {
-                    details.Add(new PartModel(subPart, GetDetailType(subPart)));
-                }
-                else
-                {
-                    ExtractParts(subPart, details);
-                }
-            }
-        }
+                    IPart7 subPart = null;
+                    try
+                    {
+                        // Используем явный вызов MoveNext для контроля
+                        if (partsCollection.Count == 0)
+                            break;
 
-        private string GetDetailType(IPart7 part)
-        {
-            object markingObj;
-            bool fromSource;
-            IPropertyKeeper propertyKeeper = (IPropertyKeeper)part;
-            propertyKeeper.GetPropertyValue((KompasAPI7._Property)_property, out markingObj, false, out fromSource);
-            return markingObj?.ToString();
+                        foreach (IPart7 p in partsCollection)
+                        {
+                            subPart = p;
+                            try
+                            {
+                                if (subPart.Detail == true)
+                                {
+                                    details.Add(new PartModel(subPart, _context));
+                                }
+                                else
+                                {
+                                    ExtractParts(subPart, details);
+                                }
+                            }
+                            finally
+                            {
+                                // Не освобождаем subPart здесь, т.к. он используется в PartModel
+                            }
+                        }
+                        break;
+                    }
+                    catch
+                    {
+                        if (subPart != null && Marshal.IsComObject(subPart))
+                            Marshal.ReleaseComObject(subPart);
+                        throw;
+                    }
+                }
+
+                // Освобождаем коллекцию
+                if (partsCollection != null && Marshal.IsComObject(partsCollection))
+                    Marshal.ReleaseComObject(partsCollection);
+            }
+            finally
+            {
+                if (partsEnum != null && Marshal.IsComObject(partsEnum))
+                    Marshal.ReleaseComObject(partsEnum);
+            }
         }
 
         public void ShowDetailInKompas(PartModel detail)
         {
-            if (_app == null || detail?.Part == null)
+            if (!_context.IsDocumentLoaded || detail?.Part == null)
                 return;
 
-            _selectionManager.UnselectAll();
-            _selectionManager.Select(detail.Part);
-
-
+            _context.SelectionManager.UnselectAll();
+            _context.SelectionManager.Select(detail.Part);
 
             // Получаем габариты детали
             detail.Part.GetGabarit(false, false, 
@@ -100,7 +127,7 @@ namespace TankManager.Core.Services
             double scale = maxSize > 0 ? 100.0 / maxSize : 1.0;
 
             // Получаем существующую матрицу
-            var matrix = _viewProjectionManager.Matrix3D;
+            var matrix = _context.ViewProjectionManager.Matrix3D;
             
             // Модифицируем позицию камеры (элементы трансляции)
             // В матрице 4x4 элементы [12], [13], [14] отвечают за позицию
@@ -108,25 +135,12 @@ namespace TankManager.Core.Services
             matrix[13] = centerY;
             matrix[14] = centerZ;
 
-            _viewProjectionManager.SetMatrix3D(matrix, scale);
-        }
-
-        private static IApplication GetKompas()
-        {
-            try
-            {
-                return (IApplication)Marshal.GetActiveObject("KOMPAS.Application.7");
-            }
-            catch
-            {
-                return null;
-            }
+            _context.ViewProjectionManager.SetMatrix3D(matrix, scale);
         }
 
         public void Dispose()
         {
-            _app = null;
-            _property = null;
+            _context?.Dispose();
         }
     }
 }

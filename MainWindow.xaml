@@ -43,21 +43,67 @@
             
             <!-- ЛЕВАЯ ПАНЕЛЬ: Список всех деталей -->
             <GroupBox Grid.Column="0" Header="Все детали">
-                <ListBox x:Name="Список_всех_деталей" 
-                         ItemsSource="{Binding Details}"
-                         SelectedItem="{Binding SelectedDetail}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,2">
-                                <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <TextBlock Text="Тип детали: " FontSize="10" Foreground="Gray"/>
-                                    <TextBlock Text="{Binding DetailType}" FontSize="10" Foreground="Gray"/>
-                                </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Индикатор активного фильтра -->
+                    <Border Grid.Row="0" 
+                            Background="#FFFFEB3B" 
+                            BorderBrush="#FFD32F2F" 
+                            BorderThickness="1" 
+                            CornerRadius="3" 
+                            Padding="8,5"
+                            Margin="5">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedMaterial, Converter={x:Null}}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="📋 Фильтр: " FontWeight="Bold" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding SelectedMaterial}" VerticalAlignment="Center" FontStyle="Italic"/>
                             </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                            <Button Grid.Column="1" 
+                                    Content="✕" 
+                                    FontWeight="Bold"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    ToolTip="Сбросить фильтр"
+                                    Click="ClearFilter_Click"
+                                    Padding="5,0"/>
+                        </Grid>
+                    </Border>
+                    
+                    <ListBox Grid.Row="1" x:Name="Список_всех_деталей" 
+                             ItemsSource="{Binding DetailsView}"
+                             SelectedItem="{Binding SelectedDetail}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock Text="Тип детали: " FontSize="10" Foreground="Gray"/>
+                                        <TextBlock Text="{Binding DetailType}" FontSize="10" Foreground="Gray"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
             </GroupBox>
             
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
@@ -159,15 +205,34 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                
+
                 <!-- Материалы -->
-                <GroupBox Grid.Row="0" Header="Материалы">
-                    <ListBox ItemsSource="{Binding Materials}">
+                <GroupBox Grid.Row="0" Header="Материалы (клик для фильтра)">
+                    <ListBox x:Name="MaterialsListBox"
+                             ItemsSource="{Binding Materials}"
+                             SelectedItem="{Binding SelectedMaterial}"
+                             SelectionMode="Single"
+                             PreviewMouseDown="MaterialsListBox_PreviewMouseDown">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding}" Margin="2"/>
+                                <TextBlock Text="{Binding}" Margin="2" Cursor="Hand"/>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="5,3"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#FFE3F2FD"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#FF2196F3"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                     </ListBox>
                 </GroupBox>
                 

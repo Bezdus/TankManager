@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Media.Imaging;
 using TankManager.Core.Models;
 using TankManager.Core.Services;
@@ -17,6 +18,7 @@ namespace TankManager.Core.ViewModels
         public ObservableCollection<PartModel> Details { get; }
         public ObservableCollection<string> Materials { get; }
         public ObservableCollection<PartModel> StandardParts { get; }
+        public ICollectionView DetailsView { get; }
 
         public MainViewModel() : this(new KompasService())
         {
@@ -28,6 +30,10 @@ namespace TankManager.Core.ViewModels
             Details = new ObservableCollection<PartModel>();
             Materials = new ObservableCollection<string>();
             StandardParts = new ObservableCollection<PartModel>();
+            
+            // Создаем представление для фильтрации
+            DetailsView = CollectionViewSource.GetDefaultView(Details);
+            DetailsView.Filter = FilterDetails;
         }
 
         private string _filePath;
@@ -45,7 +51,20 @@ namespace TankManager.Core.ViewModels
             }
         }
 
-
+        private string _selectedMaterial;
+        public string SelectedMaterial
+        {
+            get { return _selectedMaterial; }
+            set
+            {
+                if (_selectedMaterial != value)
+                {
+                    _selectedMaterial = value;
+                    OnPropertyChanged(nameof(SelectedMaterial));
+                    DetailsView?.Refresh(); // Обновляем фильтр
+                }
+            }
+        }
 
         private PartModel _selectedDetail;
         public PartModel SelectedDetail
@@ -88,6 +107,19 @@ namespace TankManager.Core.ViewModels
                     OnPropertyChanged(nameof(StatusMessage));
                 }
             }
+        }
+
+        private bool FilterDetails(object obj)
+        {
+            if (string.IsNullOrEmpty(_selectedMaterial))
+                return true;
+
+            if (obj is PartModel part)
+            {
+                return part.Material == _selectedMaterial;
+            }
+
+            return false;
         }
 
         private void LoadDocument()
