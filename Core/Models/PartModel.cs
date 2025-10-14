@@ -35,6 +35,11 @@ namespace TankManager.Core.Models
             LoadDocumentPreview();
         }
 
+        public PartModel(IBody7 body, KompasContext context)
+        {
+            Name = body.Name;
+        }
+
         private string GetDetailType(IPart7 part, IProperty property)
         {
             if (property == null)

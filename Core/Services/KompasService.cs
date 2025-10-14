@@ -9,6 +9,10 @@ namespace TankManager.Core.Services
 {
     public class KompasService : IKompasService
     {
+        private const double DefaultScale = 1.0;
+        private const double ScaleFactor = 100.0;
+        private const string DetailsSection = "Детали";
+        
         private readonly KompasContext _context;
 
         public KompasService()
@@ -23,11 +27,9 @@ namespace TankManager.Core.Services
 
         public List<PartModel> LoadDocument(string filePath)
         {
+            EnsureKompasInitialized();
+
             var result = new List<PartModel>();
-
-            if (!_context.IsInitialized)
-                throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
-
             _context.LoadDocument(filePath);
 
             if (_context.IsDocumentLoaded)
@@ -38,104 +40,169 @@ namespace TankManager.Core.Services
             return result;
         }
 
+        private void EnsureKompasInitialized()
+        {
+            if (!_context.IsInitialized)
+            {
+                throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
+            }
+        }
+
         private void ExtractParts(IPart7 part, List<PartModel> details)
         {
-            object partsEnum = null;
+            ExtractBodies(part, details);
+            ExtractSubParts(part, details);
+        }
+
+        private void ExtractBodies(IPart7 part, List<PartModel> details)
+        {
+            var bodies = ((IFeature7)part).ResultBodies;
+            
+            if (bodies == null)
+                return;
+            foreach (IBody7 body in bodies)
+            {
+                if (IsDetailBody(body))
+                {
+                    details.Add(new PartModel(body, _context));
+                }
+            }
+        }
+
+        private bool IsDetailBody(IBody7 body)
+        {
+            object val;
+            bool fromSource;
+            ((IPropertyKeeper)body).GetPropertyValue(
+                (_Property)_context.SpecificationSectionProperty, 
+                out val, 
+                false, 
+                out fromSource);
+            
+            return (val as string) == DetailsSection;
+        }
+
+        private void ExtractSubParts(IPart7 part, List<PartModel> details)
+        {
+            IParts7 partsCollection = null;
+
             try
             {
-                // Получаем коллекцию безопасно
-                var partsCollection = part.Parts;
-                partsEnum = partsCollection.GetEnumerator();
+                partsCollection = part.Parts;
                 
-                while (true)
+                if (partsCollection == null)
+                    return;
+
+                foreach (IPart7 subPart in partsCollection)
                 {
-                    IPart7 subPart = null;
+                    if (subPart == null)
+                        continue;
+
                     try
                     {
-                        // Используем явный вызов MoveNext для контроля
-                        if (partsCollection.Count == 0)
-                            break;
-
-                        foreach (IPart7 p in partsCollection)
+                        if (subPart.Detail == true)
                         {
-                            subPart = p;
-                            try
-                            {
-                                if (subPart.Detail == true)
-                                {
-                                    details.Add(new PartModel(subPart, _context));
-                                }
-                                else
-                                {
-                                    ExtractParts(subPart, details);
-                                }
-                            }
-                            finally
-                            {
-                                // Не освобождаем subPart здесь, т.к. он используется в PartModel
-                            }
+                            details.Add(new PartModel(subPart, _context));
                         }
-                        break;
+                        else
+                        {
+                            ExtractParts(subPart, details);
+                        }
                     }
-                    catch
+                    catch (COMException)
                     {
-                        if (subPart != null && Marshal.IsComObject(subPart))
-                            Marshal.ReleaseComObject(subPart);
-                        throw;
+                        // Игнорируем ошибки доступа к недоступным частям
                     }
                 }
-
-                // Освобождаем коллекцию
-                if (partsCollection != null && Marshal.IsComObject(partsCollection))
-                    Marshal.ReleaseComObject(partsCollection);
             }
             finally
             {
-                if (partsEnum != null && Marshal.IsComObject(partsEnum))
-                    Marshal.ReleaseComObject(partsEnum);
+                ReleaseComObject(partsCollection);
             }
         }
 
         public void ShowDetailInKompas(PartModel detail)
         {
-            if (!_context.IsDocumentLoaded || detail?.Part == null)
+            if (!IsValidDetailForDisplay(detail))
                 return;
 
+            SelectDetail(detail);
+            FocusOnDetail(detail);
+        }
+
+        private bool IsValidDetailForDisplay(PartModel detail)
+        {
+            return _context.IsDocumentLoaded && detail?.Part != null;
+        }
+
+        private void SelectDetail(PartModel detail)
+        {
             _context.SelectionManager.UnselectAll();
             _context.SelectionManager.Select(detail.Part);
+        }
 
-            // Получаем габариты детали
-            detail.Part.GetGabarit(false, false, 
-                out double X1, out double Y1, out double Z1, 
-                out double X2, out double Y2, out double Z2);
+        private void FocusOnDetail(PartModel detail)
+        {
+            var gabarit = GetPartGabarit(detail.Part);
+            var center = CalculateCenter(gabarit);
+            var scale = CalculateScale(gabarit);
 
-            // Вычисляем центр габарита
-            double centerX = (X1 + X2) / 2.0;
-            double centerY = (Y1 + Y2) / 2.0;
-            double centerZ = (Z1 + Z2) / 2.0;
+            UpdateCamera(center, scale);
+        }
 
-            // Вычисляем размеры габарита
-            double width = Math.Abs(X2 - X1);
-            double height = Math.Abs(Y2 - Y1);
-            double depth = Math.Abs(Z2 - Z1);
+        private struct Gabarit
+        {
+            public double X1, Y1, Z1;
+            public double X2, Y2, Z2;
+        }
 
-            // Находим максимальный размер для расчета масштаба
+        private Gabarit GetPartGabarit(IPart7 part)
+        {
+            var gabarit = new Gabarit();
+            part.GetGabarit(false, false,
+                out gabarit.X1, out gabarit.Y1, out gabarit.Z1,
+                out gabarit.X2, out gabarit.Y2, out gabarit.Z2);
+            return gabarit;
+        }
+
+        private (double x, double y, double z) CalculateCenter(Gabarit gabarit)
+        {
+            return (
+                x: (gabarit.X1 + gabarit.X2) / 2.0,
+                y: (gabarit.Y1 + gabarit.Y2) / 2.0,
+                z: (gabarit.Z1 + gabarit.Z2) / 2.0
+            );
+        }
+
+        private double CalculateScale(Gabarit gabarit)
+        {
+            double width = Math.Abs(gabarit.X2 - gabarit.X1);
+            double height = Math.Abs(gabarit.Y2 - gabarit.Y1);
+            double depth = Math.Abs(gabarit.Z2 - gabarit.Z1);
+
             double maxSize = Math.Max(Math.Max(width, height), depth);
 
-            // Вычисляем масштаб (обратная логика - больше размер = меньше масштаб)
-            // Типичный диапазон масштабов: 0.1 - 10.0
-            double scale = maxSize > 0 ? 100.0 / maxSize : 1.0;
+            return maxSize > 0 ? ScaleFactor / maxSize : DefaultScale;
+        }
 
-            // Получаем существующую матрицу
+        private void UpdateCamera((double x, double y, double z) center, double scale)
+        {
             var matrix = _context.ViewProjectionManager.Matrix3D;
-            
-            // Модифицируем позицию камеры (элементы трансляции)
-            // В матрице 4x4 элементы [12], [13], [14] отвечают за позицию
-            matrix[12] = centerX;
-            matrix[13] = centerY;
-            matrix[14] = centerZ;
+
+            // Элементы [12], [13], [14] отвечают за позицию камеры в матрице 4x4
+            matrix[12] = center.x;
+            matrix[13] = center.y;
+            matrix[14] = center.z;
 
             _context.ViewProjectionManager.SetMatrix3D(matrix, scale);
+        }
+
+        private void ReleaseComObject(object obj)
+        {
+            if (obj != null && Marshal.IsComObject(obj))
+            {
+                Marshal.ReleaseComObject(obj);
+            }
         }
 
         public void Dispose()
