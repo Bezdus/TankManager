@@ -56,15 +56,29 @@ namespace TankManager.Core.Services
 
         private void ExtractBodies(IPart7 part, List<PartModel> details)
         {
-            var bodies = ((IFeature7)part).ResultBodies;
+            var bodiesVariant = ((IFeature7)part).ResultBodies;
             
-            if (bodies == null)
+            if (bodiesVariant == null)
                 return;
-            foreach (IBody7 body in bodies)
+
+            // Обработка VARIANT: может быть одиночный объект (VT_DISPATCH) или массив (VT_ARRAY | VT_DISPATCH)
+            if (bodiesVariant is Array bodiesArray)
             {
-                if (IsDetailBody(body))
+                // Случай VT_ARRAY | VT_DISPATCH - несколько объектов
+                foreach (var bodyObj in bodiesArray)
                 {
-                    details.Add(new PartModel(body, _context));
+                    if (bodyObj is IBody7 body && IsDetailBody(body))
+                    {
+                        details.Add(new PartModel(body, _context));
+                    }
+                }
+            }
+            else if (bodiesVariant is IBody7 singleBody)
+            {
+                // Случай VT_DISPATCH - один объект
+                if (IsDetailBody(singleBody))
+                {
+                    details.Add(new PartModel(singleBody, _context));
                 }
             }
         }
