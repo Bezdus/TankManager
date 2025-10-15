@@ -123,7 +123,7 @@ namespace TankManager.Core.Services
                             if(_context.GetDetailType(subPart) == "Прочие изделия")
                             {
                                 details.Add(new PartModel(subPart, _context));
-                                return;
+                                continue;
                             }    
                             ExtractParts(subPart, details);
                         }

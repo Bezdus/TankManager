@@ -31,9 +31,12 @@ namespace TankManager.Core.ViewModels
             Materials = new ObservableCollection<string>();
             StandardParts = new ObservableCollection<PartModel>();
             
-            // Создаем представление для фильтрации
+            // Создаем представление для фильтрации и группировки
             DetailsView = CollectionViewSource.GetDefaultView(Details);
             DetailsView.Filter = FilterDetails;
+            
+            // Группируем по комбинации имени и обозначения
+            DetailsView.GroupDescriptions.Add(new PropertyGroupDescription("Name"));
         }
 
         private string _filePath;
