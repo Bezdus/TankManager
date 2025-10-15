@@ -120,6 +120,11 @@ namespace TankManager.Core.Services
                         }
                         else
                         {
+                            if(_context.GetDetailType(subPart) == "Прочие изделия")
+                            {
+                                details.Add(new PartModel(subPart, _context));
+                                return;
+                            }    
                             ExtractParts(subPart, details);
                         }
                     }

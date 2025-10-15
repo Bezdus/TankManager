@@ -44,6 +44,18 @@ namespace TankManager.Core.Services
             }
         }
 
+        public string GetDetailType(IPart7 part)
+        {
+            if (SpecificationSectionProperty == null)
+                return null;
+
+            object markingObj;
+            bool fromSource;
+            IPropertyKeeper propertyKeeper = (IPropertyKeeper)part;
+            propertyKeeper.GetPropertyValue((KompasAPI7._Property)SpecificationSectionProperty, out markingObj, false, out fromSource);
+            return markingObj?.ToString();
+        }
+
         public void CloseDocument()
         {
             if (Document != null)

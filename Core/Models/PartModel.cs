@@ -27,7 +27,7 @@ namespace TankManager.Core.Models
             Part = part;
             Name = part.Name;
             Marking = part.Marking;
-            DetailType = GetDetailType(part, context?.SpecificationSectionProperty);
+            DetailType = context.GetDetailType(part);
             Material = part.Material;
             Mass = Part.Mass/1000;
             FilePath = part.FileName;
@@ -38,18 +38,6 @@ namespace TankManager.Core.Models
         public PartModel(IBody7 body, KompasContext context)
         {
             Name = body.Name;
-        }
-
-        private string GetDetailType(IPart7 part, IProperty property)
-        {
-            if (property == null)
-                return null;
-
-            object markingObj;
-            bool fromSource;
-            IPropertyKeeper propertyKeeper = (IPropertyKeeper)part;
-            propertyKeeper.GetPropertyValue((KompasAPI7._Property)property, out markingObj, false, out fromSource);
-            return markingObj?.ToString();
         }
 
         private void LoadDocumentPreview()
