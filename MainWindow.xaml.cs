@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using TankManager.Core.Models;
 using TankManager.Core.ViewModels;
 
 namespace TankManager
@@ -78,13 +79,15 @@ namespace TankManager
             if (listBoxItem != null)
             {
                 // Клик по элементу списка
-                var clickedMaterial = listBoxItem.Content as string;
-                
-                // Если кликнули по уже выбранному материалу - сбрасываем фильтр
-                if (clickedMaterial != null && clickedMaterial == _viewModel.SelectedMaterial)
+                if (listBoxItem.Content is MaterialInfo clickedMaterial)
                 {
-                    _viewModel.SelectedMaterial = null;
-                    e.Handled = true;
+                    // Если кликнули по уже выбранному материалу - сбрасываем фильтр
+                    if (_viewModel.SelectedMaterial != null && 
+                        clickedMaterial.Name == _viewModel.SelectedMaterial.Name)
+                    {
+                        _viewModel.SelectedMaterial = null;
+                        e.Handled = true;
+                    }
                 }
             }
             else

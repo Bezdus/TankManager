@@ -37,7 +37,7 @@ namespace TankManager.Core.Services
         private const uint SHGFI_ICON = 0x100;
         private const uint SHGFI_LARGEICON = 0x0;
 
-        public static BitmapSource GetFileThumbnail(string filePath, int width = 256, int height = 256)
+        public static BitmapSource GetFileThumbnail(string filePath, int width = 512, int height = 512)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
                 return null;

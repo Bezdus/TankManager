@@ -2,6 +2,7 @@
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
 using TankManager.Core.Constants;
@@ -9,7 +10,7 @@ using TankManager.Core.Services;
 
 namespace TankManager.Core.Models
 {
-    public class PartModel : INotifyPropertyChanged
+    public class PartModel : INotifyPropertyChanged, IDisposable
     {
         private const string DefaultSteelGrade = "AISI 304";
 
@@ -20,9 +21,23 @@ namespace TankManager.Core.Models
         private double _mass;
         private string _filePath;
         private BitmapSource _filePreview;
+        private bool _disposed;
 
-        public IBody7 Body { get; private set; }
-        public IPart7 Part { get; private set; }
+        // Храним только ссылки для ShowInKompas, но с осторожностью
+        private IBody7 _body;
+        private IPart7 _part;
+
+        public IBody7 Body 
+        { 
+            get { return _body; }
+            private set { _body = value; }
+        }
+
+        public IPart7 Part 
+        { 
+            get { return _part; }
+            private set { _part = value; }
+        }
 
         public string Name
         {
@@ -136,15 +151,27 @@ namespace TankManager.Core.Models
             if (context == null) throw new ArgumentNullException(nameof(context));
 
             Body = body;
-            Name = body.Name ?? string.Empty;
-            Marking = body.Marking ?? string.Empty;
-            DetailType = KompasConstants.PartType;
-            Material = FormatMaterial(
-                context.GetBodyPropertyValue(body, KompasConstants.MaterialPropertyName));
-            Mass = ParseMass(
-                context.GetBodyPropertyValue(body, KompasConstants.MassPropertyName));
-            FilePath = ((IPart7)body.Parent)?.FileName ?? string.Empty;
-            FilePreview = TryLoadPreview(FilePath);
+            
+            IPart7 parentPart = null;
+            try
+            {
+                Name = body.Name ?? string.Empty;
+                Marking = body.Marking ?? string.Empty;
+                DetailType = KompasConstants.PartType;
+                Material = FormatMaterial(
+                    context.GetBodyPropertyValue(body, KompasConstants.MaterialPropertyName));
+                Mass = ParseMass(
+                    context.GetBodyPropertyValue(body, KompasConstants.MassPropertyName));
+                
+                parentPart = body.Parent as IPart7;
+                FilePath = parentPart?.FileName ?? string.Empty;
+                FilePreview = TryLoadPreview(FilePath);
+            }
+            finally
+            {
+                // Не освобождаем parentPart, т.к. это приведение типа, а не новый объект
+                // IPart7 должен управляться через KompasContext
+            }
         }
 
         private static string DetermineDetailType(string specificationSection)
@@ -224,6 +251,52 @@ namespace TankManager.Core.Models
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Освобождаем управляемые ресурсы
+                _filePreview = null;
+            }
+
+            // Освобождаем COM-объекты
+            if (_body != null && Marshal.IsComObject(_body))
+            {
+                try
+                {
+                    Marshal.ReleaseComObject(_body);
+                }
+                catch { }
+                _body = null;
+            }
+
+            if (_part != null && Marshal.IsComObject(_part))
+            {
+                try
+                {
+                    Marshal.ReleaseComObject(_part);
+                }
+                catch { }
+                _part = null;
+            }
+
+            _disposed = true;
+        }
+
+        ~PartModel()
+        {
+            Dispose(false);
         }
     }
 }

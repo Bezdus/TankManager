@@ -47,32 +47,94 @@ namespace TankManager.Core.Services
 
         public string GetDetailType(IPart7 part)
         {
-            if (SpecificationSectionProperty == null)
+            if (SpecificationSectionProperty == null || part == null)
                 return null;
 
-            object markingObj;
-            bool fromSource;
-            IPropertyKeeper propertyKeeper = (IPropertyKeeper)part;
-            propertyKeeper.GetPropertyValue((KompasAPI7._Property)SpecificationSectionProperty, out markingObj, false, out fromSource);
-            return markingObj?.ToString();
+            IPropertyKeeper propertyKeeper = null;
+            try
+            {
+                propertyKeeper = part as IPropertyKeeper;
+                if (propertyKeeper == null)
+                    return null;
+
+                propertyKeeper.GetPropertyValue(
+                    (KompasAPI7._Property)SpecificationSectionProperty, 
+                    out object markingObj, 
+                    false, 
+                    out bool fromSource);
+                
+                return markingObj?.ToString();
+            }
+            finally
+            {
+                // Приведение типа (as) не создает новый RCW, поэтому освобождать не нужно
+                // Проверяем на всякий случай
+                if (propertyKeeper != null && propertyKeeper != (object)part && Marshal.IsComObject(propertyKeeper))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(propertyKeeper);
+                    }
+                    catch { }
+                }
+            }
         }
 
-        public string GetBodyPropertyValue(IBody7 body, string propertyName )
+        public string GetBodyPropertyValue(IBody7 body, string propertyName)
         {
-            IProperty Property = PropertyManager.GetProperty(Document, propertyName);
+            if (body == null || string.IsNullOrEmpty(propertyName))
+                return null;
 
-            object markingObj;
-            bool fromSource;
-            IPropertyKeeper propertyKeeper = (IPropertyKeeper)body;
-            propertyKeeper.GetPropertyValue((KompasAPI7._Property)Property, out markingObj, false, out fromSource);
-            return markingObj?.ToString();
+            IProperty property = null;
+            IPropertyKeeper propertyKeeper = null;
+            
+            try
+            {
+                property = PropertyManager.GetProperty(Document, propertyName);
+                if (property == null)
+                    return null;
+
+                propertyKeeper = body as IPropertyKeeper;
+                if (propertyKeeper == null)
+                    return null;
+
+                propertyKeeper.GetPropertyValue(
+                    (KompasAPI7._Property)property, 
+                    out object markingObj, 
+                    false, 
+                    out bool fromSource);
+                
+                return markingObj?.ToString();
+            }
+            finally
+            {
+                // Освобождаем property, если это COM-объект
+                if (property != null && Marshal.IsComObject(property))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(property);
+                    }
+                    catch { }
+                }
+
+                // Приведение типа не создает новый RCW
+                if (propertyKeeper != null && propertyKeeper != (object)body && Marshal.IsComObject(propertyKeeper))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(propertyKeeper);
+                    }
+                    catch { }
+                }
+            }
         }
 
         public void CloseDocument()
         {
             if (Document != null)
             {
-                // Освобождаем COM-объекты
+                // Освобождаем COM-объекты в обратном порядке
                 ReleaseComObject(SpecificationSectionProperty);
                 ReleaseComObject(ViewProjectionManager);
                 ReleaseComObject(SelectionManager);

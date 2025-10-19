@@ -83,9 +83,17 @@ namespace TankManager.Core.Services
 
         private void ExtractBodies(IPart7 part, List<PartModel> details)
         {
+            IFeature7 feature = null;
+            object bodiesVariant = null;
+            
             try
             {
-                var bodiesVariant = ((IFeature7)part).ResultBodies;
+                feature = part as IFeature7;
+                if (feature == null)
+                    return;
+
+                _comManager.Track(feature);
+                bodiesVariant = feature.ResultBodies;
                 
                 if (bodiesVariant == null)
                     return;
@@ -94,28 +102,69 @@ namespace TankManager.Core.Services
                 {
                     foreach (var bodyObj in bodiesArray)
                     {
-                        if (bodyObj is IBody7 body && IsDetailBody(body))
+                        IBody7 body = null;
+                        try
                         {
-                            details.Add(new PartModel(body, _context));
+                            body = bodyObj as IBody7;
+                            if (body != null && IsDetailBody(body))
+                            {
+                                _comManager.Track(body);
+                                details.Add(new PartModel(body, _context));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning($"Error processing body: {ex.Message}");
+                            if (body != null)
+                            {
+                                _comManager.Release(body);
+                            }
                         }
                     }
+                    
+                    // Освобождаем массив
+                    if (Marshal.IsComObject(bodiesArray))
+                    {
+                        Marshal.ReleaseComObject(bodiesArray);
+                    }
                 }
-                else if (bodiesVariant is IBody7 singleBody && IsDetailBody(singleBody))
+                else if (bodiesVariant is IBody7 singleBody)
                 {
-                    details.Add(new PartModel(singleBody, _context));
+                    if (IsDetailBody(singleBody))
+                    {
+                        _comManager.Track(singleBody);
+                        details.Add(new PartModel(singleBody, _context));
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"Error extracting bodies: {ex.Message}");
             }
+            finally
+            {
+                if (bodiesVariant != null && Marshal.IsComObject(bodiesVariant))
+                {
+                    Marshal.ReleaseComObject(bodiesVariant);
+                }
+                
+                if (feature != null && feature != part)
+                {
+                    _comManager.Release(feature);
+                }
+            }
         }
 
         private bool IsDetailBody(IBody7 body)
         {
+            IPropertyKeeper propertyKeeper = null;
             try
             {
-                ((IPropertyKeeper)body).GetPropertyValue(
+                propertyKeeper = body as IPropertyKeeper;
+                if (propertyKeeper == null)
+                    return false;
+
+                propertyKeeper.GetPropertyValue(
                     (_Property)_context.SpecificationSectionProperty,
                     out object val,
                     false,
@@ -126,6 +175,13 @@ namespace TankManager.Core.Services
             catch
             {
                 return false;
+            }
+            finally
+            {
+                if (propertyKeeper != null && propertyKeeper != (object)body)
+                {
+                    Marshal.ReleaseComObject(propertyKeeper);
+                }
             }
         }
 
@@ -144,6 +200,8 @@ namespace TankManager.Core.Services
                 foreach (IPart7 subPart in partsCollection)
                 {
                     if (subPart == null) continue;
+
+                    _comManager.Track(subPart);
 
                     try
                     {
@@ -167,6 +225,10 @@ namespace TankManager.Core.Services
                     catch (COMException ex)
                     {
                         _logger.LogWarning($"COM error accessing part: {ex.Message}");
+                    }
+                    finally
+                    {
+                        _comManager.Release(subPart);
                     }
                 }
             }
@@ -251,11 +313,26 @@ namespace TankManager.Core.Services
 
         private void UpdateCamera((double x, double y, double z) center, double scale)
         {
-            var matrix = _context.ViewProjectionManager.Matrix3D;
-            matrix[KompasConstants.CameraMatrixXIndex] = center.x;
-            matrix[KompasConstants.CameraMatrixYIndex] = center.y;
-            matrix[KompasConstants.CameraMatrixZIndex] = center.z;
-            _context.ViewProjectionManager.SetMatrix3D(matrix, scale);
+            object matrixObj = null;
+            try
+            {
+                matrixObj = _context.ViewProjectionManager.Matrix3D;
+                
+                if (matrixObj is Array matrix)
+                {
+                    matrix.SetValue(center.x, KompasConstants.CameraMatrixXIndex);
+                    matrix.SetValue(center.y, KompasConstants.CameraMatrixYIndex);
+                    matrix.SetValue(center.z, KompasConstants.CameraMatrixZIndex);
+                    _context.ViewProjectionManager.SetMatrix3D(matrix, scale);
+                }
+            }
+            finally
+            {
+                if (matrixObj != null && Marshal.IsComObject(matrixObj))
+                {
+                    Marshal.ReleaseComObject(matrixObj);
+                }
+            }
         }
 
         public void Dispose()

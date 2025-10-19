@@ -20,7 +20,7 @@ namespace TankManager.Core.ViewModels
         private readonly IKompasService _kompasService;
 
         public ObservableCollection<PartModel> Details { get; }
-        public ObservableCollection<string> Materials { get; }
+        public ObservableCollection<MaterialInfo> Materials { get; }
         public ObservableCollection<PartModel> StandardParts { get; }
         public ICollectionView DetailsView { get; }
         public ICollectionView StandardPartsView { get; }
@@ -36,7 +36,7 @@ namespace TankManager.Core.ViewModels
             _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
 
             Details = new ObservableCollection<PartModel>();
-            Materials = new ObservableCollection<string>();
+            Materials = new ObservableCollection<MaterialInfo>();
             StandardParts = new ObservableCollection<PartModel>();
 
             // Используем обычный CollectionViewSource с пользовательской группировкой
@@ -69,8 +69,8 @@ namespace TankManager.Core.ViewModels
             }
         }
 
-        private string _selectedMaterial;
-        public string SelectedMaterial
+        private MaterialInfo _selectedMaterial;
+        public MaterialInfo SelectedMaterial
         {
             get { return _selectedMaterial; }
             set
@@ -197,12 +197,12 @@ namespace TankManager.Core.ViewModels
 
         private bool FilterDetails(object obj)
         {
-            if (string.IsNullOrEmpty(_selectedMaterial))
+            if (_selectedMaterial == null)
                 return true;
 
             if (obj is PartModel part)
             {
-                return part.Material == _selectedMaterial;
+                return part.Material == _selectedMaterial.Name;
             }
 
             return false;
@@ -221,6 +221,64 @@ namespace TankManager.Core.ViewModels
                 .Sum(g => g.Sum(p => p.Mass));
 
             UniquePartsCount = groupedParts.Count;
+
+            // Обновляем веса материалов
+            UpdateMaterialWeights();
+        }
+
+        private void UpdateMaterialWeights()
+        {
+            // Получаем все детали (с учетом фильтра, если нужно показать только отфильтрованные)
+            var allParts = Details.ToList();
+
+            // Группируем по материалу и считаем суммарный вес
+            var materialWeights = allParts
+                .Where(p => !string.IsNullOrEmpty(p.Material))
+                .GroupBy(p => p.Material)
+                .Select(g => new
+                {
+                    Material = g.Key,
+                    TotalMass = g.Sum(p => p.Mass)
+                })
+                .OrderBy(m => m.Material)
+                .ToList();
+
+            // Обновляем коллекцию Materials
+            foreach (var material in Materials)
+            {
+                var weight = materialWeights.FirstOrDefault(m => m.Material == material.Name);
+                if (weight != null)
+                {
+                    material.TotalMass = weight.TotalMass;
+                }
+                else
+                {
+                    material.TotalMass = 0;
+                }
+            }
+
+            // Добавляем новые материалы, если появились
+            foreach (var weight in materialWeights)
+            {
+                if (!Materials.Any(m => m.Name == weight.Material))
+                {
+                    Materials.Add(new MaterialInfo
+                    {
+                        Name = weight.Material,
+                        TotalMass = weight.TotalMass
+                    });
+                }
+            }
+
+            // Удаляем материалы, которых больше нет
+            var materialsToRemove = Materials
+                .Where(m => !materialWeights.Any(w => w.Material == m.Name))
+                .ToList();
+
+            foreach (var material in materialsToRemove)
+            {
+                Materials.Remove(material);
+            }
         }
 
         private void ShowDetailInKompas()
@@ -261,11 +319,6 @@ namespace TankManager.Core.ViewModels
                 {
                     Details.Add(part);
 
-                    if (!string.IsNullOrEmpty(part.Material) && !Materials.Contains(part.Material))
-                    {
-                        Materials.Add(part.Material);
-                    }
-
                     if (part.DetailType == "Покупная деталь")
                     {
                         StandardParts.Add(part);
@@ -296,6 +349,27 @@ namespace TankManager.Core.ViewModels
 
         public void Dispose()
         {
+            // Освобождаем все PartModel
+            foreach (var detail in Details)
+            {
+                if (detail is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+            
+            foreach (var part in StandardParts)
+            {
+                if (part is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+
+            Details.Clear();
+            StandardParts.Clear();
+            Materials.Clear();
+
             _kompasService?.Dispose();
         }
 
