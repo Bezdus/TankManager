@@ -3,38 +3,54 @@ using KompasAPI7;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using TankManager.Core.Constants;
 using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
 {
     public class KompasService : IKompasService
     {
-        private const double DefaultScale = 1.0;
-        private const double ScaleFactor = 100.0;
-        private const string DetailsSection = "Детали";
-        
         private readonly KompasContext _context;
+        private readonly ILogger _logger;
+        private readonly ComObjectManager _comManager;
 
-        public KompasService()
+        public KompasService() : this(new KompasContext(), new FileLogger())
         {
-            _context = new KompasContext();
         }
 
-        public KompasService(KompasContext context)
+        public KompasService(KompasContext context, ILogger logger)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _comManager = new ComObjectManager(_logger);
         }
 
         public List<PartModel> LoadDocument(string filePath)
         {
+            _logger.LogInfo($"Loading document: {filePath}");
+            
             EnsureKompasInitialized();
 
             var result = new List<PartModel>();
-            _context.LoadDocument(filePath);
-
-            if (_context.IsDocumentLoaded)
+            
+            try
             {
-                ExtractParts(_context.TopPart, result);
+                _context.LoadDocument(filePath);
+
+                if (_context.IsDocumentLoaded)
+                {
+                    ExtractParts(_context.TopPart, result);
+                    _logger.LogInfo($"Successfully loaded {result.Count} parts");
+                }
+                else
+                {
+                    _logger.LogWarning("Document loaded but TopPart is null");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to load document: {filePath}", ex);
+                throw;
             }
 
             return result;
@@ -44,56 +60,73 @@ namespace TankManager.Core.Services
         {
             if (!_context.IsInitialized)
             {
-                throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
+                const string errorMessage = "Не удалось подключиться к KOMPAS-3D";
+                _logger.LogError(errorMessage);
+                throw new InvalidOperationException(errorMessage);
             }
         }
 
         private void ExtractParts(IPart7 part, List<PartModel> details)
         {
-            ExtractBodies(part, details);
-            ExtractSubParts(part, details);
+            if (part == null) return;
+
+            try
+            {
+                ExtractBodies(part, details);
+                ExtractSubParts(part, details);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error extracting parts from {part.Name}", ex);
+            }
         }
 
         private void ExtractBodies(IPart7 part, List<PartModel> details)
         {
-            var bodiesVariant = ((IFeature7)part).ResultBodies;
-            
-            if (bodiesVariant == null)
-                return;
-
-            // Обработка VARIANT: может быть одиночный объект (VT_DISPATCH) или массив (VT_ARRAY | VT_DISPATCH)
-            if (bodiesVariant is Array bodiesArray)
+            try
             {
-                // Случай VT_ARRAY | VT_DISPATCH - несколько объектов
-                foreach (var bodyObj in bodiesArray)
+                var bodiesVariant = ((IFeature7)part).ResultBodies;
+                
+                if (bodiesVariant == null)
+                    return;
+
+                if (bodiesVariant is Array bodiesArray)
                 {
-                    if (bodyObj is IBody7 body && IsDetailBody(body))
+                    foreach (var bodyObj in bodiesArray)
                     {
-                        details.Add(new PartModel(body, _context));
+                        if (bodyObj is IBody7 body && IsDetailBody(body))
+                        {
+                            details.Add(new PartModel(body, _context));
+                        }
                     }
                 }
-            }
-            else if (bodiesVariant is IBody7 singleBody)
-            {
-                // Случай VT_DISPATCH - один объект
-                if (IsDetailBody(singleBody))
+                else if (bodiesVariant is IBody7 singleBody && IsDetailBody(singleBody))
                 {
                     details.Add(new PartModel(singleBody, _context));
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error extracting bodies: {ex.Message}");
             }
         }
 
         private bool IsDetailBody(IBody7 body)
         {
-            object val;
-            bool fromSource;
-            ((IPropertyKeeper)body).GetPropertyValue(
-                (_Property)_context.SpecificationSectionProperty, 
-                out val, 
-                false, 
-                out fromSource);
-            
-            return (val as string) == DetailsSection;
+            try
+            {
+                ((IPropertyKeeper)body).GetPropertyValue(
+                    (_Property)_context.SpecificationSectionProperty,
+                    out object val,
+                    false,
+                    out _);
+
+                return (val as string) == KompasConstants.DetailsSectionName;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void ExtractSubParts(IPart7 part, List<PartModel> details)
@@ -103,14 +136,14 @@ namespace TankManager.Core.Services
             try
             {
                 partsCollection = part.Parts;
-                
+                _comManager.Track(partsCollection);
+
                 if (partsCollection == null)
                     return;
 
                 foreach (IPart7 subPart in partsCollection)
                 {
-                    if (subPart == null)
-                        continue;
+                    if (subPart == null) continue;
 
                     try
                     {
@@ -120,33 +153,51 @@ namespace TankManager.Core.Services
                         }
                         else
                         {
-                            if(_context.GetDetailType(subPart) == "Прочие изделия")
+                            var detailType = _context.GetDetailType(subPart);
+                            if (detailType == KompasConstants.OtherPartsType)
                             {
                                 details.Add(new PartModel(subPart, _context));
-                                continue;
-                            }    
-                            ExtractParts(subPart, details);
+                            }
+                            else
+                            {
+                                ExtractParts(subPart, details);
+                            }
                         }
                     }
-                    catch (COMException)
+                    catch (COMException ex)
                     {
-                        // Игнорируем ошибки доступа к недоступным частям
+                        _logger.LogWarning($"COM error accessing part: {ex.Message}");
                     }
                 }
             }
             finally
             {
-                ReleaseComObject(partsCollection);
+                if (partsCollection != null)
+                {
+                    _comManager.Release(partsCollection);
+                }
             }
         }
 
         public void ShowDetailInKompas(PartModel detail)
         {
             if (!IsValidDetailForDisplay(detail))
+            {
+                _logger.LogWarning("Invalid detail for display");
                 return;
+            }
 
-            SelectDetail(detail);
-            FocusOnDetail(detail);
+            try
+            {
+                SelectDetail(detail);
+                FocusOnDetail(detail);
+                _logger.LogInfo($"Focused on detail: {detail.Name}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to show detail in Kompas: {detail.Name}", ex);
+                throw;
+            }
         }
 
         private bool IsValidDetailForDisplay(PartModel detail)
@@ -165,14 +216,12 @@ namespace TankManager.Core.Services
             var gabarit = GetPartGabarit(detail.Part);
             var center = CalculateCenter(gabarit);
             var scale = CalculateScale(gabarit);
-
             UpdateCamera(center, scale);
         }
 
         private struct Gabarit
         {
-            public double X1, Y1, Z1;
-            public double X2, Y2, Z2;
+            public double X1, Y1, Z1, X2, Y2, Z2;
         }
 
         private Gabarit GetPartGabarit(IPart7 part)
@@ -184,48 +233,35 @@ namespace TankManager.Core.Services
             return gabarit;
         }
 
-        private (double x, double y, double z) CalculateCenter(Gabarit gabarit)
+        private (double x, double y, double z) CalculateCenter(Gabarit g)
         {
-            return (
-                x: (gabarit.X1 + gabarit.X2) / 2.0,
-                y: (gabarit.Y1 + gabarit.Y2) / 2.0,
-                z: (gabarit.Z1 + gabarit.Z2) / 2.0
-            );
+            return ((g.X1 + g.X2) / 2.0, (g.Y1 + g.Y2) / 2.0, (g.Z1 + g.Z2) / 2.0);
         }
 
-        private double CalculateScale(Gabarit gabarit)
+        private double CalculateScale(Gabarit g)
         {
-            double width = Math.Abs(gabarit.X2 - gabarit.X1);
-            double height = Math.Abs(gabarit.Y2 - gabarit.Y1);
-            double depth = Math.Abs(gabarit.Z2 - gabarit.Z1);
+            double maxSize = Math.Max(
+                Math.Max(Math.Abs(g.X2 - g.X1), Math.Abs(g.Y2 - g.Y1)),
+                Math.Abs(g.Z2 - g.Z1));
 
-            double maxSize = Math.Max(Math.Max(width, height), depth);
-
-            return maxSize > 0 ? ScaleFactor / maxSize : DefaultScale;
+            return maxSize > 0 
+                ? KompasConstants.ScaleFactor / maxSize 
+                : KompasConstants.DefaultScale;
         }
 
         private void UpdateCamera((double x, double y, double z) center, double scale)
         {
             var matrix = _context.ViewProjectionManager.Matrix3D;
-
-            // Элементы [12], [13], [14] отвечают за позицию камеры в матрице 4x4
-            matrix[12] = center.x;
-            matrix[13] = center.y;
-            matrix[14] = center.z;
-
+            matrix[KompasConstants.CameraMatrixXIndex] = center.x;
+            matrix[KompasConstants.CameraMatrixYIndex] = center.y;
+            matrix[KompasConstants.CameraMatrixZIndex] = center.z;
             _context.ViewProjectionManager.SetMatrix3D(matrix, scale);
-        }
-
-        private void ReleaseComObject(object obj)
-        {
-            if (obj != null && Marshal.IsComObject(obj))
-            {
-                Marshal.ReleaseComObject(obj);
-            }
         }
 
         public void Dispose()
         {
+            _logger.LogInfo("Disposing KompasService");
+            _comManager?.Dispose();
             _context?.Dispose();
         }
     }

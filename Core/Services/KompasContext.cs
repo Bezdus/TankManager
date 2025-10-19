@@ -1,4 +1,5 @@
-﻿using KompasAPI7;
+﻿using Kompas6API5;
+using KompasAPI7;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,6 +54,17 @@ namespace TankManager.Core.Services
             bool fromSource;
             IPropertyKeeper propertyKeeper = (IPropertyKeeper)part;
             propertyKeeper.GetPropertyValue((KompasAPI7._Property)SpecificationSectionProperty, out markingObj, false, out fromSource);
+            return markingObj?.ToString();
+        }
+
+        public string GetBodyPropertyValue(IBody7 body, string propertyName )
+        {
+            IProperty Property = PropertyManager.GetProperty(Document, propertyName);
+
+            object markingObj;
+            bool fromSource;
+            IPropertyKeeper propertyKeeper = (IPropertyKeeper)body;
+            propertyKeeper.GetPropertyValue((KompasAPI7._Property)Property, out markingObj, false, out fromSource);
             return markingObj?.ToString();
         }
 

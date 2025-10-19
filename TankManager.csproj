@@ -99,8 +99,13 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Core\Constants\KompasConstants.cs" />
     <Compile Include="Core\Models\PartModel.cs" />
+    <Compile Include="Core\Models\Result.cs" />
+    <Compile Include="Core\Services\ComObjectManager.cs" />
+    <Compile Include="Core\Services\FileLogger.cs" />
     <Compile Include="Core\Services\IKompasService.cs" />
+    <Compile Include="Core\Services\ILogger.cs" />
     <Compile Include="Core\Services\KompasContext.cs" />
     <Compile Include="Core\Services\KompasService.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />

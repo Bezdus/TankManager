@@ -11,19 +11,23 @@
         DragEnter="FileDropZone_DragEnter">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <local:GroupCountToVisibilityConverter x:Key="GroupCountToVisibilityConverter"/>
+
         <Style TargetType="GroupBox">
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Padding" Value="5"/>
         </Style>
         <Style TargetType="TextBlock" x:Key="PropertyLabel">
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,5,10,5"/>
+            <Setter Property="Margin" Value="0,3,8,3"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style TargetType="TextBlock" x:Key="PropertyValue">
-            <Setter Property="Margin" Value="0,5,0,5"/>
+            <Setter Property="Margin" Value="0,3,0,3"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
     </Window.Resources>
     <Grid>
@@ -31,7 +35,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" MinWidth="250"/>
@@ -40,7 +44,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="1.5*" MinWidth="200"/>
             </Grid.ColumnDefinitions>
-            
+
             <!-- ЛЕВАЯ ПАНЕЛЬ: Список всех деталей -->
             <GroupBox Grid.Column="0" Header="Все детали">
                 <Grid>
@@ -48,15 +52,15 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    
+
                     <!-- Индикатор активного фильтра -->
                     <Border Grid.Row="0" 
-                            Background="#FFFFEB3B" 
-                            BorderBrush="#FFD32F2F" 
+                            Background="#FFFEF9C3" 
+                            BorderBrush="#FFD97706" 
                             BorderThickness="1" 
-                            CornerRadius="3" 
-                            Padding="8,5"
-                            Margin="5">
+                            CornerRadius="2" 
+                            Padding="5,3"
+                            Margin="3">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -73,24 +77,27 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <TextBlock Text="📋 Фильтр: " FontWeight="Bold" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding SelectedMaterial}" VerticalAlignment="Center" FontStyle="Italic"/>
+                                <TextBlock Text="Фильтр: " FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding SelectedMaterial}" FontSize="11" VerticalAlignment="Center"/>
                             </StackPanel>
                             <Button Grid.Column="1" 
                                     Content="✕" 
-                                    FontWeight="Bold"
+                                    FontSize="10"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Cursor="Hand"
                                     ToolTip="Сбросить фильтр"
                                     Click="ClearFilter_Click"
-                                    Padding="5,0"/>
+                                    Padding="3,0"/>
                         </Grid>
                     </Border>
-                    
+
                     <ListBox Grid.Row="1" x:Name="Список_всех_деталей" 
                              ItemsSource="{Binding DetailsView}"
-                             SelectedItem="{Binding SelectedDetail}">
+                             SelectedItem="{Binding SelectedDetail}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             Background="#FFF8F9FA"
+                             BorderThickness="0">
                         <ListBox.GroupStyle>
                             <GroupStyle>
                                 <GroupStyle.ContainerStyle>
@@ -98,15 +105,61 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                    <Expander IsExpanded="True" BorderBrush="LightGray" BorderThickness="0,0,0,1" Margin="0,2">
-                                                        <Expander.Header>
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Margin="0,0,10,0"/>
-                                                                <TextBlock Text="{Binding ItemCount, StringFormat='({0} шт.)'}" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                        </Expander.Header>
-                                                        <ItemsPresenter Margin="20,5,0,5"/>
-                                                    </Expander>
+                                                    <Grid>
+                                                        <!-- Для групп с количеством > 1: показываем Expander -->
+                                                        <Border Background="White"
+                                                                BorderBrush="#FFD0D0D0" 
+                                                                BorderThickness="1" 
+                                                                CornerRadius="3"
+                                                                Margin="4,3"
+                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
+                                                            <Expander IsExpanded="True">
+                                                                <Expander.Header>
+                                                                    <Grid Background="#FFE8F4FD" Margin="-5,-3">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="Auto"/>
+                                                                        </Grid.ColumnDefinitions>
+
+                                                                        <TextBlock Grid.Column="0"
+                                                                                   Text="{Binding Name}" 
+                                                                                   FontSize="11"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="#FF0D47A1"
+                                                                                   TextWrapping="Wrap"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Margin="5,3,8,3"/>
+
+                                                                        <Border Grid.Column="1" 
+                                                                                Background="#FF1976D2" 
+                                                                                CornerRadius="8" 
+                                                                                Padding="5,2"
+                                                                                Margin="0,2,5,2"
+                                                                                VerticalAlignment="Center">
+                                                                            <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" 
+                                                                                       FontSize="10" 
+                                                                                       FontWeight="SemiBold"
+                                                                                       Foreground="White"/>
+                                                                        </Border>
+                                                                    </Grid>
+                                                                </Expander.Header>
+                                                                <Border Background="White" Padding="8,4,4,6">
+                                                                    <ItemsPresenter/>
+                                                                </Border>
+                                                            </Expander>
+                                                        </Border>
+
+                                                        <!-- Для групп с количеством = 1: без Expander -->
+                                                        <Border Margin="4,3"
+                                                                Background="White"
+                                                                BorderBrush="#FFD0D0D0" 
+                                                                BorderThickness="1"
+                                                                CornerRadius="3"
+                                                                Padding="4"
+                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}">
+                                                            <ItemsPresenter/>
+                                                        </Border>
+                                                    </Grid>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
@@ -116,33 +169,100 @@
                         </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Margin="0,2">
-                                    <TextBlock Text="{Binding Marking}" FontSize="11"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="Тип: " FontSize="9" Foreground="Gray"/>
-                                        <TextBlock Text="{Binding DetailType}" FontSize="9" Foreground="Gray" Margin="0,0,10,0"/>
-                                        <TextBlock Text="Материал: " FontSize="9" Foreground="Gray"/>
-                                        <TextBlock Text="{Binding Material}" FontSize="9" Foreground="Gray"/>
-                                    </StackPanel>
-                                </StackPanel>
+                                <Border Background="White" 
+                                        BorderBrush="#FFE0E0E0" 
+                                        BorderThickness="1" 
+                                        CornerRadius="3" 
+                                        Padding="6,5"
+                                        Margin="2,3">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#FFEEF6FF"/>
+                                                    <Setter Property="BorderBrush" Value="#FF1976D2"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Название и обозначение в одну строку -->
+                                        <TextBlock Grid.Row="0" FontSize="11" FontWeight="SemiBold" Foreground="#FF0D47A1" TextWrapping="Wrap">
+                                            <Run Text="{Binding Name}"/>
+                                            <Run Text=" • " Foreground="#FF9E9E9E"/>
+                                            <Run Text="{Binding Marking}" FontWeight="Normal" Foreground="#FF616161"/>
+                                        </TextBlock>
+
+                                        <!-- Разделитель -->
+                                        <Border Grid.Row="1" Height="1" Background="#FFE8E8E8" Margin="0,3"/>
+
+                                        <!-- Теги компактно -->
+                                        <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                            <Border Background="#FFF0F0F0" 
+                                                    BorderBrush="#FFCCCCCC"
+                                                    BorderThickness="1"
+                                                    CornerRadius="2" 
+                                                    Padding="4,2" 
+                                                    Margin="0,0,4,0">
+                                                <TextBlock Text="{Binding DetailType}" 
+                                                           FontSize="9" 
+                                                           Foreground="#FF616161"/>
+                                            </Border>
+                                            <Border Background="#FFF0F0F0" 
+                                                    BorderBrush="#FFCCCCCC"
+                                                    BorderThickness="1"
+                                                    CornerRadius="2" 
+                                                    Padding="4,2">
+                                                <TextBlock Text="{Binding Material}" 
+                                                           FontSize="9" 
+                                                           Foreground="#FF616161"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                     </ListBox>
                 </Grid>
             </GroupBox>
-            
+
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
-            
+
             <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Свойства выбранной детали -->
             <GroupBox Grid.Column="2" Header="Свойства детали">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel DataContext="{Binding SelectedDetail}">
+                    <StackPanel DataContext="{Binding CurrentlySelectedPart}">
                         <TextBlock Text="Выберите деталь из списка" 
                                    HorizontalAlignment="Center" 
                                    VerticalAlignment="Center"
                                    Foreground="Gray"
                                    FontStyle="Italic"
-                                   Margin="20"
+                                   FontSize="11"
+                                   Margin="15"
                                    Visibility="{Binding Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -155,8 +275,8 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                        
-                        <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="5" Padding="10" Margin="5">
+
+                        <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="3" Padding="8" Margin="3">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="Visibility" Value="Visible"/>
@@ -170,10 +290,10 @@
                             <StackPanel>
                                 <!-- Превью файла -->
                                 <Image Source="{Binding FilePreview}" 
-                                       Width="150" Height="150" 
+                                       Width="120" Height="120" 
                                        Stretch="Uniform"
                                        StretchDirection="DownOnly"
-                                       Margin="0,0,0,10"
+                                       Margin="0,0,0,8"
                                        HorizontalAlignment="Center">
                                     <Image.Style>
                                         <Style TargetType="Image">
@@ -185,7 +305,7 @@
                                         </Style>
                                     </Image.Style>
                                 </Image>
-                                
+
                                 <!-- Свойства детали -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -202,27 +322,67 @@
 
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Название:" Style="{StaticResource PropertyLabel}"/>
                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" Style="{StaticResource PropertyValue}"/>
-                                    
+
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Обозначение:" Style="{StaticResource PropertyLabel}"/>
                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Marking}" Style="{StaticResource PropertyValue}"/>
-                                    
+
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Тип детали:" Style="{StaticResource PropertyLabel}"/>
                                     <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DetailType}" Style="{StaticResource PropertyValue}"/>
 
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Материал:" Style="{StaticResource PropertyLabel}"/>
                                     <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Material}" Style="{StaticResource PropertyValue}"/>
-                                    
+
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
                                     <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Mass}" Style="{StaticResource PropertyValue}"/>
                                 </Grid>
+
+                                <!-- Кнопка для показа детали в КОМПАС -->
+                                <Button Content="Показать в КОМПАС" 
+                                        Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        Margin="0,12,0,0"
+                                        Padding="12,6"
+                                        FontSize="12"
+                                        FontWeight="SemiBold"
+                                        Background="#FF2196F3"
+                                        Foreground="White"
+                                        BorderThickness="0"
+                                        Cursor="Hand">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}"
+                                                                CornerRadius="4"
+                                                                Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#FF1976D2"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter Property="Background" Value="#FF0D47A1"/>
+                                                </Trigger>
+                                                <Trigger Property="IsEnabled" Value="False">
+                                                    <Setter Property="Background" Value="#FFB0BEC5"/>
+                                                    <Setter Property="Cursor" Value="Arrow"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
             </GroupBox>
-            
+
             <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
-            
+
             <!-- ПРАВАЯ ПАНЕЛЬ: Материалы и стандартные детали -->
             <Grid Grid.Column="4">
                 <Grid.RowDefinitions>
@@ -240,12 +400,12 @@
                              PreviewMouseDown="MaterialsListBox_PreviewMouseDown">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding}" Margin="2" Cursor="Hand"/>
+                                <TextBlock Text="{Binding}" Margin="1" Cursor="Hand" FontSize="11"/>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding" Value="5,3"/>
+                                <Setter Property="Padding" Value="4,2"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter Property="Background" Value="#FFE3F2FD"/>
@@ -253,46 +413,190 @@
                                     <Trigger Property="IsSelected" Value="True">
                                         <Setter Property="Background" Value="#FF2196F3"/>
                                         <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
                         </ListBox.ItemContainerStyle>
                     </ListBox>
                 </GroupBox>
-                
+
                 <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
-                
+
                 <!-- Стандартные детали -->
                 <GroupBox Grid.Row="2" Header="Стандартные изделия">
-                    <ListBox ItemsSource="{Binding StandardParts}">
+                    <ListBox ItemsSource="{Binding StandardPartsView}"
+                             SelectedItem="{Binding SelectedStandardPart}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             Background="#FFF8F9FA"
+                             BorderThickness="0">
+                        <ListBox.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <Grid>
+                                                        <!-- Для групп с количеством > 1: показываем Expander -->
+                                                        <Border Background="White"
+                                                                BorderBrush="#FFD0D0D0" 
+                                                                BorderThickness="1" 
+                                                                CornerRadius="3"
+                                                                Margin="4,3"
+                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
+                                                            <Expander IsExpanded="True">
+                                                                <Expander.Header>
+                                                                    <Grid Background="#FFE8F4FD" Margin="-5,-3">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="Auto"/>
+                                                                        </Grid.ColumnDefinitions>
+
+                                                                        <TextBlock Grid.Column="0"
+                                                                                   Text="{Binding Name}" 
+                                                                                   FontSize="11"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="#FF0D47A1"
+                                                                                   TextWrapping="Wrap"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Margin="5,3,8,3"/>
+
+                                                                        <Border Grid.Column="1" 
+                                                                                Background="#FF1976D2" 
+                                                                                CornerRadius="8" 
+                                                                                Padding="5,2"
+                                                                                Margin="0,2,5,2"
+                                                                                VerticalAlignment="Center">
+                                                                            <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" 
+                                                                                       FontSize="10" 
+                                                                                       FontWeight="SemiBold"
+                                                                                       Foreground="White"/>
+                                                                        </Border>
+                                                                    </Grid>
+                                                                </Expander.Header>
+                                                                <Border Background="White" Padding="8,4,4,6">
+                                                                    <ItemsPresenter/>
+                                                                </Border>
+                                                            </Expander>
+                                                        </Border>
+
+                                                        <!-- Для групп с количеством = 1: без Expander -->
+                                                        <Border Margin="4,3"
+                                                                Background="White"
+                                                                BorderBrush="#FFD0D0D0" 
+                                                                BorderThickness="1"
+                                                                CornerRadius="3"
+                                                                Padding="4"
+                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}">
+                                                            <ItemsPresenter/>
+                                                        </Border>
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Margin="0,2">
-                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="11"/>
-                                    <TextBlock Text="{Binding Marking}" FontSize="10" Foreground="Gray"/>
-                                </StackPanel>
+                                <Border Background="White" 
+                                        BorderBrush="#FFE0E0E0" 
+                                        BorderThickness="1" 
+                                        CornerRadius="3" 
+                                        Padding="6,5"
+                                        Margin="2,3">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#FFEEF6FF"/>
+                                                    <Setter Property="BorderBrush" Value="#FF1976D2"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Название и обозначение в одну строку -->
+                                        <TextBlock Grid.Row="0" FontSize="11" FontWeight="SemiBold" Foreground="#FF0D47A1" TextWrapping="Wrap">
+                                            <Run Text="{Binding Name}"/>
+                                            <Run Text=" • " Foreground="#FF9E9E9E"/>
+                                            <Run Text="{Binding Marking}" FontWeight="Normal" Foreground="#FF616161"/>
+                                        </TextBlock>
+
+                                        <!-- Разделитель -->
+                                        <Border Grid.Row="1" Height="1" Background="#FFE8E8E8" Margin="0,3"/>
+
+                                        <!-- Теги компактно -->
+                                        <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                            <Border Background="#FFF0F0F0" 
+                                                    BorderBrush="#FFCCCCCC"
+                                                    BorderThickness="1"
+                                                    CornerRadius="2" 
+                                                    Padding="4,2" 
+                                                    Margin="0,0,4,0">
+                                                <TextBlock Text="{Binding DetailType}" 
+                                                           FontSize="9" 
+                                                           Foreground="#FF616161"/>
+                                            </Border>
+                                            <Border Background="#FFF0F0F0" 
+                                                    BorderBrush="#FFCCCCCC"
+                                                    BorderThickness="1"
+                                                    CornerRadius="2" 
+                                                    Padding="4,2">
+                                                <TextBlock Text="{Binding Material}" 
+                                                           FontSize="9" 
+                                                           Foreground="#FF616161"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                     </ListBox>
                 </GroupBox>
             </Grid>
-            
+
             <!-- Индикатор загрузки -->
             <Grid Grid.ColumnSpan="5" 
                   Background="#80000000" 
                   Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ProgressBar IsIndeterminate="True" Width="200" Height="20"/>
-                    <TextBlock Text="Загрузка..." Foreground="White" Margin="0,10,0,0"/>
+                    <TextBlock Text="Загрузка..." Foreground="White" Margin="0,10,0,0" FontSize="11"/>
                 </StackPanel>
             </Grid>
         </Grid>
-        
+
         <!-- Статус-бар -->
         <StatusBar Grid.Row="1">
             <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}"/>
+                <TextBlock Text="{Binding StatusMessage}" FontSize="11"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>

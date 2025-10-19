@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using TankManager.Core.ViewModels;
 
@@ -117,6 +119,33 @@ namespace TankManager
         {
             base.OnClosed(e);
             _viewModel?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Конвертер для проверки количества элементов в группе
+    /// </summary>
+    public class GroupCountToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int count)
+            {
+                // Если параметр "Multiple" - показываем только для count > 1
+                // Если параметр "Single" - показываем только для count == 1
+                string mode = parameter as string;
+                
+                if (mode == "Multiple")
+                    return count > 1 ? Visibility.Visible : Visibility.Collapsed;
+                else if (mode == "Single")
+                    return count == 1 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            return Visibility.Visible;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 }
