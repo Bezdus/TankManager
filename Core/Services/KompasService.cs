@@ -122,7 +122,6 @@ namespace TankManager.Core.Services
                         }
                     }
                     
-                    // Освобождаем массив
                     if (Marshal.IsComObject(bodiesArray))
                     {
                         Marshal.ReleaseComObject(bodiesArray);
@@ -243,16 +242,23 @@ namespace TankManager.Core.Services
 
         public void ShowDetailInKompas(PartModel detail)
         {
-            if (!IsValidDetailForDisplay(detail))
+            if (detail == null || !_context.IsDocumentLoaded)
             {
-                _logger.LogWarning("Invalid detail for display");
+                _logger.LogWarning("Invalid detail or document not loaded");
                 return;
             }
 
             try
             {
-                SelectDetail(detail);
-                FocusOnDetail(detail);
+                IPart7 targetPart = FindPartByModel(detail, _context.TopPart);
+                if (targetPart == null)
+                {
+                    _logger.LogWarning($"Could not find part: {detail.Name}");
+                    return;
+                }
+
+                SelectDetail(targetPart);
+                FocusOnDetail(targetPart);
                 _logger.LogInfo($"Focused on detail: {detail.Name}");
             }
             catch (Exception ex)
@@ -262,20 +268,76 @@ namespace TankManager.Core.Services
             }
         }
 
-        private bool IsValidDetailForDisplay(PartModel detail)
+        private IPart7 FindPartByModel(PartModel model, IPart7 currentPart)
         {
-            return _context.IsDocumentLoaded && detail?.Part != null;
+            if (currentPart == null)
+                return null;
+
+            try
+            {
+                if (MatchesPart(model, currentPart))
+                    return currentPart;
+
+                if (model.IsBodyBased)
+                {
+                    IFeature7 feature = currentPart as IFeature7;
+                    if (feature != null)
+                    {
+                        object bodiesVariant = feature.ResultBodies;
+                        if (bodiesVariant is Array bodiesArray)
+                        {
+                            foreach (var bodyObj in bodiesArray)
+                            {
+                                IBody7 body = bodyObj as IBody7;
+                                if (body != null && MatchesBody(model, body))
+                                {
+                                    return currentPart;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                IParts7 partsCollection = currentPart.Parts;
+                if (partsCollection != null)
+                {
+                    foreach (IPart7 subPart in partsCollection)
+                    {
+                        IPart7 found = FindPartByModel(model, subPart);
+                        if (found != null)
+                            return found;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error finding part: {ex.Message}");
+            }
+
+            return null;
         }
 
-        private void SelectDetail(PartModel detail)
+        private bool MatchesPart(PartModel model, IPart7 part)
+        {
+            return part.Name == model.Name && 
+                   part.Marking == model.Marking &&
+                   (part.FileName == model.FilePath || string.IsNullOrEmpty(model.FilePath));
+        }
+
+        private bool MatchesBody(PartModel model, IBody7 body)
+        {
+            return body.Name == model.Name && body.Marking == model.Marking;
+        }
+
+        private void SelectDetail(IPart7 part)
         {
             _context.SelectionManager.UnselectAll();
-            _context.SelectionManager.Select(detail.Part);
+            _context.SelectionManager.Select(part);
         }
 
-        private void FocusOnDetail(PartModel detail)
+        private void FocusOnDetail(IPart7 part)
         {
-            var gabarit = GetPartGabarit(detail.Part);
+            var gabarit = GetPartGabarit(part);
             var center = CalculateCenter(gabarit);
             var scale = CalculateScale(gabarit);
             UpdateCamera(center, scale);

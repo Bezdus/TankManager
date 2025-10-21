@@ -349,23 +349,6 @@ namespace TankManager.Core.ViewModels
 
         public void Dispose()
         {
-            // Освобождаем все PartModel
-            foreach (var detail in Details)
-            {
-                if (detail is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-            
-            foreach (var part in StandardParts)
-            {
-                if (part is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-
             Details.Clear();
             StandardParts.Clear();
             Materials.Clear();

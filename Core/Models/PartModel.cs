@@ -23,21 +23,9 @@ namespace TankManager.Core.Models
         private BitmapSource _filePreview;
         private bool _disposed;
 
-        // Храним только ссылки для ShowInKompas, но с осторожностью
-        private IBody7 _body;
-        private IPart7 _part;
-
-        public IBody7 Body 
-        { 
-            get { return _body; }
-            private set { _body = value; }
-        }
-
-        public IPart7 Part 
-        { 
-            get { return _part; }
-            private set { _part = value; }
-        }
+        // Храним идентификатор вместо прямой ссылки на COM-объект
+        public string PartId { get; private set; }
+        public bool IsBodyBased { get; private set; }
 
         public string Name
         {
@@ -135,7 +123,8 @@ namespace TankManager.Core.Models
             if (part == null) throw new ArgumentNullException(nameof(part));
             if (context == null) throw new ArgumentNullException(nameof(context));
 
-            Part = part;
+            IsBodyBased = false;
+            PartId = $"{part.Name}|{part.Marking}|{part.FileName}";
             Name = part.Name ?? string.Empty;
             Marking = part.Marking ?? string.Empty;
             DetailType = DetermineDetailType(context.GetDetailType(part));
@@ -150,8 +139,7 @@ namespace TankManager.Core.Models
             if (body == null) throw new ArgumentNullException(nameof(body));
             if (context == null) throw new ArgumentNullException(nameof(context));
 
-            Body = body;
-            
+            IsBodyBased = true;
             IPart7 parentPart = null;
             try
             {
@@ -164,13 +152,15 @@ namespace TankManager.Core.Models
                     context.GetBodyPropertyValue(body, KompasConstants.MassPropertyName));
                 
                 parentPart = body.Parent as IPart7;
-                FilePath = parentPart?.FileName ?? string.Empty;
+                string parentFileName = parentPart?.FileName ?? string.Empty;
+                string parentName = parentPart?.Name ?? string.Empty;
+                PartId = $"{parentName}|{Name}|{Marking}";
+                FilePath = parentFileName;
                 FilePreview = TryLoadPreview(FilePath);
             }
             finally
             {
-                // Не освобождаем parentPart, т.к. это приведение типа, а не новый объект
-                // IPart7 должен управляться через KompasContext
+                // Не освобождаем parentPart, т.к. это приведение типа
             }
         }
 
@@ -266,37 +256,10 @@ namespace TankManager.Core.Models
 
             if (disposing)
             {
-                // Освобождаем управляемые ресурсы
                 _filePreview = null;
             }
 
-            // Освобождаем COM-объекты
-            if (_body != null && Marshal.IsComObject(_body))
-            {
-                try
-                {
-                    Marshal.ReleaseComObject(_body);
-                }
-                catch { }
-                _body = null;
-            }
-
-            if (_part != null && Marshal.IsComObject(_part))
-            {
-                try
-                {
-                    Marshal.ReleaseComObject(_part);
-                }
-                catch { }
-                _part = null;
-            }
-
             _disposed = true;
-        }
-
-        ~PartModel()
-        {
-            Dispose(false);
         }
     }
 }
