@@ -2,6 +2,7 @@
 using KompasAPI7;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using TankManager.Core.Constants;
 using TankManager.Core.Models;
@@ -98,6 +99,7 @@ namespace TankManager.Core.Services
                 if (bodiesVariant == null)
                     return;
 
+                int bodyIndex = 0; // Счётчик для тел
                 if (bodiesVariant is Array bodiesArray)
                 {
                     foreach (var bodyObj in bodiesArray)
@@ -109,7 +111,15 @@ namespace TankManager.Core.Services
                             if (body != null && IsDetailBody(body))
                             {
                                 _comManager.Track(body);
-                                details.Add(new PartModel(body, _context));
+                        
+                                // Подсчитываем, сколько таких же тел уже добавлено
+                                int instanceIndex = details.Count(d => 
+                                    d.Name == body.Name && 
+                                    d.Marking == body.Marking && 
+                                    d.IsBodyBased);
+                        
+                                details.Add(new PartModel(body, _context, instanceIndex));
+                                bodyIndex++;
                             }
                         }
                         catch (Exception ex)
@@ -121,7 +131,7 @@ namespace TankManager.Core.Services
                             }
                         }
                     }
-                    
+            
                     if (Marshal.IsComObject(bodiesArray))
                     {
                         Marshal.ReleaseComObject(bodiesArray);
@@ -132,7 +142,13 @@ namespace TankManager.Core.Services
                     if (IsDetailBody(singleBody))
                     {
                         _comManager.Track(singleBody);
-                        details.Add(new PartModel(singleBody, _context));
+                
+                        int instanceIndex = details.Count(d => 
+                            d.Name == singleBody.Name && 
+                            d.Marking == singleBody.Marking && 
+                            d.IsBodyBased);
+                
+                        details.Add(new PartModel(singleBody, _context, instanceIndex));
                     }
                 }
             }
@@ -206,14 +222,27 @@ namespace TankManager.Core.Services
                     {
                         if (subPart.Detail == true)
                         {
-                            details.Add(new PartModel(subPart, _context));
+                            // Подсчитываем, сколько таких же деталей уже добавлено
+                            int instanceIndex = details.Count(d => 
+                                d.Name == subPart.Name && 
+                                d.Marking == subPart.Marking && 
+                                !d.IsBodyBased &&
+                                d.FilePath == subPart.FileName);
+                    
+                            details.Add(new PartModel(subPart, _context, instanceIndex));
                         }
                         else
                         {
                             var detailType = _context.GetDetailType(subPart);
                             if (detailType == KompasConstants.OtherPartsType)
                             {
-                                details.Add(new PartModel(subPart, _context));
+                                int instanceIndex = details.Count(d => 
+                                    d.Name == subPart.Name && 
+                                    d.Marking == subPart.Marking && 
+                                    !d.IsBodyBased &&
+                                    d.FilePath == subPart.FileName);
+                        
+                                details.Add(new PartModel(subPart, _context, instanceIndex));
                             }
                             else
                             {
@@ -273,10 +302,17 @@ namespace TankManager.Core.Services
             if (currentPart == null)
                 return null;
 
+            // Счётчик найденных совпадений
+            int foundIndex = 0;
+
             try
             {
                 if (MatchesPart(model, currentPart))
-                    return currentPart;
+                {
+                    if (foundIndex == model.InstanceIndex)
+                        return currentPart;
+                    foundIndex++;
+                }
 
                 if (model.IsBodyBased)
                 {
@@ -291,7 +327,9 @@ namespace TankManager.Core.Services
                                 IBody7 body = bodyObj as IBody7;
                                 if (body != null && MatchesBody(model, body))
                                 {
-                                    return currentPart;
+                                    if (foundIndex == model.InstanceIndex)
+                                        return currentPart;
+                                    foundIndex++;
                                 }
                             }
                         }
@@ -303,7 +341,7 @@ namespace TankManager.Core.Services
                 {
                     foreach (IPart7 subPart in partsCollection)
                     {
-                        IPart7 found = FindPartByModel(model, subPart);
+                        IPart7 found = FindPartByModelRecursive(model, subPart, ref foundIndex);
                         if (found != null)
                             return found;
                     }
@@ -338,7 +376,7 @@ namespace TankManager.Core.Services
         private void FocusOnDetail(IPart7 part)
         {
             var gabarit = GetPartGabarit(part);
-            var center = CalculateCenter(gabarit);
+            var center = CalculateGlobalCenter(part);
             var scale = CalculateScale(gabarit);
             UpdateCamera(center, scale);
         }
@@ -348,16 +386,63 @@ namespace TankManager.Core.Services
             public double X1, Y1, Z1, X2, Y2, Z2;
         }
 
+        private (double x, double y, double z) CalculateGlobalCenter(IPart7 detail)
+        {
+            // Начинаем с локального центра детали
+            var gabarit = GetPartGabarit(detail);
+            var localCenter = CalculateLocalCenter(gabarit);
+
+            double globalX = localCenter.x;
+            double globalY = localCenter.y;
+            double globalZ = localCenter.z;
+
+            // Начинаем с родителя детали (пропускаем саму деталь)
+            IPart7 currentPart = TryGetParent(detail);
+
+            // Проходим по всей иерархии родителей до TopPart
+            while (currentPart != null)
+            {
+                IPart7 parentPart = TryGetParent(currentPart);
+
+                // Если есть родитель, применяем смещение текущей части относительно родителя
+                if (parentPart != null)
+                {
+                    double originX, originY, originZ;
+                    currentPart.Placement.GetOrigin(out originX, out originY, out originZ);
+
+                    globalX += originX;
+                    globalY += originY;
+                    globalZ += originZ;
+                }
+
+                currentPart = parentPart;
+            }
+
+            return (globalX, globalY, globalZ);
+        }
+
+        private IPart7 TryGetParent(IPart7 part)
+        {
+            try
+            {
+                return part.Parent as IPart7;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private Gabarit GetPartGabarit(IPart7 part)
         {
             var gabarit = new Gabarit();
-            part.GetGabarit(false, false,
+            part.GetGabarit(true, true,
                 out gabarit.X1, out gabarit.Y1, out gabarit.Z1,
                 out gabarit.X2, out gabarit.Y2, out gabarit.Z2);
             return gabarit;
         }
 
-        private (double x, double y, double z) CalculateCenter(Gabarit g)
+        private (double x, double y, double z) CalculateLocalCenter(Gabarit g)
         {
             return ((g.X1 + g.X2) / 2.0, (g.Y1 + g.Y2) / 2.0, (g.Z1 + g.Z2) / 2.0);
         }
@@ -395,6 +480,62 @@ namespace TankManager.Core.Services
                     Marshal.ReleaseComObject(matrixObj);
                 }
             }
+        }
+
+        // Вспомогательный рекурсивный метод с передачей счётчика
+        private IPart7 FindPartByModelRecursive(PartModel model, IPart7 currentPart, ref int foundIndex)
+        {
+            if (currentPart == null)
+                return null;
+
+            try
+            {
+                if (MatchesPart(model, currentPart))
+                {
+                    if (foundIndex == model.InstanceIndex)
+                        return currentPart;
+                    foundIndex++;
+                }
+
+                if (model.IsBodyBased)
+                {
+                    IFeature7 feature = currentPart as IFeature7;
+                    if (feature != null)
+                    {
+                        object bodiesVariant = feature.ResultBodies;
+                        if (bodiesVariant is Array bodiesArray)
+                        {
+                            foreach (var bodyObj in bodiesArray)
+                            {
+                                IBody7 body = bodyObj as IBody7;
+                                if (body != null && MatchesBody(model, body))
+                                {
+                                    if (foundIndex == model.InstanceIndex)
+                                        return currentPart;
+                                    foundIndex++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                IParts7 partsCollection = currentPart.Parts;
+                if (partsCollection != null)
+                {
+                    foreach (IPart7 subPart in partsCollection)
+                    {
+                        IPart7 found = FindPartByModelRecursive(model, subPart, ref foundIndex);
+                        if (found != null)
+                            return found;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error finding part: {ex.Message}");
+            }
+
+            return null;
         }
 
         public void Dispose()

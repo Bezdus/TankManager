@@ -23,9 +23,10 @@ namespace TankManager.Core.Models
         private BitmapSource _filePreview;
         private bool _disposed;
 
-        // Храним идентификатор вместо прямой ссылки на COM-объект
+        // Уникальные идентификаторы для поиска в KOMPAS
         public string PartId { get; private set; }
         public bool IsBodyBased { get; private set; }
+        public int InstanceIndex { get; private set; } // Индекс экземпляра в сборке
 
         public string Name
         {
@@ -118,13 +119,14 @@ namespace TankManager.Core.Models
             }
         }
 
-        public PartModel(IPart7 part, KompasContext context)
+        public PartModel(IPart7 part, KompasContext context, int instanceIndex = 0)
         {
             if (part == null) throw new ArgumentNullException(nameof(part));
             if (context == null) throw new ArgumentNullException(nameof(context));
 
             IsBodyBased = false;
-            PartId = $"{part.Name}|{part.Marking}|{part.FileName}";
+            InstanceIndex = instanceIndex;
+            PartId = $"{part.Name}|{part.Marking}|{part.FileName}|{instanceIndex}";
             Name = part.Name ?? string.Empty;
             Marking = part.Marking ?? string.Empty;
             DetailType = DetermineDetailType(context.GetDetailType(part));
@@ -134,12 +136,13 @@ namespace TankManager.Core.Models
             FilePreview = TryLoadPreview(FilePath);
         }
 
-        public PartModel(IBody7 body, KompasContext context)
+        public PartModel(IBody7 body, KompasContext context, int instanceIndex = 0)
         {
             if (body == null) throw new ArgumentNullException(nameof(body));
             if (context == null) throw new ArgumentNullException(nameof(context));
 
             IsBodyBased = true;
+            InstanceIndex = instanceIndex;
             IPart7 parentPart = null;
             try
             {
@@ -154,7 +157,7 @@ namespace TankManager.Core.Models
                 parentPart = body.Parent as IPart7;
                 string parentFileName = parentPart?.FileName ?? string.Empty;
                 string parentName = parentPart?.Name ?? string.Empty;
-                PartId = $"{parentName}|{Name}|{Marking}";
+                PartId = $"{parentName}|{Name}|{Marking}|{instanceIndex}";
                 FilePath = parentFileName;
                 FilePreview = TryLoadPreview(FilePath);
             }

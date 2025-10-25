@@ -16,8 +16,8 @@ namespace TankManager
     /// </summary>
     public partial class MainWindow : Window
     {
-        private MainViewModel _viewModel;
-        
+        private readonly MainViewModel _viewModel;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -29,40 +29,40 @@ namespace TankManager
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                var kompasFile = files?.FirstOrDefault();
-
-                if (IsKompasFile(kompasFile))
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
                 {
-                    var fileName = Path.GetFullPath(kompasFile);
-                    _viewModel.FilePath = fileName;
+                    string filePath = files[0];
+                    if (IsKompasFile(filePath))
+                    {
+                        _viewModel.FilePath = filePath;
+                    }
+                    else
+                    {
+                        MessageBox.Show("Пожалуйста, выберите файл КОМПАС (.a3d)", 
+                            "Неверный формат файла", 
+                            MessageBoxButton.OK, 
+                            MessageBoxImage.Warning);
+                    }
                 }
             }
-            e.Handled = true;
         }
 
         private void FileDropZone_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                e.Effects = IsKompasFile(files?.FirstOrDefault()) 
-                    ? DragDropEffects.Copy 
-                    : DragDropEffects.None;
+                e.Effects = DragDropEffects.Copy;
             }
             else
             {
                 e.Effects = DragDropEffects.None;
             }
-            e.Handled = true;
         }
 
         private void ClearFilter_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is MainViewModel viewModel)
-            {
-                viewModel.SelectedMaterial = null;
-            }
+            _viewModel.SelectedMaterial = null;
         }
 
         private void MaterialsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -149,6 +149,51 @@ namespace TankManager
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Статический класс команд для работы с Expander
+    /// </summary>
+    public static class ExpanderCommands
+    {
+        public static ICommand ToggleCommand { get; } = new RelayCommand<System.Windows.Controls.Expander>(expander =>
+        {
+            if (expander != null)
+            {
+                expander.IsExpanded = !expander.IsExpanded;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Простая реализация RelayCommand для использования в коде
+    /// </summary>
+    public class RelayCommand<T> : ICommand
+    {
+        private readonly Action<T> _execute;
+        private readonly Func<T, bool> _canExecute;
+
+        public RelayCommand(Action<T> execute, Func<T, bool> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return _canExecute == null || _canExecute((T)parameter);
+        }
+
+        public void Execute(object parameter)
+        {
+            _execute((T)parameter);
         }
     }
 }

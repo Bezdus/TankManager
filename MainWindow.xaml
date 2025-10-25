@@ -53,14 +53,14 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Индикатор активного фильтра -->
+                    <!-- Индикатор активного фильтра (без изменений) -->
                     <Border Grid.Row="0" 
-                            Background="#FFFEF9C3" 
-                            BorderBrush="#FFD97706" 
-                            BorderThickness="1" 
-                            CornerRadius="2" 
-                            Padding="5,3"
-                            Margin="3">
+                Background="#FFFEF9C3" 
+                BorderBrush="#FFD97706" 
+                BorderThickness="1" 
+                CornerRadius="2" 
+                Padding="5,3"
+                Margin="3">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -81,23 +81,23 @@
                                 <TextBlock Text="{Binding SelectedMaterial.Name}" FontSize="11" VerticalAlignment="Center"/>
                             </StackPanel>
                             <Button Grid.Column="1" 
-                                    Content="✕" 
-                                    FontSize="10"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Cursor="Hand"
-                                    ToolTip="Сбросить фильтр"
-                                    Click="ClearFilter_Click"
-                                    Padding="3,0"/>
+                        Content="✕" 
+                        FontSize="10"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        ToolTip="Сбросить фильтр"
+                        Click="ClearFilter_Click"
+                        Padding="3,0"/>
                         </Grid>
                     </Border>
 
                     <ListBox Grid.Row="1" x:Name="Список_всех_деталей" 
-                             ItemsSource="{Binding DetailsView}"
-                             SelectedItem="{Binding SelectedDetail}"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             Background="#FFF8F9FA"
-                             BorderThickness="0">
+                 ItemsSource="{Binding DetailsView}"
+                 SelectedItem="{Binding SelectedDetail}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 Background="Transparent"
+                 BorderThickness="0">
                         <ListBox.GroupStyle>
                             <GroupStyle>
                                 <GroupStyle.ContainerStyle>
@@ -105,61 +105,59 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                    <Grid>
-                                                        <!-- Для групп с количеством > 1: показываем Expander -->
-                                                        <Border Background="White"
-                                                                BorderBrush="#FFD0D0D0" 
-                                                                BorderThickness="1" 
-                                                                CornerRadius="3"
-                                                                Margin="4,3"
-                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
-                                                            <Expander IsExpanded="True">
+                                                    <Border Background="White"
+                                                BorderBrush="#FFD0D0D0" 
+                                                BorderThickness="1" 
+                                                CornerRadius="3"
+                                                Margin="4,3"
+                                                Padding="8,6">
+                                                        <Grid>
+                                                            <!-- Для групп с количеством > 1: Expander -->
+                                                            <Expander IsExpanded="False"
+                                                          Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
                                                                 <Expander.Header>
-                                                                    <Grid Background="#FFE8F4FD" Margin="-5,-3">
+                                                                    <Grid Background="Transparent">
                                                                         <Grid.ColumnDefinitions>
                                                                             <ColumnDefinition Width="*"/>
                                                                             <ColumnDefinition Width="Auto"/>
                                                                         </Grid.ColumnDefinitions>
 
-                                                                        <TextBlock Grid.Column="0"
-                                                                                   Text="{Binding Name}" 
-                                                                                   FontSize="11"
-                                                                                   FontWeight="SemiBold"
-                                                                                   Foreground="#FF0D47A1"
-                                                                                   TextWrapping="Wrap"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Margin="5,3,8,3"/>
+                                                                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                                            <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#FF0D47A1" TextWrapping="Wrap">
+                                                                    <Run Text="{Binding Items[0].Name, Mode=OneWay}"/>
+                                                                    <Run Text=" "/>
+                                                                    <Run Text="{Binding Items[0].Marking, Mode=OneWay}" Foreground="#FF616161"/>
+                                                                            </TextBlock>
+                                                                            <TextBlock FontSize="10" 
+                                                                           Foreground="#FF616161"
+                                                                           Margin="0,2,0,0">
+                                                                    <Run Text="{Binding Items[0].DetailType}"/>
+                                                                    <Run Text=" • "/>
+                                                                    <Run Text="{Binding Items[0].Material}"/>
+                                                                            </TextBlock>
+                                                                        </StackPanel>
 
                                                                         <Border Grid.Column="1" 
-                                                                                Background="#FF1976D2" 
-                                                                                CornerRadius="8" 
-                                                                                Padding="5,2"
-                                                                                Margin="0,2,5,2"
-                                                                                VerticalAlignment="Center">
+                                                                    Background="#FF1976D2" 
+                                                                    CornerRadius="8" 
+                                                                    Padding="5,2"
+                                                                    VerticalAlignment="Center">
                                                                             <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" 
-                                                                                       FontSize="10" 
-                                                                                       FontWeight="SemiBold"
-                                                                                       Foreground="White"/>
+                                                                           FontSize="10" 
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="White"/>
                                                                         </Border>
                                                                     </Grid>
                                                                 </Expander.Header>
-                                                                <Border Background="White" Padding="8,4,4,6" Margin="20,0,0,0">
-                                                                    <ItemsPresenter/>  
+                                                                <Border Padding="0,4,0,0" Margin="12,0,0,0">
+                                                                    <ItemsPresenter/>
                                                                 </Border>
                                                             </Expander>
-                                                        </Border>
 
-                                                        <!-- Для групп с количеством = 1: без Expander -->
-                                                        <Border Margin="4,3"
-                                                                Background="White"
-                                                                BorderBrush="#FFD0D0D0" 
-                                                                BorderThickness="1"
-                                                                CornerRadius="3"
-                                                                Padding="4"
-                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}">
-                                                            <ItemsPresenter/>
-                                                        </Border>
-                                                    </Grid>
+                                                            <!-- Для групп с количеством = 1: только содержимое, БЕЗ Expander -->
+                                                            <ItemsPresenter Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}"/>
+                                                        </Grid>
+                                                    </Border>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
@@ -169,79 +167,37 @@
                         </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="White" 
-                                        BorderBrush="#FFE0E0E0" 
-                                        BorderThickness="1" 
-                                        CornerRadius="3" 
-                                        Padding="6,5"
-                                        Margin="2,3">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#FFEEF6FF"/>
-                                                    <Setter Property="BorderBrush" Value="#FF1976D2"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <!-- Название и обозначение в одну строку -->
-                                        <TextBlock Grid.Row="0" FontSize="11" FontWeight="SemiBold" Foreground="#FF0D47A1" TextWrapping="Wrap">
-                                            <Run Text="{Binding Name}"/>
-                                            <Run Text=" • " Foreground="#FF9E9E9E"/>
-                                            <Run Text="{Binding Marking}" FontWeight="Normal" Foreground="#FF616161"/>
-                                        </TextBlock>
-
-                                        <!-- Разделитель -->
-                                        <Border Grid.Row="1" Height="1" Background="#FFE8E8E8" Margin="0,3"/>
-
-                                        <!-- Теги компактно -->
-                                        <StackPanel Grid.Row="2" Orientation="Horizontal">
-                                            <Border Background="#FFF0F0F0" 
-                                                    BorderBrush="#FFCCCCCC"
-                                                    BorderThickness="1"
-                                                    CornerRadius="2" 
-                                                    Padding="4,2" 
-                                                    Margin="0,0,4,0">
-                                                <TextBlock Text="{Binding DetailType}" 
-                                                           FontSize="9" 
-                                                           Foreground="#FF616161"/>
-                                            </Border>
-                                            <Border Background="#FFF0F0F0" 
-                                                    BorderBrush="#FFCCCCCC"
-                                                    BorderThickness="1"
-                                                    CornerRadius="2" 
-                                                    Padding="4,2">
-                                                <TextBlock Text="{Binding Material}" 
-                                                           FontSize="9" 
-                                                           Foreground="#FF616161"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
+                                <StackPanel Margin="1" Cursor="Hand">
+                                    <TextBlock FontSize="11" FontWeight="SemiBold">
+                            <Run Text="{Binding Name, Mode=OneWay}"/>
+                            <Run Text=" "/>
+                            <Run Text="{Binding Marking, Mode=OneWay}" Foreground="#FF616161"/>
+                                    </TextBlock>
+                                    <TextBlock FontSize="10" 
+                                   Foreground="#FF616161"
+                                   Margin="0,2,0,0">
+                            <Run Text="{Binding DetailType}"/>
+                            <Run Text=" • "/>
+                            <Run Text="{Binding Material}"/>
+                                    </TextBlock>
+                                </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Padding" Value="4,2"/>
                                 <Setter Property="Margin" Value="0"/>
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="BorderThickness" Value="0"/>
                                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Background" Value="#FFE3F2FD"/>
                                     </Trigger>
                                     <Trigger Property="IsSelected" Value="True">
-                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Background" Value="#FF2196F3"/>
+                                        <Setter Property="Foreground" Value="White"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -392,9 +348,55 @@
                 </Grid.RowDefinitions>
 
                 <!-- Материалы -->
-                <GroupBox Grid.Row="0" Header="Материалы (клик для фильтра)">
+                <GroupBox Grid.Row="0">
+                    <GroupBox.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" 
+                                       Text="Материалы (клик для фильтра)" 
+                                       VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" 
+                                    Content="{Binding MaterialSortText}"
+                                    Command="{Binding ToggleMaterialSortCommand}"
+                                    FontSize="9"
+                                    Padding="6,2"
+                                    Margin="5,0,0,0"
+                                    Background="#FFE3F2FD"
+                                    BorderBrush="#FF2196F3"
+                                    BorderThickness="1"
+                                    Cursor="Hand"
+                                    ToolTip="Переключить режим сортировки">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                            CornerRadius="3"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#FF2196F3"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </Grid>
+                    </GroupBox.Header>
                     <ListBox x:Name="MaterialsListBox"
-                             ItemsSource="{Binding Materials}"
+                             ItemsSource="{Binding MaterialsView}"
                              SelectedItem="{Binding SelectedMaterial}"
                              SelectionMode="Single"
                              PreviewMouseDown="MaterialsListBox_PreviewMouseDown">
@@ -444,17 +446,18 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                    <Grid>
-                                                        <!-- Для групп с количеством > 1: показываем Expander -->
-                                                        <Border Background="White"
-                                                                BorderBrush="#FFD0D0D0" 
-                                                                BorderThickness="1" 
-                                                                CornerRadius="3"
-                                                                Margin="4,3"
-                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
-                                                            <Expander IsExpanded="True">
+                                                    <Border Background="White"
+                                                            BorderBrush="#FFD0D0D0" 
+                                                            BorderThickness="1" 
+                                                            CornerRadius="3"
+                                                            Margin="4,3"
+                                                            Padding="8,6">
+                                                        <Grid>
+                                                            <!-- Для групп с количеством > 1: Expander -->
+                                                            <Expander IsExpanded="False"
+                                                                      Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
                                                                 <Expander.Header>
-                                                                    <Grid Background="#FFE8F4FD" Margin="-5,-3">
+                                                                    <Grid Background="Transparent">
                                                                         <Grid.ColumnDefinitions>
                                                                             <ColumnDefinition Width="*"/>
                                                                             <ColumnDefinition Width="Auto"/>
@@ -467,13 +470,12 @@
                                                                                    Foreground="#FF0D47A1"
                                                                                    TextWrapping="Wrap"
                                                                                    VerticalAlignment="Center"
-                                                                                   Margin="5,3,8,3"/>
+                                                                                   Margin="0,0,8,0"/>
 
                                                                         <Border Grid.Column="1" 
                                                                                 Background="#FF1976D2" 
                                                                                 CornerRadius="8" 
                                                                                 Padding="5,2"
-                                                                                Margin="0,2,5,2"
                                                                                 VerticalAlignment="Center">
                                                                             <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" 
                                                                                        FontSize="10" 
@@ -482,23 +484,24 @@
                                                                         </Border>
                                                                     </Grid>
                                                                 </Expander.Header>
-                                                                <Border Background="White" Padding="8,4,4,6" Margin="12,0,0,0">
+                                                                <Border Padding="0,4,0,0" Margin="12,0,0,0">
                                                                     <ItemsPresenter/>
                                                                 </Border>
                                                             </Expander>
-                                                        </Border>
 
-                                                        <!-- Для групп с количеством = 1: без Expander -->
-                                                        <Border Margin="4,3"
-                                                                Background="White"
-                                                                BorderBrush="#FFD0D0D0" 
-                                                                BorderThickness="1"
-                                                                CornerRadius="3"
-                                                                Padding="4"
-                                                                Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}">
-                                                            <ItemsPresenter/>
-                                                        </Border>
-                                                    </Grid>
+                                                            <!-- Для групп с количеством = 1: только заголовок и содержимое, БЕЗ Expander -->
+                                                            <StackPanel Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}">
+                                                                <TextBlock Text="{Binding Name}" 
+                                                                           FontSize="11"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="#FF0D47A1"
+                                                                           TextWrapping="Wrap"
+                                                                           VerticalAlignment="Center"
+                                                                           Margin="0,0,0,6"/>
+                                                                <ItemsPresenter/>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>

@@ -18,14 +18,17 @@ namespace TankManager.Core.ViewModels
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly IKompasService _kompasService;
+        private bool _isUpdatingCalculations = false;
 
         public ObservableCollection<PartModel> Details { get; }
         public ObservableCollection<MaterialInfo> Materials { get; }
         public ObservableCollection<PartModel> StandardParts { get; }
         public ICollectionView DetailsView { get; }
         public ICollectionView StandardPartsView { get; }
+        public ICollectionView MaterialsView { get; }
 
         public ICommand ShowInKompasCommand { get; }
+        public ICommand ToggleMaterialSortCommand { get; }
 
         public MainViewModel() : this(new KompasService())
         {
@@ -48,10 +51,12 @@ namespace TankManager.Core.ViewModels
             StandardPartsView.Filter = FilterDetails;
             StandardPartsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
 
-            Details.CollectionChanged += (s, e) => UpdateCalculations();
-            StandardParts.CollectionChanged += (s, e) => UpdateCalculations();
+            // Создаем представление для материалов с сортировкой
+            MaterialsView = CollectionViewSource.GetDefaultView(Materials);
+            MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
 
             ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null);
+            ToggleMaterialSortCommand = new RelayCommand(ToggleMaterialSort);
         }
 
         private string _filePath;
@@ -79,11 +84,36 @@ namespace TankManager.Core.ViewModels
                 {
                     _selectedMaterial = value;
                     OnPropertyChanged(nameof(SelectedMaterial));
-                    DetailsView?.Refresh();
-                    StandardPartsView?.Refresh();
+                    
+                    // Обновляем фильтры
+                    DetailsView.Refresh();
+                    StandardPartsView.Refresh();
+                    
+                    // Теперь безопасно вызываем расчеты
                     UpdateCalculations();
                 }
             }
+        }
+
+        private bool _sortMaterialsByMass = false;
+        public bool SortMaterialsByMass
+        {
+            get { return _sortMaterialsByMass; }
+            set
+            {
+                if (_sortMaterialsByMass != value)
+                {
+                    _sortMaterialsByMass = value;
+                    OnPropertyChanged(nameof(SortMaterialsByMass));
+                    OnPropertyChanged(nameof(MaterialSortText));
+                    ApplyMaterialSort();
+                }
+            }
+        }
+
+        public string MaterialSortText
+        {
+            get { return _sortMaterialsByMass ? "Сортировка: по массе ↓" : "Сортировка: по названию ↑"; }
         }
 
         private PartModel _currentlySelectedPart;
@@ -208,48 +238,72 @@ namespace TankManager.Core.ViewModels
             return false;
         }
 
+        private void ToggleMaterialSort()
+        {
+            SortMaterialsByMass = !SortMaterialsByMass;
+        }
+
+        private void ApplyMaterialSort()
+        {
+            MaterialsView.SortDescriptions.Clear();
+            
+            if (_sortMaterialsByMass)
+            {
+                MaterialsView.SortDescriptions.Add(new SortDescription("TotalMass", ListSortDirection.Descending));
+            }
+            else
+            {
+                MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
+            }
+        }
+
         private void UpdateCalculations()
         {
-            var visibleParts = DetailsView.Cast<PartModel>().ToList();
+            if (_isUpdatingCalculations)
+                return;
 
-            var groupedParts = visibleParts
-                .GroupBy(p => new { p.Name, p.Marking })
-                .Where(g => g.Count() > 1)
-                .ToList();
+            _isUpdatingCalculations = true;
 
-            TotalMassMultipleParts = groupedParts
-                .Sum(g => g.Sum(p => p.Mass));
+            try
+            {
+                // Кэшируем отфильтрованные детали один раз
+                var visibleParts = DetailsView.Cast<PartModel>().ToList();
 
-            UniquePartsCount = groupedParts.Count;
+                // Группировка и подсчет массы за один проход
+                var groupedParts = visibleParts
+                    .GroupBy(p => new { p.Name, p.Marking })
+                    .Where(g => g.Count() > 1)
+                    .ToList();
 
-            // Обновляем веса материалов
-            UpdateMaterialWeights();
+                TotalMassMultipleParts = groupedParts.Sum(g => g.Sum(p => p.Mass));
+                UniquePartsCount = groupedParts.Count;
+
+                // Обновляем веса материалов
+                UpdateMaterialWeights();
+            }
+            finally
+            {
+                _isUpdatingCalculations = false;
+            }
         }
 
         private void UpdateMaterialWeights()
         {
-            // Получаем все детали (с учетом фильтра, если нужно показать только отфильтрованные)
-            var allParts = Details.ToList();
-
-            // Группируем по материалу и считаем суммарный вес
-            var materialWeights = allParts
+            // Группируем по материалу и считаем суммарный вес за один проход
+            var materialWeights = Details
                 .Where(p => !string.IsNullOrEmpty(p.Material))
                 .GroupBy(p => p.Material)
-                .Select(g => new
-                {
-                    Material = g.Key,
-                    TotalMass = g.Sum(p => p.Mass)
-                })
-                .OrderBy(m => m.Material)
-                .ToList();
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Mass));
 
-            // Обновляем коллекцию Materials
+            // Создаем HashSet для быстрой проверки существования
+            var existingMaterials = new HashSet<string>(Materials.Select(m => m.Name));
+
+            // Обновляем существующие материалы
             foreach (var material in Materials)
             {
-                var weight = materialWeights.FirstOrDefault(m => m.Material == material.Name);
-                if (weight != null)
+                if (materialWeights.TryGetValue(material.Name, out double totalMass))
                 {
-                    material.TotalMass = weight.TotalMass;
+                    material.TotalMass = totalMass;
                 }
                 else
                 {
@@ -257,27 +311,26 @@ namespace TankManager.Core.ViewModels
                 }
             }
 
-            // Добавляем новые материалы, если появились
-            foreach (var weight in materialWeights)
+            // Добавляем новые материалы
+            foreach (var kvp in materialWeights)
             {
-                if (!Materials.Any(m => m.Name == weight.Material))
+                if (!existingMaterials.Contains(kvp.Key))
                 {
                     Materials.Add(new MaterialInfo
                     {
-                        Name = weight.Material,
-                        TotalMass = weight.TotalMass
+                        Name = kvp.Key,
+                        TotalMass = kvp.Value
                     });
                 }
             }
 
-            // Удаляем материалы, которых больше нет
-            var materialsToRemove = Materials
-                .Where(m => !materialWeights.Any(w => w.Material == m.Name))
-                .ToList();
-
-            foreach (var material in materialsToRemove)
+            // Удаляем материалы без веса (в обратном порядке)
+            for (int i = Materials.Count - 1; i >= 0; i--)
             {
-                Materials.Remove(material);
+                if (!materialWeights.ContainsKey(Materials[i].Name))
+                {
+                    Materials.RemoveAt(i);
+                }
             }
         }
 
@@ -315,6 +368,7 @@ namespace TankManager.Core.ViewModels
 
                 var parts = await Task.Run(() => _kompasService.LoadDocument(filePath));
 
+                // Просто добавляем элементы
                 foreach (var part in parts)
                 {
                     Details.Add(part);
@@ -325,6 +379,7 @@ namespace TankManager.Core.ViewModels
                     }
                 }
 
+                // Обновляем расчеты один раз после загрузки всех данных
                 UpdateCalculations();
                 StatusMessage = $"Загружено деталей: {Details.Count}";
             }
@@ -363,10 +418,8 @@ namespace TankManager.Core.ViewModels
             {
                 if (item is PartModel part)
                 {
-                    // Группируем по комбинации имени и маркировки
-                    var name = part.Name ?? string.Empty;
-                    var marking = part.Marking ?? string.Empty;
-                    return $"{name} | {marking}";
+                    // Группируем по имени и маркировке (без GetHashCode)
+                    return $"{part.Name}|{part.Marking}";
                 }
                 return string.Empty;
             }
