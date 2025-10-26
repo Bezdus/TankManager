@@ -38,7 +38,7 @@ namespace TankManager.Core.Services
             }
         }
 
-        private (double x, double y, double z) CalculateGlobalCenter(IPart7 detail)
+        public (double x, double y, double z) CalculateGlobalCenter(IPart7 detail)
         {
             var gabarit = GetPartGabarit(detail);
             var localCenter = CalculateLocalCenter(gabarit);
@@ -67,7 +67,7 @@ namespace TankManager.Core.Services
             return (globalX, globalY, globalZ);
         }
 
-        private Gabarit GetPartGabarit(IPart7 part)
+        public Gabarit GetPartGabarit(IPart7 part)
         {
             var gabarit = new Gabarit();
             part.GetGabarit(true, true,

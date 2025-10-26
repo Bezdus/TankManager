@@ -1,4 +1,6 @@
-﻿using KompasAPI7;
+﻿using Kompas6API5;
+using Kompas6Constants3D;
+using KompasAPI7;
 using System;
 using System.Collections.Generic;
 using TankManager.Core.Models;
@@ -13,6 +15,7 @@ namespace TankManager.Core.Services
         private readonly PartExtractor _partExtractor;
         private readonly PartFinder _partFinder;
         private readonly KompasCameraController _cameraController;
+        private readonly PartIntersectionDetector _intersectionDetector;
 
         public KompasService() : this(new KompasContext(), new FileLogger())
         {
@@ -26,6 +29,7 @@ namespace TankManager.Core.Services
             _partExtractor = new PartExtractor(_context, _logger, _comManager);
             _partFinder = new PartFinder(_logger);
             _cameraController = new KompasCameraController(_context, _logger);
+            _intersectionDetector = new PartIntersectionDetector(_context, _logger, _cameraController);
         }
 
         public List<PartModel> LoadDocument(string filePath)
@@ -78,7 +82,9 @@ namespace TankManager.Core.Services
 
                 SelectDetail(targetPart);
                 _cameraController.FocusOnPart(targetPart);
-                _logger.LogInfo($"Focused on detail: {detail.Name}");
+                
+                // Находим пересекающиеся объекты (если необходимо)
+                //List<IPart7> intersectingObjects = _intersectionDetector.FindIntersectingObjects(targetPart);
             }
             catch (Exception ex)
             {

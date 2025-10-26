@@ -112,6 +112,7 @@
     <Compile Include="Core\Services\KompasService.cs" />
     <Compile Include="Core\Services\PartExtractor.cs" />
     <Compile Include="Core\Services\PartFinder.cs" />
+    <Compile Include="Core\Services\PartIntersectionDetector.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />
     <Compile Include="Core\ViewModels\MainViewModel.cs" />
     <Compile Include="MainWindow.xaml.cs">

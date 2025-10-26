@@ -74,6 +74,27 @@ namespace TankManager.Core.ViewModels
             }
         }
 
+        private string _searchText;
+        public string SearchText
+        {
+            get { return _searchText; }
+            set
+            {
+                if (_searchText != value)
+                {
+                    _searchText = value;
+                    OnPropertyChanged(nameof(SearchText));
+                    
+                    // Обновляем фильтры при изменении текста поиска
+                    DetailsView.Refresh();
+                    StandardPartsView.Refresh();
+                    
+                    // Обновляем расчеты с учетом нового фильтра
+                    UpdateCalculations();
+                }
+            }
+        }
+
         private MaterialInfo _selectedMaterial;
         public MaterialInfo SelectedMaterial
         {
@@ -227,12 +248,30 @@ namespace TankManager.Core.ViewModels
 
         private bool FilterDetails(object obj)
         {
-            if (_selectedMaterial == null)
-                return true;
-
             if (obj is PartModel part)
             {
-                return part.Material == _selectedMaterial.Name;
+                // Фильтр по материалу
+                if (_selectedMaterial != null && part.Material != _selectedMaterial.Name)
+                {
+                    return false;
+                }
+
+                // Фильтр по тексту поиска
+                if (!string.IsNullOrWhiteSpace(_searchText))
+                {
+                    string searchLower = _searchText.ToLower();
+                    
+                    // Поиск по названию и маркировке
+                    bool nameMatch = part.Name != null && part.Name.ToLower().Contains(searchLower);
+                    bool markingMatch = part.Marking != null && part.Marking.ToLower().Contains(searchLower);
+                    
+                    if (!nameMatch && !markingMatch)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
             }
 
             return false;
