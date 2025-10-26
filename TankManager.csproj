@@ -107,8 +107,11 @@
     <Compile Include="Core\Services\FileLogger.cs" />
     <Compile Include="Core\Services\IKompasService.cs" />
     <Compile Include="Core\Services\ILogger.cs" />
+    <Compile Include="Core\Services\KompasCameraController.cs" />
     <Compile Include="Core\Services\KompasContext.cs" />
     <Compile Include="Core\Services\KompasService.cs" />
+    <Compile Include="Core\Services\PartExtractor.cs" />
+    <Compile Include="Core\Services\PartFinder.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />
     <Compile Include="Core\ViewModels\MainViewModel.cs" />
     <Compile Include="MainWindow.xaml.cs">
