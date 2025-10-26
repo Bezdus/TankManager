@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -29,6 +30,8 @@ namespace TankManager.Core.ViewModels
 
         public ICommand ShowInKompasCommand { get; }
         public ICommand ToggleMaterialSortCommand { get; }
+        public ICommand LoadFromActiveDocumentCommand { get; }
+        public ICommand ClearSearchCommand { get; }
 
         public MainViewModel() : this(new KompasService())
         {
@@ -36,27 +39,46 @@ namespace TankManager.Core.ViewModels
 
         public MainViewModel(IKompasService kompasService)
         {
-            _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
+            Debug.WriteLine("MainViewModel.Constructor: Начало");
+            
+            try
+            {
+                _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
+                Debug.WriteLine("MainViewModel.Constructor: KompasService установлен");
 
-            Details = new ObservableCollection<PartModel>();
-            Materials = new ObservableCollection<MaterialInfo>();
-            StandardParts = new ObservableCollection<PartModel>();
+                Details = new ObservableCollection<PartModel>();
+                Materials = new ObservableCollection<MaterialInfo>();
+                StandardParts = new ObservableCollection<PartModel>();
+                Debug.WriteLine("MainViewModel.Constructor: Коллекции созданы");
 
-            // Используем обычный CollectionViewSource с пользовательской группировкой
-            DetailsView = CollectionViewSource.GetDefaultView(Details);
-            DetailsView.Filter = FilterDetails;
-            DetailsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
+                DetailsView = CollectionViewSource.GetDefaultView(Details);
+                DetailsView.Filter = FilterDetails;
+                DetailsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
+                Debug.WriteLine("MainViewModel.Constructor: DetailsView настроен");
 
-            StandardPartsView = CollectionViewSource.GetDefaultView(StandardParts);
-            StandardPartsView.Filter = FilterDetails;
-            StandardPartsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
+                StandardPartsView = CollectionViewSource.GetDefaultView(StandardParts);
+                StandardPartsView.Filter = FilterDetails;
+                StandardPartsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
+                Debug.WriteLine("MainViewModel.Constructor: StandardPartsView настроен");
 
-            // Создаем представление для материалов с сортировкой
-            MaterialsView = CollectionViewSource.GetDefaultView(Materials);
-            MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
+                MaterialsView = CollectionViewSource.GetDefaultView(Materials);
+                MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
+                Debug.WriteLine("MainViewModel.Constructor: MaterialsView настроен");
 
-            ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null);
-            ToggleMaterialSortCommand = new RelayCommand(ToggleMaterialSort);
+                ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null);
+                ToggleMaterialSortCommand = new RelayCommand(ToggleMaterialSort);
+                LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync());
+                ClearSearchCommand = new RelayCommand(ClearSearch);
+                Debug.WriteLine("MainViewModel.Constructor: Команды созданы");
+                
+                Debug.WriteLine("MainViewModel.Constructor: Завершено успешно");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MainViewModel.Constructor: ИСКЛЮЧЕНИЕ - {ex.Message}");
+                Debug.WriteLine($"MainViewModel.Constructor: StackTrace - {ex.StackTrace}");
+                throw;
+            }
         }
 
         private string _filePath;
@@ -432,6 +454,51 @@ namespace TankManager.Core.ViewModels
             {
                 IsLoading = false;
             }
+        }
+
+        public async Task LoadFromActiveDocumentAsync()
+        {
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Загрузка документа из КОМПАС...";
+
+                Details.Clear();
+                Materials.Clear();
+                StandardParts.Clear();
+
+                var parts = await Task.Run(() => _kompasService.LoadActiveDocument());
+
+                // Добавляем элементы
+                foreach (var part in parts)
+                {
+                    Details.Add(part);
+
+                    if (part.DetailType == "Покупная деталь")
+                    {
+                        StandardParts.Add(part);
+                    }
+                }
+
+                // Обновляем расчеты
+                UpdateCalculations();
+                StatusMessage = $"Загружено деталей из активного документа: {Details.Count}";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Ошибка: {ex.Message}";
+                MessageBox.Show($"Ошибка при загрузке из КОМПАС: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private void ClearSearch()
+        {
+            SearchText = string.Empty;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

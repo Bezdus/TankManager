@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -16,13 +15,47 @@ namespace TankManager
     /// </summary>
     public partial class MainWindow : Window
     {
-        private readonly MainViewModel _viewModel;
+        private MainViewModel _viewModel;
+        private string _pendingFilePath;
+        private bool _loadFromActiveDocument;
 
         public MainWindow()
         {
-            InitializeComponent();
             _viewModel = new MainViewModel();
             this.DataContext = _viewModel;
+            
+            InitializeComponent();
+            
+            this.Loaded += MainWindow_Loaded;
+        }
+
+        public void SetLoadingParameters(string filePath = null, bool loadFromActiveDocument = false)
+        {
+            _pendingFilePath = filePath;
+            _loadFromActiveDocument = loadFromActiveDocument;
+        }
+
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_loadFromActiveDocument)
+                {
+                    await _viewModel.LoadFromActiveDocumentAsync();
+                }
+                else if (!string.IsNullOrEmpty(_pendingFilePath))
+                {
+                    _viewModel.FilePath = _pendingFilePath;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Ошибка инициализации:\n\n{ex.Message}",
+                    "Ошибка",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private void FileDropZone_Drop(object sender, DragEventArgs e)
@@ -39,7 +72,8 @@ namespace TankManager
                     }
                     else
                     {
-                        MessageBox.Show("Пожалуйста, выберите файл КОМПАС (.a3d)", 
+                        MessageBox.Show(
+                            "Пожалуйста, выберите файл КОМПАС (.a3d)", 
                             "Неверный формат файла", 
                             MessageBoxButton.OK, 
                             MessageBoxImage.Warning);
@@ -67,21 +101,18 @@ namespace TankManager
 
         private void MaterialsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            // Получаем элемент под курсором
             var listBox = sender as ListBox;
             if (listBox == null)
                 return;
 
-            // Проверяем, кликнули ли мы на ListBoxItem
             var clickedElement = e.OriginalSource as DependencyObject;
             var listBoxItem = FindParent<ListBoxItem>(clickedElement);
 
             if (listBoxItem != null)
             {
-                // Клик по элементу списка
                 if (listBoxItem.Content is MaterialInfo clickedMaterial)
                 {
-                    // Если кликнули по уже выбранному материалу - сбрасываем фильтр
+                    // Сброс фильтра при клике по уже выбранному материалу
                     if (_viewModel.SelectedMaterial != null && 
                         clickedMaterial.Name == _viewModel.SelectedMaterial.Name)
                     {
@@ -92,12 +123,11 @@ namespace TankManager
             }
             else
             {
-                // Клик в пустую область - сбрасываем фильтр
+                // Сброс фильтра при клике в пустую область
                 _viewModel.SelectedMaterial = null;
             }
         }
 
-        // Вспомогательный метод для поиска родительского элемента определенного типа
         private T FindParent<T>(DependencyObject child) where T : DependencyObject
         {
             while (child != null)
@@ -134,8 +164,6 @@ namespace TankManager
         {
             if (value is int count)
             {
-                // Если параметр "Multiple" - показываем только для count > 1
-                // Если параметр "Single" - показываем только для count == 1
                 string mode = parameter as string;
                 
                 if (mode == "Multiple")
@@ -157,7 +185,7 @@ namespace TankManager
     /// </summary>
     public static class ExpanderCommands
     {
-        public static ICommand ToggleCommand { get; } = new RelayCommand<System.Windows.Controls.Expander>(expander =>
+        public static ICommand ToggleCommand { get; } = new RelayCommand<Expander>(expander =>
         {
             if (expander != null)
             {
@@ -167,7 +195,7 @@ namespace TankManager
     }
 
     /// <summary>
-    /// Простая реализация RelayCommand для использования в коде
+    /// Простая реализация RelayCommand
     /// </summary>
     public class RelayCommand<T> : ICommand
     {

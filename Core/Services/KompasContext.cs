@@ -37,12 +37,30 @@ namespace TankManager.Core.Services
 
             if (Document != null)
             {
-                TopPart = Document.TopPart;
-                ChooseManager = Document.ChooseManager;
-                SelectionManager = Document.SelectionManager;
-                ViewProjectionManager = ((IKompasDocument3D1)Document).ViewProjectionManager;
-                SpecificationSectionProperty = PropertyManager.GetProperty(Document, "Раздел спецификации");
+                InitializeDocumentComponents();
             }
+        }
+
+        public void LoadActiveDocument()
+        {
+            if (Application == null)
+                throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
+
+            Document = Application.ActiveDocument as IKompasDocument3D;
+
+            if (Document == null)
+                throw new InvalidOperationException("Нет активного 3D документа в KOMPAS-3D");
+
+            InitializeDocumentComponents();
+        }
+
+        private void InitializeDocumentComponents()
+        {
+            TopPart = Document.TopPart;
+            ChooseManager = Document.ChooseManager;
+            SelectionManager = Document.SelectionManager;
+            ViewProjectionManager = ((IKompasDocument3D1)Document).ViewProjectionManager;
+            SpecificationSectionProperty = PropertyManager.GetProperty(Document, "Раздел спецификации");
         }
 
         public string GetDetailType(IPart7 part)

@@ -63,6 +63,37 @@ namespace TankManager.Core.Services
             return result;
         }
 
+        public List<PartModel> LoadActiveDocument()
+        {
+            _logger.LogInfo("Loading active document from KOMPAS");
+
+            EnsureKompasInitialized();
+
+            var result = new List<PartModel>();
+
+            try
+            {
+                _context.LoadActiveDocument();
+
+                if (_context.IsDocumentLoaded)
+                {
+                    _partExtractor.ExtractParts(_context.TopPart, result);
+                    _logger.LogInfo($"Successfully loaded {result.Count} parts from active document");
+                }
+                else
+                {
+                    _logger.LogWarning("Active document loaded but TopPart is null");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to load active document", ex);
+                throw;
+            }
+
+            return result;
+        }
+
         public void ShowDetailInKompas(PartModel detail)
         {
             if (detail == null || !_context.IsDocumentLoaded)

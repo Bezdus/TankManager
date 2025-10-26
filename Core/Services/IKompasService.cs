@@ -10,6 +10,7 @@ namespace TankManager.Core.Services
     public interface IKompasService : IDisposable
     {
         List<PartModel> LoadDocument(string filePath);
+        List<PartModel> LoadActiveDocument();
         void ShowDetailInKompas(PartModel detail);
     }
 }
