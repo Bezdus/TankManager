@@ -91,9 +91,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Views\LoadingScreen.xaml.cs">
-      <DependentUpon>LoadingScreen.xaml</DependentUpon>
-    </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -102,9 +99,12 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Converters\NullToVisibilityConverter.cs" />
     <Compile Include="Core\Constants\KompasConstants.cs" />
     <Compile Include="Core\Models\MaterialInfo.cs" />
     <Compile Include="Core\Models\PartModel.cs" />
+    <Compile Include="Core\Models\PartModelFromStorage.cs" />
+    <Compile Include="Core\Models\Product.cs" />
     <Compile Include="Core\Models\Result.cs" />
     <Compile Include="Core\Services\ComObjectManager.cs" />
     <Compile Include="Core\Services\FileLogger.cs" />
@@ -116,16 +116,13 @@
     <Compile Include="Core\Services\PartExtractor.cs" />
     <Compile Include="Core\Services\PartFinder.cs" />
     <Compile Include="Core\Services\PartIntersectionDetector.cs" />
+    <Compile Include="Core\Services\ProductStorageService.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />
     <Compile Include="Core\ViewModels\MainViewModel.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="Views\LoadingScreen.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -172,12 +169,18 @@
     <PackageReference Include="MvvmLightLibs">
       <Version>5.4.1.1</Version>
     </PackageReference>
+    <PackageReference Include="System.Runtime.Serialization.Json">
+      <Version>4.3.0</Version>
+    </PackageReference>
     <PackageReference Include="WindowsAPICodePack-Core">
       <Version>1.1.2</Version>
     </PackageReference>
     <PackageReference Include="WindowsAPICodePack-Shell">
       <Version>1.1.1</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Views\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

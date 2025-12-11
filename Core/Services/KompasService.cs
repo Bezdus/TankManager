@@ -32,13 +32,11 @@ namespace TankManager.Core.Services
             _intersectionDetector = new PartIntersectionDetector(_context, _logger, _cameraController);
         }
 
-        public List<PartModel> LoadDocument(string filePath)
+        public Product LoadDocument(string filePath)
         {
             _logger.LogInfo($"Loading document: {filePath}");
 
             EnsureKompasInitialized();
-
-            var result = new List<PartModel>();
 
             try
             {
@@ -46,12 +44,14 @@ namespace TankManager.Core.Services
 
                 if (_context.IsDocumentLoaded)
                 {
-                    _partExtractor.ExtractParts(_context.TopPart, result);
-                    _logger.LogInfo($"Successfully loaded {result.Count} parts");
+                    var product = CreateProductFromTopPart();
+                    _logger.LogInfo($"Successfully loaded product '{product.Name}' with {product.Details.Count} parts");
+                    return product;
                 }
                 else
                 {
                     _logger.LogWarning("Document loaded but TopPart is null");
+                    return new Product();
                 }
             }
             catch (Exception ex)
@@ -59,17 +59,13 @@ namespace TankManager.Core.Services
                 _logger.LogError($"Failed to load document: {filePath}", ex);
                 throw;
             }
-
-            return result;
         }
 
-        public List<PartModel> LoadActiveDocument()
+        public Product LoadActiveDocument()
         {
             _logger.LogInfo("Loading active document from KOMPAS");
 
             EnsureKompasInitialized();
-
-            var result = new List<PartModel>();
 
             try
             {
@@ -77,12 +73,14 @@ namespace TankManager.Core.Services
 
                 if (_context.IsDocumentLoaded)
                 {
-                    _partExtractor.ExtractParts(_context.TopPart, result);
-                    _logger.LogInfo($"Successfully loaded {result.Count} parts from active document");
+                    var product = CreateProductFromTopPart();
+                    _logger.LogInfo($"Successfully loaded product '{product.Name}' with {product.Details.Count} parts from active document");
+                    return product;
                 }
                 else
                 {
                     _logger.LogWarning("Active document loaded but TopPart is null");
+                    return new Product();
                 }
             }
             catch (Exception ex)
@@ -90,8 +88,28 @@ namespace TankManager.Core.Services
                 _logger.LogError("Failed to load active document", ex);
                 throw;
             }
+        }
 
-            return result;
+        private Product CreateProductFromTopPart()
+        {
+            var topPart = _context.TopPart;
+            var product = new Product(topPart, _context);
+
+            // Извлекаем дочерние детали
+            var parts = new List<PartModel>();
+            _partExtractor.ExtractParts(topPart, parts);
+
+            foreach (var part in parts)
+            {
+                product.Details.Add(part);
+
+                if (part.DetailType == Constants.KompasConstants.PurchasedPartType)
+                {
+                    product.StandardParts.Add(part);
+                }
+            }
+
+            return product;
         }
 
         public void ShowDetailInKompas(PartModel detail)
@@ -113,9 +131,6 @@ namespace TankManager.Core.Services
 
                 SelectDetail(targetPart);
                 _cameraController.FocusOnPart(targetPart);
-                
-                // Находим пересекающиеся объекты (если необходимо)
-                //List<IPart7> intersectingObjects = _intersectionDetector.FindIntersectingObjects(targetPart);
             }
             catch (Exception ex)
             {

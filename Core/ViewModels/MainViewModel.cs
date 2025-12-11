@@ -1,10 +1,10 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -19,19 +19,97 @@ namespace TankManager.Core.ViewModels
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly IKompasService _kompasService;
+        private readonly ProductStorageService _storageService = new ProductStorageService();
         private bool _isUpdatingCalculations = false;
 
-        public ObservableCollection<PartModel> Details { get; }
-        public ObservableCollection<MaterialInfo> Materials { get; }
-        public ObservableCollection<PartModel> StandardParts { get; }
-        public ICollectionView DetailsView { get; }
-        public ICollectionView StandardPartsView { get; }
-        public ICollectionView MaterialsView { get; }
+        private Product _currentProduct;
+        public Product CurrentProduct
+        {
+            get => _currentProduct;
+            private set
+            {
+                if (_currentProduct != value)
+                {
+                    _currentProduct = value;
+                    OnPropertyChanged(nameof(CurrentProduct));
+                    OnPropertyChanged(nameof(Details));
+                    OnPropertyChanged(nameof(Materials));
+                    OnPropertyChanged(nameof(StandardParts));
+                    
+                    // Пересоздаём представления для новых коллекций
+                    InitializeCollectionViews();
+                    
+                    // Автосохранение при установке нового продукта
+                    AutoSaveProduct();
+                }
+            }
+        }
+
+        // Делегируем коллекции к Product
+        public ObservableCollection<PartModel> Details => CurrentProduct?.Details;
+        public ObservableCollection<MaterialInfo> Materials => CurrentProduct?.Materials;
+        public ObservableCollection<PartModel> StandardParts => CurrentProduct?.StandardParts;
+
+        public ICollectionView DetailsView { get; private set; }
+        public ICollectionView StandardPartsView { get; private set; }
+        public ICollectionView MaterialsView { get; private set; }
+
+        // Список сохранённых продуктов
+        private ObservableCollection<ProductFileInfo> _savedProducts;
+        public ObservableCollection<ProductFileInfo> SavedProducts
+        {
+            get => _savedProducts;
+            private set
+            {
+                _savedProducts = value;
+                OnPropertyChanged(nameof(SavedProducts));
+            }
+        }
+
+        // Выбранный продукт в списке
+        private ProductFileInfo _selectedSavedProduct;
+        public ProductFileInfo SelectedSavedProduct
+        {
+            get => _selectedSavedProduct;
+            set
+            {
+                if (_selectedSavedProduct != value)
+                {
+                    _selectedSavedProduct = value;
+                    OnPropertyChanged(nameof(SelectedSavedProduct));
+                    ((RelayCommand)DeleteProductCommand)?.NotifyCanExecuteChanged();
+                }
+            }
+        }
+
+        // Видимость панели продуктов
+        private bool _isProductsPanelOpen;
+        public bool IsProductsPanelOpen
+        {
+            get => _isProductsPanelOpen;
+            set
+            {
+                if (_isProductsPanelOpen != value)
+                {
+                    _isProductsPanelOpen = value;
+                    OnPropertyChanged(nameof(IsProductsPanelOpen));
+                    
+                    if (value)
+                    {
+                        RefreshSavedProducts();
+                    }
+                }
+            }
+        }
 
         public ICommand ShowInKompasCommand { get; }
         public ICommand ToggleMaterialSortCommand { get; }
         public ICommand LoadFromActiveDocumentCommand { get; }
         public ICommand ClearSearchCommand { get; }
+        public ICommand LoadProductCommand { get; }
+        public ICommand DeleteProductCommand { get; }
+        public ICommand ToggleProductsPanelCommand { get; }
+        public ICommand SwitchToProductCommand { get; }
 
         public MainViewModel() : this(new KompasService())
         {
@@ -46,31 +124,34 @@ namespace TankManager.Core.ViewModels
                 _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
                 Debug.WriteLine("MainViewModel.Constructor: KompasService установлен");
 
-                Details = new ObservableCollection<PartModel>();
-                Materials = new ObservableCollection<MaterialInfo>();
-                StandardParts = new ObservableCollection<PartModel>();
-                Debug.WriteLine("MainViewModel.Constructor: Коллекции созданы");
-
-                DetailsView = CollectionViewSource.GetDefaultView(Details);
-                DetailsView.Filter = FilterDetails;
-                DetailsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
-                Debug.WriteLine("MainViewModel.Constructor: DetailsView настроен");
-
-                StandardPartsView = CollectionViewSource.GetDefaultView(StandardParts);
-                StandardPartsView.Filter = FilterDetails;
-                StandardPartsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
-                Debug.WriteLine("MainViewModel.Constructor: StandardPartsView настроен");
-
-                MaterialsView = CollectionViewSource.GetDefaultView(Materials);
-                MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
-                Debug.WriteLine("MainViewModel.Constructor: MaterialsView настроен");
+                SavedProducts = new ObservableCollection<ProductFileInfo>();
+                CurrentProduct = new Product();
+                Debug.WriteLine("MainViewModel.Constructor: Product создан");
 
                 ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null);
                 ToggleMaterialSortCommand = new RelayCommand(ToggleMaterialSort);
                 LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync());
                 ClearSearchCommand = new RelayCommand(ClearSearch);
+                LoadProductCommand = new RelayCommand<string>(LoadProduct);
+                DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
+                ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
+                SwitchToProductCommand = new RelayCommand<ProductFileInfo>(SwitchToProduct);
                 Debug.WriteLine("MainViewModel.Constructor: Команды созданы");
                 
+                // Загрузка последнего продукта при старте (без автосохранения)
+                var lastProduct = _storageService.LoadLast();
+                if (lastProduct != null && !string.IsNullOrEmpty(lastProduct.Name))
+                {
+                    _currentProduct = lastProduct; // Прямое присваивание без вызова сеттера
+                    OnPropertyChanged(nameof(CurrentProduct));
+                    OnPropertyChanged(nameof(Details));
+                    OnPropertyChanged(nameof(Materials));
+                    OnPropertyChanged(nameof(StandardParts));
+                    InitializeCollectionViews();
+                    UpdateCalculations();
+                    Debug.WriteLine("MainViewModel.Constructor: Загружен последний Product");
+                }
+
                 Debug.WriteLine("MainViewModel.Constructor: Завершено успешно");
             }
             catch (Exception ex)
@@ -78,6 +159,58 @@ namespace TankManager.Core.ViewModels
                 Debug.WriteLine($"MainViewModel.Constructor: ИСКЛЮЧЕНИЕ - {ex.Message}");
                 Debug.WriteLine($"MainViewModel.Constructor: StackTrace - {ex.StackTrace}");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Автоматическое сохранение продукта в список (если ещё не существует)
+        /// </summary>
+        private void AutoSaveProduct()
+        {
+            if (CurrentProduct == null || string.IsNullOrEmpty(CurrentProduct.Name))
+                return;
+
+            // Проверяем, существует ли уже такой продукт
+            var existingProducts = _storageService.GetSavedProducts();
+            var existing = existingProducts.FirstOrDefault(p => 
+                p.ProductName == CurrentProduct.Name && 
+                p.Marking == CurrentProduct.Marking);
+
+            if (existing == null)
+            {
+                // Сохраняем только если такого продукта ещё нет
+                string filePath = _storageService.Save(CurrentProduct);
+                StatusMessage = $"Автосохранено: {Path.GetFileName(filePath)}";
+                RefreshSavedProducts();
+            }
+        }
+
+        private void InitializeCollectionViews()
+        {
+            if (Details != null)
+            {
+                DetailsView = CollectionViewSource.GetDefaultView(Details);
+                DetailsView.Filter = FilterDetails;
+                DetailsView.GroupDescriptions.Clear();
+                DetailsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
+                OnPropertyChanged(nameof(DetailsView));
+            }
+
+            if (StandardParts != null)
+            {
+                StandardPartsView = CollectionViewSource.GetDefaultView(StandardParts);
+                StandardPartsView.Filter = FilterDetails;
+                StandardPartsView.GroupDescriptions.Clear();
+                StandardPartsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
+                OnPropertyChanged(nameof(StandardPartsView));
+            }
+
+            if (Materials != null)
+            {
+                MaterialsView = CollectionViewSource.GetDefaultView(Materials);
+                MaterialsView.SortDescriptions.Clear();
+                MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
+                OnPropertyChanged(nameof(MaterialsView));
             }
         }
 
@@ -107,11 +240,8 @@ namespace TankManager.Core.ViewModels
                     _searchText = value;
                     OnPropertyChanged(nameof(SearchText));
                     
-                    // Обновляем фильтры при изменении текста поиска
-                    DetailsView.Refresh();
-                    StandardPartsView.Refresh();
-                    
-                    // Обновляем расчеты с учетом нового фильтра
+                    DetailsView?.Refresh();
+                    StandardPartsView?.Refresh();
                     UpdateCalculations();
                 }
             }
@@ -128,11 +258,8 @@ namespace TankManager.Core.ViewModels
                     _selectedMaterial = value;
                     OnPropertyChanged(nameof(SelectedMaterial));
                     
-                    // Обновляем фильтры
-                    DetailsView.Refresh();
-                    StandardPartsView.Refresh();
-                    
-                    // Теперь безопасно вызываем расчеты
+                    DetailsView?.Refresh();
+                    StandardPartsView?.Refresh();
                     UpdateCalculations();
                 }
             }
@@ -272,18 +399,15 @@ namespace TankManager.Core.ViewModels
         {
             if (obj is PartModel part)
             {
-                // Фильтр по материалу
                 if (_selectedMaterial != null && part.Material != _selectedMaterial.Name)
                 {
                     return false;
                 }
 
-                // Фильтр по тексту поиска
                 if (!string.IsNullOrWhiteSpace(_searchText))
                 {
                     string searchLower = _searchText.ToLower();
                     
-                    // Поиск по названию и маркировке
                     bool nameMatch = part.Name != null && part.Name.ToLower().Contains(searchLower);
                     bool markingMatch = part.Marking != null && part.Marking.ToLower().Contains(searchLower);
                     
@@ -306,6 +430,8 @@ namespace TankManager.Core.ViewModels
 
         private void ApplyMaterialSort()
         {
+            if (MaterialsView == null) return;
+
             MaterialsView.SortDescriptions.Clear();
             
             if (_sortMaterialsByMass)
@@ -320,17 +446,15 @@ namespace TankManager.Core.ViewModels
 
         private void UpdateCalculations()
         {
-            if (_isUpdatingCalculations)
+            if (_isUpdatingCalculations || DetailsView == null)
                 return;
 
             _isUpdatingCalculations = true;
 
             try
             {
-                // Кэшируем отфильтрованные детали один раз
                 var visibleParts = DetailsView.Cast<PartModel>().ToList();
 
-                // Группировка и подсчет массы за один проход
                 var groupedParts = visibleParts
                     .GroupBy(p => new { p.Name, p.Marking })
                     .Where(g => g.Count() > 1)
@@ -339,7 +463,6 @@ namespace TankManager.Core.ViewModels
                 TotalMassMultipleParts = groupedParts.Sum(g => g.Sum(p => p.Mass));
                 UniquePartsCount = groupedParts.Count;
 
-                // Обновляем веса материалов
                 UpdateMaterialWeights();
             }
             finally
@@ -350,16 +473,15 @@ namespace TankManager.Core.ViewModels
 
         private void UpdateMaterialWeights()
         {
-            // Группируем по материалу и считаем суммарный вес за один проход
+            if (Details == null || Materials == null) return;
+
             var materialWeights = Details
                 .Where(p => !string.IsNullOrEmpty(p.Material))
                 .GroupBy(p => p.Material)
                 .ToDictionary(g => g.Key, g => g.Sum(p => p.Mass));
 
-            // Создаем HashSet для быстрой проверки существования
             var existingMaterials = new HashSet<string>(Materials.Select(m => m.Name));
 
-            // Обновляем существующие материалы
             foreach (var material in Materials)
             {
                 if (materialWeights.TryGetValue(material.Name, out double totalMass))
@@ -372,7 +494,6 @@ namespace TankManager.Core.ViewModels
                 }
             }
 
-            // Добавляем новые материалы
             foreach (var kvp in materialWeights)
             {
                 if (!existingMaterials.Contains(kvp.Key))
@@ -385,7 +506,6 @@ namespace TankManager.Core.ViewModels
                 }
             }
 
-            // Удаляем материалы без веса (в обратном порядке)
             for (int i = Materials.Count - 1; i >= 0; i--)
             {
                 if (!materialWeights.ContainsKey(Materials[i].Name))
@@ -423,26 +543,11 @@ namespace TankManager.Core.ViewModels
                 IsLoading = true;
                 StatusMessage = "Загрузка документа...";
 
-                Details.Clear();
-                Materials.Clear();
-                StandardParts.Clear();
+                var product = await Task.Run(() => _kompasService.LoadDocument(filePath));
+                CurrentProduct = product;
 
-                var parts = await Task.Run(() => _kompasService.LoadDocument(filePath));
-
-                // Просто добавляем элементы
-                foreach (var part in parts)
-                {
-                    Details.Add(part);
-
-                    if (part.DetailType == "Покупная деталь")
-                    {
-                        StandardParts.Add(part);
-                    }
-                }
-
-                // Обновляем расчеты один раз после загрузки всех данных
                 UpdateCalculations();
-                StatusMessage = $"Загружено деталей: {Details.Count}";
+                StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
             }
             catch (Exception ex)
             {
@@ -463,26 +568,11 @@ namespace TankManager.Core.ViewModels
                 IsLoading = true;
                 StatusMessage = "Загрузка документа из КОМПАС...";
 
-                Details.Clear();
-                Materials.Clear();
-                StandardParts.Clear();
+                var product = await Task.Run(() => _kompasService.LoadActiveDocument());
+                CurrentProduct = product;
 
-                var parts = await Task.Run(() => _kompasService.LoadActiveDocument());
-
-                // Добавляем элементы
-                foreach (var part in parts)
-                {
-                    Details.Add(part);
-
-                    if (part.DetailType == "Покупная деталь")
-                    {
-                        StandardParts.Add(part);
-                    }
-                }
-
-                // Обновляем расчеты
                 UpdateCalculations();
-                StatusMessage = $"Загружено деталей из активного документа: {Details.Count}";
+                StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
             }
             catch (Exception ex)
             {
@@ -501,6 +591,74 @@ namespace TankManager.Core.ViewModels
             SearchText = string.Empty;
         }
 
+        private void LoadProduct(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return;
+
+            var product = _storageService.Load(fileName);
+            if (product != null)
+            {
+                // Прямое присваивание чтобы избежать повторного автосохранения
+                _currentProduct = product;
+                OnPropertyChanged(nameof(CurrentProduct));
+                OnPropertyChanged(nameof(Details));
+                OnPropertyChanged(nameof(Materials));
+                OnPropertyChanged(nameof(StandardParts));
+                InitializeCollectionViews();
+                UpdateCalculations();
+                StatusMessage = $"Загружено: {product.Name}";
+            }
+        }
+
+        private void SwitchToProduct(ProductFileInfo productInfo)
+        {
+            if (productInfo == null) return;
+
+            var product = _storageService.Load(productInfo.FileName);
+            if (product != null)
+            {
+                // Прямое присваивание чтобы избежать повторного автосохранения
+                _currentProduct = product;
+                OnPropertyChanged(nameof(CurrentProduct));
+                OnPropertyChanged(nameof(Details));
+                OnPropertyChanged(nameof(Materials));
+                OnPropertyChanged(nameof(StandardParts));
+                InitializeCollectionViews();
+                UpdateCalculations();
+                StatusMessage = $"Переключено на: {product.Name}";
+                IsProductsPanelOpen = false;
+            }
+        }
+
+        private void DeleteSelectedProduct()
+        {
+            if (SelectedSavedProduct == null) return;
+
+            var result = MessageBox.Show(
+                $"Удалить \"{SelectedSavedProduct.ProductName}\"?",
+                "Подтверждение удаления",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                if (_storageService.Delete(SelectedSavedProduct.FileName))
+                {
+                    StatusMessage = $"Удалено: {SelectedSavedProduct.ProductName}";
+                    RefreshSavedProducts();
+                }
+            }
+        }
+
+        public void RefreshSavedProducts()
+        {
+            SavedProducts.Clear();
+            foreach (var product in _storageService.GetSavedProducts())
+            {
+                SavedProducts.Add(product);
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -510,21 +668,17 @@ namespace TankManager.Core.ViewModels
 
         public void Dispose()
         {
-            Details.Clear();
-            StandardParts.Clear();
-            Materials.Clear();
-
+            _storageService.SaveAsLast(CurrentProduct);
+            CurrentProduct?.Clear();
             _kompasService?.Dispose();
         }
 
-        // Кастомная группировка по имени и маркировке
         private class PartNameAndMarkingGroupDescription : GroupDescription
         {
             public override object GroupNameFromItem(object item, int level, CultureInfo culture)
             {
                 if (item is PartModel part)
                 {
-                    // Группируем по имени и маркировке (без GetHashCode)
                     return $"{part.Name}|{part.Marking}";
                 }
                 return string.Empty;

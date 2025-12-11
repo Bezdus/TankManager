@@ -129,6 +129,17 @@ namespace TankManager.Core.Models
             }
         }
 
+        /// <summary>
+        /// Защищённый конструктор для наследников
+        /// </summary>
+        protected PartModel()
+        {
+            _name = string.Empty;
+            _marking = string.Empty;
+            _material = string.Empty;
+            _filePath = string.Empty;
+        }
+
         public PartModel(IPart7 part, KompasContext context, int instanceIndex = 0)
         {
             if (part == null) throw new ArgumentNullException(nameof(part));
@@ -143,7 +154,6 @@ namespace TankManager.Core.Models
             Material = FormatMaterial(part.Material);
             Mass = part.Mass / KompasConstants.MassConversionFactor;
             FilePath = part.FileName ?? string.Empty;
-            // Ленивая загрузка: превью загружается при первом обращении к FilePreview
         }
 
         public PartModel(IBody7 body, KompasContext context, int instanceIndex = 0)
@@ -169,7 +179,6 @@ namespace TankManager.Core.Models
                 string parentName = parentPart?.Name ?? string.Empty;
                 PartId = $"{parentName}|{Name}|{Marking}|{instanceIndex}";
                 FilePath = parentFileName;
-                // Ленивая загрузка: превью загружается при первом обращении к FilePreview
             }
             finally
             {

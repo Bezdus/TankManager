@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using Microsoft.Win32;
 using TankManager.Core.Models;
 using TankManager.Core.ViewModels;
 
@@ -16,8 +17,6 @@ namespace TankManager
     public partial class MainWindow : Window
     {
         private MainViewModel _viewModel;
-        private string _pendingFilePath;
-        private bool _loadFromActiveDocument;
 
         public MainWindow()
         {
@@ -25,36 +24,32 @@ namespace TankManager
             this.DataContext = _viewModel;
             
             InitializeComponent();
-            
-            this.Loaded += MainWindow_Loaded;
         }
 
-        public void SetLoadingParameters(string filePath = null, bool loadFromActiveDocument = false)
+        private void LoadDocumentButton_Click(object sender, RoutedEventArgs e)
         {
-            _pendingFilePath = filePath;
-            _loadFromActiveDocument = loadFromActiveDocument;
+            LoadOptionsPopup.IsOpen = true;
         }
 
-        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void LoadFromKompas_Click(object sender, RoutedEventArgs e)
         {
-            try
+            LoadOptionsPopup.IsOpen = false;
+            await _viewModel.LoadFromActiveDocumentAsync();
+        }
+
+        private void SelectFile_Click(object sender, RoutedEventArgs e)
+        {
+            LoadOptionsPopup.IsOpen = false;
+
+            var openFileDialog = new OpenFileDialog
             {
-                if (_loadFromActiveDocument)
-                {
-                    await _viewModel.LoadFromActiveDocumentAsync();
-                }
-                else if (!string.IsNullOrEmpty(_pendingFilePath))
-                {
-                    _viewModel.FilePath = _pendingFilePath;
-                }
-            }
-            catch (Exception ex)
+                Filter = "Файлы КОМПАС (*.a3d)|*.a3d|Все файлы (*.*)|*.*",
+                Title = "Выберите файл КОМПАС"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
             {
-                MessageBox.Show(
-                    $"Ошибка инициализации:\n\n{ex.Message}",
-                    "Ошибка",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                _viewModel.FilePath = openFileDialog.FileName;
             }
         }
 
@@ -152,6 +147,14 @@ namespace TankManager
         {
             base.OnClosed(e);
             _viewModel?.Dispose();
+        }
+
+        private void OverlayBackground_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (DataContext is MainViewModel viewModel)
+            {
+                viewModel.IsProductsPanelOpen = false;
+            }
         }
     }
 

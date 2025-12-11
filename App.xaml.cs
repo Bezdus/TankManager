@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Windows;
-using TankManager.Views;
 
 namespace TankManager
 {
@@ -12,43 +11,15 @@ namespace TankManager
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-
-            // Временно устанавливаем OnExplicitShutdown, чтобы предотвратить 
-            // преждевременное завершение приложения до инициализации главного окна
-            this.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
 
             try
             {
-                var loadingScreen = new LoadingScreen();
-                var dialogResult = loadingScreen.ShowDialog();
-                
-                if (dialogResult == true)
-                {
-                    var mainWindow = new MainWindow();
-                    this.MainWindow = mainWindow;
-                    
-                    // После установки главного окна переключаемся на стандартный режим
-                    this.ShutdownMode = ShutdownMode.OnMainWindowClose;
-                    
-                    // Передаем параметры загрузки
-                    if (loadingScreen.LoadFromActiveDocument)
-                    {
-                        mainWindow.SetLoadingParameters(loadFromActiveDocument: true);
-                    }
-                    else if (!string.IsNullOrEmpty(loadingScreen.SelectedFilePath))
-                    {
-                        mainWindow.SetLoadingParameters(filePath: loadingScreen.SelectedFilePath);
-                    }
-
-                    mainWindow.Show();
-                }
-                else
-                {
-                    Shutdown();
-                }
+                var mainWindow = new MainWindow();
+                this.MainWindow = mainWindow;
+                mainWindow.Show();
             }
             catch (Exception ex)
             {
