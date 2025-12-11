@@ -22,6 +22,7 @@ namespace TankManager.Core.Models
         private string _filePath;
         private BitmapSource _filePreview;
         private bool _disposed;
+        private bool _previewLoaded;
 
         // Уникальные идентификаторы для поиска в KOMPAS
         public string PartId { get; private set; }
@@ -108,12 +109,21 @@ namespace TankManager.Core.Models
 
         public BitmapSource FilePreview
         {
-            get { return _filePreview; }
+            get
+            {
+                if (!_previewLoaded)
+                {
+                    _previewLoaded = true;
+                    _filePreview = TryLoadPreview(FilePath);
+                }
+                return _filePreview;
+            }
             set
             {
                 if (_filePreview != value)
                 {
                     _filePreview = value;
+                    _previewLoaded = true;
                     OnPropertyChanged(nameof(FilePreview));
                 }
             }
@@ -133,7 +143,7 @@ namespace TankManager.Core.Models
             Material = FormatMaterial(part.Material);
             Mass = part.Mass / KompasConstants.MassConversionFactor;
             FilePath = part.FileName ?? string.Empty;
-            FilePreview = TryLoadPreview(FilePath);
+            // Ленивая загрузка: превью загружается при первом обращении к FilePreview
         }
 
         public PartModel(IBody7 body, KompasContext context, int instanceIndex = 0)
@@ -159,7 +169,7 @@ namespace TankManager.Core.Models
                 string parentName = parentPart?.Name ?? string.Empty;
                 PartId = $"{parentName}|{Name}|{Marking}|{instanceIndex}";
                 FilePath = parentFileName;
-                FilePreview = TryLoadPreview(FilePath);
+                // Ленивая загрузка: превью загружается при первом обращении к FilePreview
             }
             finally
             {
