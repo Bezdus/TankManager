@@ -752,7 +752,7 @@
                                         CornerRadius="4"
                                         Cursor="Hand">
                                     <Border.InputBindings>
-                                        <MouseBinding MouseAction="LeftDoubleClick"
+                                        <MouseBinding MouseAction= "LeftDoubleClick"
                                                       Command="{Binding DataContext.SwitchToProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="{Binding}"/>
                                     </Border.InputBindings>

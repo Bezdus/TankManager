@@ -22,6 +22,9 @@ namespace TankManager.Core.ViewModels
         private readonly ProductStorageService _storageService = new ProductStorageService();
         private bool _isUpdatingCalculations = false;
 
+        // Кэш загруженных продуктов (ключ = FilePath)
+        private readonly Dictionary<string, Product> _linkedProductsCache = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
+
         private Product _currentProduct;
         public Product CurrentProduct
         {
@@ -35,7 +38,12 @@ namespace TankManager.Core.ViewModels
                     OnPropertyChanged(nameof(Details));
                     OnPropertyChanged(nameof(Materials));
                     OnPropertyChanged(nameof(StandardParts));
-                    
+
+                    // Сброс выбранных элементов при смене продукта
+                    SelectedDetail = null;
+                    SelectedStandardPart = null;
+                    CurrentlySelectedPart = null;
+
                     // Пересоздаём представления для новых коллекций
                     InitializeCollectionViews();
                     
@@ -53,6 +61,26 @@ namespace TankManager.Core.ViewModels
         public ICollectionView DetailsView { get; private set; }
         public ICollectionView StandardPartsView { get; private set; }
         public ICollectionView MaterialsView { get; private set; }
+
+        // Флаг связи с KOMPAS
+        private bool _isLinkedToKompas;
+        public bool IsLinkedToKompas
+        {
+            get => _isLinkedToKompas;
+            private set
+            {
+                if (_isLinkedToKompas != value)
+                {
+                    _isLinkedToKompas = value;
+                    OnPropertyChanged(nameof(IsLinkedToKompas));
+                    OnPropertyChanged(nameof(KompasLinkStatus));
+                }
+            }
+        }
+
+        public string KompasLinkStatus => IsLinkedToKompas 
+            ? "🔗 Связан с KOMPАС" 
+            : "⚠️ Нет связи с KOMPАС";
 
         // Список сохранённых продуктов
         private ObservableCollection<ProductFileInfo> _savedProducts;
@@ -128,37 +156,158 @@ namespace TankManager.Core.ViewModels
                 CurrentProduct = new Product();
                 Debug.WriteLine("MainViewModel.Constructor: Product создан");
 
-                ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null);
+                ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null && IsLinkedToKompas);
                 ToggleMaterialSortCommand = new RelayCommand(ToggleMaterialSort);
                 LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync());
                 ClearSearchCommand = new RelayCommand(ClearSearch);
-                LoadProductCommand = new RelayCommand<string>(LoadProduct);
+                LoadProductCommand = new RelayCommand<string>(fileName => _ = LoadProductAsync(fileName));
                 DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
                 ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
-                SwitchToProductCommand = new RelayCommand<ProductFileInfo>(SwitchToProduct);
+                SwitchToProductCommand = new RelayCommand<ProductFileInfo>(info => _ = SwitchToProductAsync(info));
                 Debug.WriteLine("MainViewModel.Constructor: Команды созданы");
                 
-                // Загрузка последнего продукта при старте (без автосохранения)
-                var lastProduct = _storageService.LoadLast();
-                if (lastProduct != null && !string.IsNullOrEmpty(lastProduct.Name))
-                {
-                    _currentProduct = lastProduct; // Прямое присваивание без вызова сеттера
-                    OnPropertyChanged(nameof(CurrentProduct));
-                    OnPropertyChanged(nameof(Details));
-                    OnPropertyChanged(nameof(Materials));
-                    OnPropertyChanged(nameof(StandardParts));
-                    InitializeCollectionViews();
-                    UpdateCalculations();
-                    Debug.WriteLine("MainViewModel.Constructor: Загружен последний Product");
-                }
+                // Загрузка последнего продукта при старте с автоматическим связыванием
+                _ = LoadLastProductAsync();
 
-                Debug.WriteLine("MainViewModel.Constructor: Завершено успешно");
+                Debug.WriteLine("MainViewModel.Constructor: ЗавершеноSuccessfully");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"MainViewModel.Constructor: ИСКЛЮЧЕНИЕ - {ex.Message}");
                 Debug.WriteLine($"MainViewModel.Constructor: StackTrace - {ex.StackTrace}");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Загрузка последнего продукта при старте с автоматическим связыванием с KOMPАС
+        /// </summary>
+        private async Task LoadLastProductAsync()
+        {
+            var lastProduct = _storageService.LoadLast();
+            if (lastProduct == null || string.IsNullOrEmpty(lastProduct.Name))
+                return;
+
+            await LoadAndLinkProductAsync(lastProduct, "Загружен последний Product");
+        }
+
+        /// <summary>
+        /// Загрузить продукт и автоматически связать с KOMPАС (с кэшированием)
+        /// </summary>
+        private async Task LoadAndLinkProductAsync(Product savedProduct, string successMessage)
+        {
+            string filePath = savedProduct.FilePath;
+
+            // Проверяем кэш — если уже загружали этот продукт, используем его
+            if (!string.IsNullOrEmpty(filePath) && _linkedProductsCache.TryGetValue(filePath, out var cachedProduct))
+            {
+                // Мгновенное переключение из кэша
+                SetCurrentProduct(cachedProduct, isLinked: true);
+                StatusMessage = $"{successMessage} (из кэша)";
+                Debug.WriteLine($"Продукт загружен из кэша: {filePath}");
+                return;
+            }
+
+            // Сначала показываем сохранённые данные (мгновенно)
+            SetCurrentProduct(savedProduct, isLinked: false);
+
+            // Затем пытаемся связать с KOMPАС в фоне
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                await TryLinkToKompasAsync(filePath);
+            }
+
+            StatusMessage = IsLinkedToKompas 
+                ? $"{successMessage} (связан с KOMPАС)" 
+                : $"{successMessage} (без связи с KOMPАС)";
+        }
+
+        /// <summary>
+        /// Установить текущий продукт без вызова сеттера (для избежания автосохранения при переключении)
+        /// </summary>
+        private void SetCurrentProduct(Product product, bool isLinked)
+        {
+            _currentProduct = product;
+            _isLinkedToKompas = isLinked;
+
+            SelectedDetail = null;
+            SelectedStandardPart = null;
+            CurrentlySelectedPart = null;
+
+            OnPropertyChanged(nameof(CurrentProduct));
+            OnPropertyChanged(nameof(Details));
+            OnPropertyChanged(nameof(Materials));
+            OnPropertyChanged(nameof(StandardParts));
+            OnPropertyChanged(nameof(IsLinkedToKompas));
+            OnPropertyChanged(nameof(KompasLinkStatus));
+            InitializeCollectionViews();
+            UpdateCalculations();
+            ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+        }
+
+        /// <summary>
+        /// Попытаться связать с KOMPАС — загрузить документ по пути (с кэшированием)
+        /// </summary>
+        private async Task TryLinkToKompasAsync(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return;
+
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Связывание с KOMPАС...";
+
+                if (File.Exists(filePath))
+                {
+                    // Загружаем документ в KOMPАС
+                    var linkedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
+                    
+                    if (linkedProduct != null)
+                    {
+                        // Сохраняем в кэш
+                        _linkedProductsCache[filePath] = linkedProduct;
+                        
+                        // Обновляем данные из KOMPАС
+                        SetCurrentProduct(linkedProduct, isLinked: true);
+                        Debug.WriteLine($"Продукт загружен и закэширован: {filePath}");
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine($"Файл не найден: {filePath}");
+                    StatusMessage = $"Файл не найден: {Path.GetFileName(filePath)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка связывания с KOMPАС: {ex.Message}");
+                IsLinkedToKompas = false;
+            }
+            finally
+            {
+                IsLoading = false;
+                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+            }
+        }
+
+        /// <summary>
+        /// Очистить кэш загруженных продуктов (например, при обновлении данных)
+        /// </summary>
+        public void ClearProductCache()
+        {
+            _linkedProductsCache.Clear();
+            Debug.WriteLine("Кэш продуктов очищен");
+        }
+
+        /// <summary>
+        /// Очистить конкретный продукт из кэша (при изменении файла)
+        /// </summary>
+        public void InvalidateProductCache(string filePath)
+        {
+            if (!string.IsNullOrEmpty(filePath) && _linkedProductsCache.Remove(filePath))
+            {
+                Debug.WriteLine($"Продукт удалён из кэша: {filePath}");
             }
         }
 
@@ -517,19 +666,24 @@ namespace TankManager.Core.ViewModels
 
         private void ShowDetailInKompas()
         {
-            if (CurrentlySelectedPart != null)
+            if (CurrentlySelectedPart == null) return;
+
+            if (!IsLinkedToKompas || CurrentProduct?.Context == null)
             {
-                try
-                {
-                    _kompasService.ShowDetailInKompas(CurrentlySelectedPart);
-                    StatusMessage = $"Показана деталь: {CurrentlySelectedPart.Name}";
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = $"Ошибка: {ex.Message}";
-                    MessageBox.Show($"Не удалось показать деталь в KOMPAS: {ex.Message}",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                StatusMessage = "Нет связи с KOMPАС. Дождитесь загрузки документа.";
+                return;
+            }
+
+            try
+            {
+                _kompasService.ShowDetailInKompas(CurrentlySelectedPart, CurrentProduct);
+                StatusMessage = $"Показана деталь: {CurrentlySelectedPart.Name}";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Ошибка: {ex.Message}";
+                MessageBox.Show($"Не удалось показать деталь в KOMPАС: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -544,9 +698,15 @@ namespace TankManager.Core.ViewModels
                 StatusMessage = "Загрузка документа...";
 
                 var product = await Task.Run(() => _kompasService.LoadDocument(filePath));
+                
+                // Сохраняем в кэш
+                _linkedProductsCache[filePath] = product;
+                
                 CurrentProduct = product;
+                IsLinkedToKompas = true;
 
                 UpdateCalculations();
+                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
             }
             catch (Exception ex)
@@ -569,9 +729,18 @@ namespace TankManager.Core.ViewModels
                 StatusMessage = "Загрузка документа из КОМПАС...";
 
                 var product = await Task.Run(() => _kompasService.LoadActiveDocument());
+                
+                // Сохраняем в кэш по FilePath
+                if (!string.IsNullOrEmpty(product.FilePath))
+                {
+                    _linkedProductsCache[product.FilePath] = product;
+                }
+                
                 CurrentProduct = product;
+                IsLinkedToKompas = true;
 
                 UpdateCalculations();
+                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
             }
             catch (Exception ex)
@@ -591,42 +760,26 @@ namespace TankManager.Core.ViewModels
             SearchText = string.Empty;
         }
 
-        private void LoadProduct(string fileName)
+        private async Task LoadProductAsync(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return;
 
             var product = _storageService.Load(fileName);
             if (product != null)
             {
-                // Прямое присваивание чтобы избежать повторного автосохранения
-                _currentProduct = product;
-                OnPropertyChanged(nameof(CurrentProduct));
-                OnPropertyChanged(nameof(Details));
-                OnPropertyChanged(nameof(Materials));
-                OnPropertyChanged(nameof(StandardParts));
-                InitializeCollectionViews();
-                UpdateCalculations();
-                StatusMessage = $"Загружено: {product.Name}";
+                await LoadAndLinkProductAsync(product, $"Загружено: {product.Name}");
             }
         }
 
-        private void SwitchToProduct(ProductFileInfo productInfo)
+        private async Task SwitchToProductAsync(ProductFileInfo productInfo)
         {
             if (productInfo == null) return;
 
             var product = _storageService.Load(productInfo.FileName);
             if (product != null)
             {
-                // Прямое присваивание чтобы избежать повторного автосохранения
-                _currentProduct = product;
-                OnPropertyChanged(nameof(CurrentProduct));
-                OnPropertyChanged(nameof(Details));
-                OnPropertyChanged(nameof(Materials));
-                OnPropertyChanged(nameof(StandardParts));
-                InitializeCollectionViews();
-                UpdateCalculations();
-                StatusMessage = $"Переключено на: {product.Name}";
                 IsProductsPanelOpen = false;
+                await LoadAndLinkProductAsync(product, $"Переключено на: {product.Name}");
             }
         }
 
@@ -669,6 +822,7 @@ namespace TankManager.Core.ViewModels
         public void Dispose()
         {
             _storageService.SaveAsLast(CurrentProduct);
+            _linkedProductsCache.Clear();
             CurrentProduct?.Clear();
             _kompasService?.Dispose();
         }

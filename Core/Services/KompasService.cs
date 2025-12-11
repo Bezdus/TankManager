@@ -3,48 +3,41 @@ using Kompas6Constants3D;
 using KompasAPI7;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
 {
     public class KompasService : IKompasService
     {
-        private readonly KompasContext _context;
         private readonly ILogger _logger;
         private readonly ComObjectManager _comManager;
-        private readonly PartExtractor _partExtractor;
-        private readonly PartFinder _partFinder;
-        private readonly KompasCameraController _cameraController;
-        private readonly PartIntersectionDetector _intersectionDetector;
 
-        public KompasService() : this(new KompasContext(), new FileLogger())
+        public KompasService() : this(new FileLogger())
         {
         }
 
-        public KompasService(KompasContext context, ILogger logger)
+        public KompasService(ILogger logger)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _comManager = new ComObjectManager(_logger);
-            _partExtractor = new PartExtractor(_context, _logger, _comManager);
-            _partFinder = new PartFinder(_logger);
-            _cameraController = new KompasCameraController(_context, _logger);
-            _intersectionDetector = new PartIntersectionDetector(_context, _logger, _cameraController);
         }
 
         public Product LoadDocument(string filePath)
         {
             _logger.LogInfo($"Loading document: {filePath}");
 
-            EnsureKompasInitialized();
+            // Создаём новый контекст для каждого документа
+            var context = new KompasContext();
+            EnsureKompasInitialized(context);
 
             try
             {
-                _context.LoadDocument(filePath);
+                context.LoadDocument(filePath);
 
-                if (_context.IsDocumentLoaded)
+                if (context.IsDocumentLoaded)
                 {
-                    var product = CreateProductFromTopPart();
+                    var product = CreateProductFromTopPart(context);
                     _logger.LogInfo($"Successfully loaded product '{product.Name}' with {product.Details.Count} parts");
                     return product;
                 }
@@ -57,6 +50,7 @@ namespace TankManager.Core.Services
             catch (Exception ex)
             {
                 _logger.LogError($"Failed to load document: {filePath}", ex);
+                context.Dispose();
                 throw;
             }
         }
@@ -65,15 +59,16 @@ namespace TankManager.Core.Services
         {
             _logger.LogInfo("Loading active document from KOMPAS");
 
-            EnsureKompasInitialized();
+            var context = new KompasContext();
+            EnsureKompasInitialized(context);
 
             try
             {
-                _context.LoadActiveDocument();
+                context.LoadActiveDocument();
 
-                if (_context.IsDocumentLoaded)
+                if (context.IsDocumentLoaded)
                 {
-                    var product = CreateProductFromTopPart();
+                    var product = CreateProductFromTopPart(context);
                     _logger.LogInfo($"Successfully loaded product '{product.Name}' with {product.Details.Count} parts from active document");
                     return product;
                 }
@@ -86,18 +81,19 @@ namespace TankManager.Core.Services
             catch (Exception ex)
             {
                 _logger.LogError("Failed to load active document", ex);
+                context.Dispose();
                 throw;
             }
         }
 
-        private Product CreateProductFromTopPart()
+        private Product CreateProductFromTopPart(KompasContext context)
         {
-            var topPart = _context.TopPart;
-            var product = new Product(topPart, _context);
+            var topPart = context.TopPart;
+            var product = new Product(topPart, context);
 
-            // Извлекаем дочерние детали
+            var partExtractor = new PartExtractor(context, _logger, _comManager);
             var parts = new List<PartModel>();
-            _partExtractor.ExtractParts(topPart, parts);
+            partExtractor.ExtractParts(topPart, parts);
 
             foreach (var part in parts)
             {
@@ -112,25 +108,41 @@ namespace TankManager.Core.Services
             return product;
         }
 
-        public void ShowDetailInKompas(PartModel detail)
+        public void ShowDetailInKompas(PartModel detail, Product product)
         {
-            if (detail == null || !_context.IsDocumentLoaded)
+            if (detail == null)
             {
-                _logger.LogWarning("Invalid detail or document not loaded");
+                _logger.LogWarning("Detail is null");
                 return;
             }
 
+            if (product?.Context == null || !product.Context.IsDocumentLoaded)
+            {
+                _logger.LogWarning("Product context not loaded");
+                return;
+            }
+
+            var context = product.Context;
+
             try
             {
-                IPart7 targetPart = _partFinder.FindPartByModel(detail, _context.TopPart);
+                Debug.WriteLine(context.TopPart.Name);
+                
+                var partFinder = new PartFinder(_logger);
+                IPart7 targetPart = partFinder.FindPartByModel(detail, context.TopPart);
+                
                 if (targetPart == null)
                 {
                     _logger.LogWarning($"Could not find part: {detail.Name}");
                     return;
                 }
 
-                SelectDetail(targetPart);
-                _cameraController.FocusOnPart(targetPart);
+                context.Document.Active = true;
+
+                SelectDetail(context, targetPart);
+                
+                var cameraController = new KompasCameraController(context, _logger);
+                cameraController.FocusOnPart(targetPart);
             }
             catch (Exception ex)
             {
@@ -139,9 +151,9 @@ namespace TankManager.Core.Services
             }
         }
 
-        private void EnsureKompasInitialized()
+        private void EnsureKompasInitialized(KompasContext context)
         {
-            if (!_context.IsInitialized)
+            if (!context.IsInitialized)
             {
                 const string errorMessage = "Не удалось подключиться к KOMPAS-3D";
                 _logger.LogError(errorMessage);
@@ -149,17 +161,16 @@ namespace TankManager.Core.Services
             }
         }
 
-        private void SelectDetail(IPart7 part)
+        private void SelectDetail(KompasContext context, IPart7 part)
         {
-            _context.SelectionManager.UnselectAll();
-            _context.SelectionManager.Select(part);
+            context.SelectionManager.UnselectAll();
+            context.SelectionManager.Select(part);
         }
 
         public void Dispose()
         {
             _logger.LogInfo("Disposing KompasService");
             _comManager?.Dispose();
-            _context?.Dispose();
         }
     }
 }

@@ -7,6 +7,6 @@ namespace TankManager.Core.Services
     {
         Product LoadDocument(string filePath);
         Product LoadActiveDocument();
-        void ShowDetailInKompas(PartModel detail);
+        void ShowDetailInKompas(PartModel detail, Product product);
     }
 }
