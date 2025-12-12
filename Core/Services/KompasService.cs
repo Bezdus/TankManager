@@ -4,6 +4,7 @@ using KompasAPI7;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
@@ -99,13 +100,58 @@ namespace TankManager.Core.Services
             {
                 product.Details.Add(part);
 
-                if (part.DetailType == Constants.KompasConstants.PurchasedPartType)
+                switch (part.ProductType)
                 {
-                    product.StandardParts.Add(part);
+                    case ProductType.PurchasedPart:
+                        product.StandardParts.Add(part);
+                        break;
                 }
             }
 
+            // Агрегируем материалы по типам
+            AggregateMaterials(product);
+
             return product;
+        }
+
+        /// <summary>
+        /// Агрегирует материалы из деталей в соответствующие коллекции
+        /// </summary>
+        private void AggregateMaterials(Product product)
+        {
+            // Группируем листовой прокат по материалу
+            var sheetMaterials = product.Details
+                .Where(p => p.ProductType == ProductType.SheetMaterial && !string.IsNullOrEmpty(p.Material))
+                .GroupBy(p => p.Material)
+                .Select(g => new MaterialInfo
+                {
+                    Name = g.Key,
+                    TotalMass = g.Sum(p => p.Mass)
+                })
+                .OrderByDescending(m => m.TotalMass);
+
+            foreach (var material in sheetMaterials)
+            {
+                product.SheetMaterials.Add(material);
+            }
+
+            // Группируем трубный прокат по материалу
+            var tubularProducts = product.Details
+                .Where(p => p.ProductType == ProductType.TubularProduct && !string.IsNullOrEmpty(p.Material))
+                .GroupBy(p => p.Material)
+                .Select(g => new MaterialInfo
+                {
+                    Name = g.Key,
+                    TotalMass = g.Sum(p => p.Mass)
+                })
+                .OrderByDescending(m => m.TotalMass);
+
+            foreach (var material in tubularProducts)
+            {
+                product.TubularProducts.Add(material);
+            }
+
+            _logger.LogInfo($"Aggregated materials: {product.SheetMaterials.Count} sheet, {product.TubularProducts.Count} tubular");
         }
 
         public void ShowDetailInKompas(PartModel detail, Product product)

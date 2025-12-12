@@ -16,6 +16,7 @@
         <local:InverseNullToVisibilityConverter x:Key="InverseNullToVisibilityConverter"/>
         <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
+        <local:GroupItemPropertyConverter x:Key="GroupItemPropertyConverter"/>
 
         <Style TargetType="GroupBox">
             <Setter Property="Margin" Value="3"/>
@@ -62,8 +63,99 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Общий шаблон для списка деталей с группировкой -->
+        <DataTemplate x:Key="PartItemTemplate">
+            <StackPanel Margin="1" Cursor="Hand">
+                <TextBlock FontSize="11" FontWeight="SemiBold">
+                    <Run Text="{Binding Name, Mode=OneWay}"/>
+                    <Run Text=" "/>
+                    <Run Text="{Binding Marking, Mode=OneWay}" Foreground="#FF616161"/>
+                </TextBlock>
+                <TextBlock FontSize="10" Foreground="#FF616161" Margin="0,2,0,0">
+                    <Run Text="{Binding DetailType}"/>
+                    <Run Text=" • "/>
+                    <Run Text="{Binding Material}"/>
+                </TextBlock>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Стиль для элементов списка -->
+        <Style x:Key="PartListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFE3F2FD"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#FF2196F3"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Стиль группировки -->
+        <Style x:Key="GroupedContainerStyle" TargetType="{x:Type GroupItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                        <Border Background="White"
+                                BorderBrush="#FFD0D0D0" 
+                                BorderThickness="1" 
+                                CornerRadius="3"
+                                Margin="4,3"
+                                Padding="8,6">
+                            <Grid>
+                                <Expander IsExpanded="False"
+                                          Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
+                                    <Expander.Header>
+                                        <Grid Background="Transparent">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#FF0D47A1" TextWrapping="Wrap"
+                                                               Text="{Binding Converter={StaticResource GroupItemPropertyConverter}, ConverterParameter=Name}"/>
+                                                    <TextBlock Text=" " FontSize="11"/>
+                                                    <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#FF616161" TextWrapping="Wrap"
+                                                               Text="{Binding Converter={StaticResource GroupItemPropertyConverter}, ConverterParameter=Marking}"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                    <TextBlock FontSize="10" Foreground="#FF616161"
+                                                               Text="{Binding Converter={StaticResource GroupItemPropertyConverter}, ConverterParameter=DetailType}"/>
+                                                    <TextBlock Text=" • " FontSize="10" Foreground="#FF616161"/>
+                                                    <TextBlock FontSize="10" Foreground="#FF616161"
+                                                               Text="{Binding Converter={StaticResource GroupItemPropertyConverter}, ConverterParameter=Material}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <Border Grid.Column="1" Background="#FF1976D2" CornerRadius="8" Padding="5,2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" FontSize="10" FontWeight="SemiBold" Foreground="White"/>
+                                            </Border>
+                                        </Grid>
+                                    </Expander.Header>
+                                    <Border Padding="0,4,0,0" Margin="12,0,0,0">
+                                        <ItemsPresenter/>
+                                    </Border>
+                                </Expander>
+
+                                <ItemsPresenter Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}"/>
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
-    
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -96,10 +188,10 @@
                     Cursor="Hand"/>
             
             <Separator/>
-            <!-- Добавьте эту кнопку в нужном месте вашего интерфейса -->
+            
             <Button Content="📋 Копировать в Excel" 
-        Command="{Binding CopyAllToClipboardCommand}"
-        ToolTip="Копировать список материалов в буфер обмена для вставки в Excel"/>
+                    Command="{Binding CopyAllToClipboardCommand}"
+                    ToolTip="Копировать список деталей в буфер обмена для вставки в Excel"/>
         </ToolBar>
 
         <!-- Информация об изделии -->
@@ -257,7 +349,7 @@
                                 CornerRadius="2" 
                                 Padding="5,3"
                                 Margin="3"
-                                Visibility="{Binding SelectedMaterial, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                Visibility="{Binding SelectedMaterialFilter, Converter={StaticResource InverseNullToVisibilityConverter}}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -265,7 +357,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                                     <TextBlock Text="Фильтр: " FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding SelectedMaterial.Name}" FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding SelectedMaterialFilter.Name}" FontSize="11" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" 
                                         Content="✕" 
@@ -282,100 +374,14 @@
                         <ListBox Grid.Row="2" x:Name="Список_всех_деталей" 
                                  ItemsSource="{Binding DetailsView}"
                                  SelectedItem="{Binding SelectedDetail}"
+                                 ItemTemplate="{StaticResource PartItemTemplate}"
+                                 ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Background="Transparent"
                                  BorderThickness="0">
                             <ListBox.GroupStyle>
-                                <GroupStyle>
-                                    <GroupStyle.ContainerStyle>
-                                        <Style TargetType="{x:Type GroupItem}">
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                        <Border Background="White"
-                                                                BorderBrush="#FFD0D0D0" 
-                                                                BorderThickness="1" 
-                                                                CornerRadius="3"
-                                                                Margin="4,3"
-                                                                Padding="8,6">
-                                                            <Grid>
-                                                                <Expander IsExpanded="False"
-                                                                          Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
-                                                                    <Expander.Header>
-                                                                        <Grid Background="Transparent">
-                                                                            <Grid.ColumnDefinitions>
-                                                                                <ColumnDefinition Width="*"/>
-                                                                                <ColumnDefinition Width="Auto"/>
-                                                                            </Grid.ColumnDefinitions>
-
-                                                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                                                                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#FF0D47A1" TextWrapping="Wrap">
-                                                                                    <Run Text="{Binding Items[0].Name, Mode=OneWay}"/>
-                                                                                    <Run Text=" "/>
-                                                                                    <Run Text="{Binding Items[0].Marking, Mode=OneWay}" Foreground="#FF616161"/>
-                                                                                </TextBlock>
-                                                                                <TextBlock FontSize="10" Foreground="#FF616161" Margin="0,2,0,0">
-                                                                                    <Run Text="{Binding Items[0].DetailType}"/>
-                                                                                    <Run Text=" • "/>
-                                                                                    <Run Text="{Binding Items[0].Material}"/>
-                                                                                </TextBlock>
-                                                                            </StackPanel>
-
-                                                                            <Border Grid.Column="1" Background="#FF1976D2" CornerRadius="8" Padding="5,2" VerticalAlignment="Center">
-                                                                                <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" FontSize="10" FontWeight="SemiBold" Foreground="White"/>
-                                                                            </Border>
-                                                                        </Grid>
-                                                                    </Expander.Header>
-                                                                    <Border Padding="0,4,0,0" Margin="12,0,0,0">
-                                                                        <ItemsPresenter/>
-                                                                    </Border>
-                                                                </Expander>
-
-                                                                <ItemsPresenter Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}"/>
-                                                            </Grid>
-                                                        </Border>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </GroupStyle.ContainerStyle>
-                                </GroupStyle>
+                                <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                             </ListBox.GroupStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="1" Cursor="Hand">
-                                        <TextBlock FontSize="11" FontWeight="SemiBold">
-                                            <Run Text="{Binding Name, Mode=OneWay}"/>
-                                            <Run Text=" "/>
-                                            <Run Text="{Binding Marking, Mode=OneWay}" Foreground="#FF616161"/>
-                                        </TextBlock>
-                                        <TextBlock FontSize="10" Foreground="#FF616161" Margin="0,2,0,0">
-                                            <Run Text="{Binding DetailType}"/>
-                                            <Run Text=" • "/>
-                                            <Run Text="{Binding Material}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Padding" Value="4,2"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderThickness" Value="0"/>
-                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#FFE3F2FD"/>
-                                        </Trigger>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter Property="Background" Value="#FF2196F3"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
                         </ListBox>
                     </Grid>
                 </GroupBox>
@@ -417,6 +423,7 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
                                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Название:" Style="{StaticResource PropertyLabel}"/>
@@ -428,11 +435,14 @@
                                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Тип детали:" Style="{StaticResource PropertyLabel}"/>
                                         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DetailType}" Style="{StaticResource PropertyValue}"/>
 
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Материал:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Material}" Style="{StaticResource PropertyValue}"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Тип продукта:" Style="{StaticResource PropertyLabel}"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ProductType}" Style="{StaticResource PropertyValue}"/>
 
-                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Mass}" Style="{StaticResource PropertyValue}"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Материал:" Style="{StaticResource PropertyLabel}"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Material}" Style="{StaticResource PropertyValue}"/>
+
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
                                     </Grid>
 
                                     <Button Content="Показать в КОМПАС" 
@@ -479,14 +489,17 @@
 
                 <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
 
-                <!-- ПРАВАЯ ПАНЕЛЬ: Материалы и стандартные детали -->
+                <!-- ПРАВАЯ ПАНЕЛЬ: Листовой прокат, Трубный прокат, Стандартные изделия -->
                 <Grid Grid.Column="4">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Листовой прокат -->
                     <GroupBox Grid.Row="0">
                         <GroupBox.Header>
                             <Grid>
@@ -494,7 +507,10 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Материалы (клик для фильтра)" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <TextBlock Text="📄" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Листовой прокат" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <Button Grid.Column="1" 
                                         Content="{Binding MaterialSortText}"
                                         Command="{Binding ToggleMaterialSortCommand}"
@@ -532,22 +548,24 @@
                                 </Button>
                             </Grid>
                         </GroupBox.Header>
-                        <ListBox x:Name="MaterialsListBox"
-                                 ItemsSource="{Binding MaterialsView}"
-                                 SelectedItem="{Binding SelectedMaterial}"
+                        <ListBox ItemsSource="{Binding SheetMaterialsView}"
+                                 SelectedItem="{Binding SelectedSheetMaterial}"
                                  SelectionMode="Single"
-                                 PreviewMouseDown="MaterialsListBox_PreviewMouseDown">
+                                 PreviewMouseDown="SheetMaterialsListBox_PreviewMouseDown"
+                                 Background="Transparent"
+                                 BorderThickness="0">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Margin="1" Cursor="Hand">
-                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                         <TextBlock Text="{Binding TotalMass, StringFormat='{}{0:F2} кг'}" FontSize="10" Foreground="#FF616161" Margin="0,2,0,0"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="4,2"/>
+                                    <Setter Property="Padding" Value="6,4"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                     <Style.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter Property="Background" Value="#FFE3F2FD"/>
@@ -564,92 +582,32 @@
 
                     <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
 
-                    <GroupBox Grid.Row="2" Header="Стандартные изделия">
-                        <ListBox ItemsSource="{Binding StandardPartsView}"
-                                 SelectedItem="{Binding SelectedStandardPart}"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                    <!-- Трубный прокат -->
+                    <GroupBox Grid.Row="2">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔩" Margin="0,0,5,0"/>
+                                <TextBlock Text="Трубный прокат" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox ItemsSource="{Binding TubularProductsView}"
+                                 SelectedItem="{Binding SelectedTubularProduct}"
+                                 SelectionMode="Single"
+                                 PreviewMouseDown="TubularProductsListBox_PreviewMouseDown"
                                  Background="Transparent"
                                  BorderThickness="0">
-                            <ListBox.GroupStyle>
-                                <GroupStyle>
-                                    <GroupStyle.ContainerStyle>
-                                        <Style TargetType="{x:Type GroupItem}">
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                        <Border Background="White"
-                                                                BorderBrush="#FFD0D0D0" 
-                                                                BorderThickness="1" 
-                                                                CornerRadius="3"
-                                                                Margin="4,3"
-                                                                Padding="8,6">
-                                                            <Grid>
-                                                                <Expander IsExpanded="False"
-                                                                          Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Multiple}">
-                                                                    <Expander.Header>
-                                                                        <Grid Background="Transparent">
-                                                                            <Grid.ColumnDefinitions>
-                                                                                <ColumnDefinition Width="*"/>
-                                                                                <ColumnDefinition Width="Auto"/>
-                                                                            </Grid.ColumnDefinitions>
-
-                                                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                                                                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#FF0D47A1" TextWrapping="Wrap">
-                                                                                    <Run Text="{Binding Items[0].Name, Mode=OneWay}"/>
-                                                                                    <Run Text=" "/>
-                                                                                    <Run Text="{Binding Items[0].Marking, Mode=OneWay}" Foreground="#FF616161"/>
-                                                                                </TextBlock>
-                                                                                <TextBlock FontSize="10" Foreground="#FF616161" Margin="0,2,0,0">
-                                                                                    <Run Text="{Binding Items[0].DetailType}"/>
-                                                                                    <Run Text=" • "/>
-                                                                                    <Run Text="{Binding Items[0].Material}"/>
-                                                                                </TextBlock>
-                                                                            </StackPanel>
-
-                                                                            <Border Grid.Column="1" Background="#FF1976D2" CornerRadius="8" Padding="5,2" VerticalAlignment="Center">
-                                                                                <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" FontSize="10" FontWeight="SemiBold" Foreground="White"/>
-                                                                            </Border>
-                                                                        </Grid>
-                                                                    </Expander.Header>
-                                                                    <Border Padding="0,4,0,0" Margin="12,0,0,0">
-                                                                        <ItemsPresenter/>
-                                                                    </Border>
-                                                                </Expander>
-
-                                                                <ItemsPresenter Visibility="{Binding ItemCount, Converter={StaticResource GroupCountToVisibilityConverter}, ConverterParameter=Single}"/>
-                                                            </Grid>
-                                                        </Border>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </GroupStyle.ContainerStyle>
-                                </GroupStyle>
-                            </ListBox.GroupStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Margin="1" Cursor="Hand">
-                                        <TextBlock FontSize="11" FontWeight="SemiBold">
-                                            <Run Text="{Binding Name, Mode=OneWay}"/>
-                                            <Run Text=" "/>
-                                            <Run Text="{Binding Marking, Mode=OneWay}" Foreground="#FF616161"/>
-                                        </TextBlock>
-                                        <TextBlock FontSize="10" Foreground="#FF616161" Margin="0,2,0,0">
-                                            <Run Text="{Binding DetailType}"/>
-                                            <Run Text=" • "/>
-                                            <Run Text="{Binding Material}"/>
-                                        </TextBlock>
+                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding TotalMass, StringFormat='{}{0:F2} кг'}" FontSize="10" Foreground="#FF616161" Margin="0,2,0,0"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="6,4"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Padding" Value="4,2"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderThickness" Value="0"/>
-                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                                     <Style.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter Property="Background" Value="#FFE3F2FD"/>
@@ -661,6 +619,29 @@
                                     </Style.Triggers>
                                 </Style>
                             </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </GroupBox>
+
+                    <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+
+                    <!-- Стандартные изделия -->
+                    <GroupBox Grid.Row="4">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🛒" Margin="0,0,5,0"/>
+                                <TextBlock Text="Покупные изделия" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox ItemsSource="{Binding StandardPartsView}"
+                                 SelectedItem="{Binding SelectedStandardPart}"
+                                 ItemTemplate="{StaticResource PartItemTemplate}"
+                                 ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                            <ListBox.GroupStyle>
+                                <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
+                            </ListBox.GroupStyle>
                         </ListBox>
                     </GroupBox>
                 </Grid>

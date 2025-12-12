@@ -205,13 +205,10 @@ namespace TankManager.Core.Services
                 Marking = product.Marking,
                 Mass = product.Mass,
                 FilePath = product.FilePath,
-                Details = product.Details.Select(ToPartDto).ToList(),
-                StandardParts = product.StandardParts.Select(ToPartDto).ToList(),
-                Materials = product.Materials.Select(m => new MaterialInfoDto
-                {
-                    Name = m.Name,
-                    TotalMass = m.TotalMass
-                }).ToList()
+                Details = product.Details.Select(d => ToPartDto(d)).ToList(),
+                StandardParts = product.StandardParts.Select(d => ToPartDto(d)).ToList(),
+                SheetMaterials = product.SheetMaterials.Select(m => ToMaterialDto(m)).ToList(),
+                TubularProducts = product.TubularProducts.Select(m => ToMaterialDto(m)).ToList()
             };
         }
 
@@ -227,7 +224,17 @@ namespace TankManager.Core.Services
                 FilePath = part.FilePath,
                 PartId = part.PartId,
                 IsBodyBased = part.IsBodyBased,
-                InstanceIndex = part.InstanceIndex
+                InstanceIndex = part.InstanceIndex,
+                ProductType = (int)part.ProductType
+            };
+        }
+
+        private static MaterialInfoDto ToMaterialDto(MaterialInfo material)
+        {
+            return new MaterialInfoDto
+            {
+                Name = material.Name,
+                TotalMass = material.TotalMass
             };
         }
 
@@ -249,13 +256,14 @@ namespace TankManager.Core.Services
                 product.StandardParts.Add(FromPartDto(partDto));
             }
 
-            foreach (var materialDto in dto.Materials ?? Enumerable.Empty<MaterialInfoDto>())
+            foreach (var materialDto in dto.SheetMaterials ?? Enumerable.Empty<MaterialInfoDto>())
             {
-                product.Materials.Add(new MaterialInfo
-                {
-                    Name = materialDto.Name,
-                    TotalMass = materialDto.TotalMass
-                });
+                product.SheetMaterials.Add(FromMaterialDto(materialDto));
+            }
+
+            foreach (var materialDto in dto.TubularProducts ?? Enumerable.Empty<MaterialInfoDto>())
+            {
+                product.TubularProducts.Add(FromMaterialDto(materialDto));
             }
 
             return product;
@@ -270,7 +278,17 @@ namespace TankManager.Core.Services
                 DetailType = dto.DetailType,
                 Material = dto.Material,
                 Mass = dto.Mass,
-                FilePath = dto.FilePath
+                FilePath = dto.FilePath,
+                ProductType = (ProductType)(dto.ProductType)
+            };
+        }
+
+        private static MaterialInfo FromMaterialDto(MaterialInfoDto dto)
+        {
+            return new MaterialInfo
+            {
+                Name = dto.Name,
+                TotalMass = dto.TotalMass
             };
         }
 
@@ -315,7 +333,10 @@ namespace TankManager.Core.Services
         public List<PartModelDto> StandardParts { get; set; }
 
         [System.Runtime.Serialization.DataMember]
-        public List<MaterialInfoDto> Materials { get; set; }
+        public List<MaterialInfoDto> SheetMaterials { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public List<MaterialInfoDto> TubularProducts { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
@@ -347,6 +368,9 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public int InstanceIndex { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public int ProductType { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]

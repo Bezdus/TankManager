@@ -91,10 +91,25 @@ namespace TankManager
 
         private void ClearFilter_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.SelectedMaterial = null;
+            _viewModel.ClearMaterialFilter();
         }
 
-        private void MaterialsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        private void SheetMaterialsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            HandleMaterialListBoxClick(sender, e, 
+                () => _viewModel.SelectedSheetMaterial, 
+                () => _viewModel.SelectedSheetMaterial = null);
+        }
+
+        private void TubularProductsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            HandleMaterialListBoxClick(sender, e, 
+                () => _viewModel.SelectedTubularProduct, 
+                () => _viewModel.SelectedTubularProduct = null);
+        }
+
+        private void HandleMaterialListBoxClick(object sender, MouseButtonEventArgs e, 
+            Func<MaterialInfo> getSelected, Action clearSelection)
         {
             var listBox = sender as ListBox;
             if (listBox == null)
@@ -107,11 +122,11 @@ namespace TankManager
             {
                 if (listBoxItem.Content is MaterialInfo clickedMaterial)
                 {
+                    var selected = getSelected();
                     // Сброс фильтра при клике по уже выбранному материалу
-                    if (_viewModel.SelectedMaterial != null && 
-                        clickedMaterial.Name == _viewModel.SelectedMaterial.Name)
+                    if (selected != null && clickedMaterial.Name == selected.Name)
                     {
-                        _viewModel.SelectedMaterial = null;
+                        clearSelection();
                         e.Handled = true;
                     }
                 }
@@ -119,7 +134,7 @@ namespace TankManager
             else
             {
                 // Сброс фильтра при клике в пустую область
-                _viewModel.SelectedMaterial = null;
+                clearSelection();
             }
         }
 
@@ -151,35 +166,7 @@ namespace TankManager
 
         private void OverlayBackground_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (DataContext is MainViewModel viewModel)
-            {
-                viewModel.IsProductsPanelOpen = false;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Конвертер для проверки количества элементов в группе
-    /// </summary>
-    public class GroupCountToVisibilityConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is int count)
-            {
-                string mode = parameter as string;
-                
-                if (mode == "Multiple")
-                    return count > 1 ? Visibility.Visible : Visibility.Collapsed;
-                else if (mode == "Single")
-                    return count == 1 ? Visibility.Visible : Visibility.Collapsed;
-            }
-            return Visibility.Visible;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
+            _viewModel.IsProductsPanelOpen = false;
         }
     }
 

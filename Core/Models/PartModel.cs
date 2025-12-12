@@ -1,12 +1,15 @@
-﻿using KompasAPI7;
+﻿using Kompas6API5;
+using KompasAPI7;
 using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Runtime.Remoting.Contexts;
 using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
 using TankManager.Core.Constants;
 using TankManager.Core.Services;
+using static Microsoft.WindowsAPICodePack.Shell.PropertySystem.SystemProperties.System;
 
 namespace TankManager.Core.Models
 {
@@ -23,6 +26,9 @@ namespace TankManager.Core.Models
         private BitmapSource _filePreview;
         private bool _disposed;
         private bool _previewLoaded;
+        private ProductType _productType;
+        private double _length;
+
 
         // Уникальные идентификаторы для поиска в KOMPAS
         public string PartId { get; private set; }
@@ -94,6 +100,19 @@ namespace TankManager.Core.Models
             }
         }
 
+        public double Length
+        {
+            get { return _length; }
+            set
+            {
+                if (Math.Abs(_length - value) > 0.0001)
+                {
+                    _length = value;
+                    OnPropertyChanged(nameof(Mass));
+                }
+            }
+        }
+
         public string FilePath
         {
             get { return _filePath; }
@@ -103,6 +122,19 @@ namespace TankManager.Core.Models
                 {
                     _filePath = value;
                     OnPropertyChanged(nameof(FilePath));
+                }
+            }
+        }
+
+        public ProductType ProductType
+        {
+            get { return _productType; }
+            set
+            {
+                if (_productType != value)
+                {
+                    _productType = value;
+                    OnPropertyChanged(nameof(ProductType));
                 }
             }
         }
@@ -138,6 +170,7 @@ namespace TankManager.Core.Models
             _marking = string.Empty;
             _material = string.Empty;
             _filePath = string.Empty;
+            _productType = ProductType.Part;
         }
 
         public PartModel(IPart7 part, KompasContext context, int instanceIndex = 0)
@@ -154,6 +187,12 @@ namespace TankManager.Core.Models
             Material = FormatMaterial(part.Material);
             Mass = part.Mass / KompasConstants.MassConversionFactor;
             FilePath = part.FileName ?? string.Empty;
+            ProductType = DetermineProductType(DetailType, Material);
+
+            if (ProductType == ProductType.TubularProduct)
+                Length = GetLength(part, context);
+            else
+                Length = -1;
         }
 
         public PartModel(IBody7 body, KompasContext context, int instanceIndex = 0)
@@ -164,6 +203,8 @@ namespace TankManager.Core.Models
             IsBodyBased = true;
             InstanceIndex = instanceIndex;
             IPart7 parentPart = null;
+            
+
             try
             {
                 Name = body.Name ?? string.Empty;
@@ -179,11 +220,43 @@ namespace TankManager.Core.Models
                 string parentName = parentPart?.Name ?? string.Empty;
                 PartId = $"{parentName}|{Name}|{Marking}|{instanceIndex}";
                 FilePath = parentFileName;
+                ProductType = DetermineProductType(DetailType, Material);
+
+                if (ProductType == ProductType.TubularProduct)
+                    Length = GetLength(body, context);
+                else
+                    Length = -1;
             }
             finally
             {
                 // Не освобождаем parentPart, т.к. это приведение типа
             }
+        }
+
+        private static double GetLength(object detail, KompasContext context)
+        {
+            if (detail == null || context == null)
+                return 0;
+
+            try
+            {
+                if (detail is IBody7 body)
+                {
+                    string lengthValue = context.GetBodyPropertyValue(body, "Длина профиля");
+                    return ParseMass(lengthValue);
+                }
+
+                if (detail is IPart7 iPart)
+                {
+                    return context.GetDetailLengthByExtrusion(iPart);
+                }
+            }
+            catch
+            {
+                return 0;
+            }
+
+            return 0;
         }
 
         private static string DetermineDetailType(string specificationSection)
@@ -194,6 +267,38 @@ namespace TankManager.Core.Models
                 return KompasConstants.PurchasedPartType;
             }
             return KompasConstants.PartType;
+        }
+
+        private static ProductType DetermineProductType(string detailType, string material)
+        {
+            // Покупная деталь
+            if (detailType == KompasConstants.PurchasedPartType)
+            {
+                return ProductType.PurchasedPart;
+            }
+
+            // Определяем по материалу
+            if (!string.IsNullOrWhiteSpace(material))
+            {
+                string materialLower = material.ToLowerInvariant();
+
+                // Трубный прокат
+                if (materialLower.Contains("труба") || 
+                    materialLower.Contains("труб"))
+                {
+                    return ProductType.TubularProduct;
+                }
+
+                // Листовой прокат
+                if (materialLower.Contains("лист") || 
+                    materialLower.Contains("полоса") ||
+                    materialLower.Contains("рулон"))
+                {
+                    return ProductType.SheetMaterial;
+                }
+            }
+
+            return ProductType.Part;
         }
 
         private static double ParseMass(string massString)

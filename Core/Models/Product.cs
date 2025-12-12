@@ -18,8 +18,9 @@ namespace TankManager.Core.Models
         public Product() : base()
         {
             Details = new ObservableCollection<PartModel>();
-            Materials = new ObservableCollection<MaterialInfo>();
             StandardParts = new ObservableCollection<PartModel>();
+            SheetMaterials = new ObservableCollection<MaterialInfo>();
+            TubularProducts = new ObservableCollection<MaterialInfo>();
         }
 
         public Product(IPart7 part, KompasContext context, int instanceIndex = 0) 
@@ -27,13 +28,30 @@ namespace TankManager.Core.Models
         {
             Context = context;
             Details = new ObservableCollection<PartModel>();
-            Materials = new ObservableCollection<MaterialInfo>();
             StandardParts = new ObservableCollection<PartModel>();
+            SheetMaterials = new ObservableCollection<MaterialInfo>();
+            TubularProducts = new ObservableCollection<MaterialInfo>();
         }
 
+        /// <summary>
+        /// Все детали изделия
+        /// </summary>
         public ObservableCollection<PartModel> Details { get; }
-        public ObservableCollection<MaterialInfo> Materials { get; }
+
+        /// <summary>
+        /// Покупные детали (стандартные изделия)
+        /// </summary>
         public ObservableCollection<PartModel> StandardParts { get; }
+
+        /// <summary>
+        /// Листовой прокат (материал -> суммарная масса)
+        /// </summary>
+        public ObservableCollection<MaterialInfo> SheetMaterials { get; }
+
+        /// <summary>
+        /// Трубный прокат (материал -> суммарная масса)
+        /// </summary>
+        public ObservableCollection<MaterialInfo> TubularProducts { get; }
 
         /// <summary>
         /// Проверяет, связан ли продукт с активным документом KOMPAS
@@ -43,8 +61,9 @@ namespace TankManager.Core.Models
         public void Clear()
         {
             Details.Clear();
-            Materials.Clear();
             StandardParts.Clear();
+            SheetMaterials.Clear();
+            TubularProducts.Clear();
             Name = null;
             Marking = null;
             Mass = 0;

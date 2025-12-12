@@ -105,6 +105,7 @@
     <Compile Include="Core\Models\PartModel.cs" />
     <Compile Include="Core\Models\PartModelFromStorage.cs" />
     <Compile Include="Core\Models\Product.cs" />
+    <Compile Include="Core\Models\ProductType.cs" />
     <Compile Include="Core\Models\Result.cs" />
     <Compile Include="Core\Services\ComObjectManager.cs" />
     <Compile Include="Core\Services\ExcelService.cs" />

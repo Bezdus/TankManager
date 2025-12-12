@@ -37,12 +37,15 @@ namespace TankManager.Core.ViewModels
                     _currentProduct = value;
                     OnPropertyChanged(nameof(CurrentProduct));
                     OnPropertyChanged(nameof(Details));
-                    OnPropertyChanged(nameof(Materials));
+                    OnPropertyChanged(nameof(SheetMaterials));
+                    OnPropertyChanged(nameof(TubularProducts));
                     OnPropertyChanged(nameof(StandardParts));
 
                     // Сброс выбранных элементов при смене продукта
                     SelectedDetail = null;
                     SelectedStandardPart = null;
+                    SelectedSheetMaterial = null;
+                    SelectedTubularProduct = null;
                     CurrentlySelectedPart = null;
 
                     // Пересоздаём представления для новых коллекций
@@ -56,12 +59,14 @@ namespace TankManager.Core.ViewModels
 
         // Делегируем коллекции к Product
         public ObservableCollection<PartModel> Details => CurrentProduct?.Details;
-        public ObservableCollection<MaterialInfo> Materials => CurrentProduct?.Materials;
+        public ObservableCollection<MaterialInfo> SheetMaterials => CurrentProduct?.SheetMaterials;
+        public ObservableCollection<MaterialInfo> TubularProducts => CurrentProduct?.TubularProducts;
         public ObservableCollection<PartModel> StandardParts => CurrentProduct?.StandardParts;
 
         public ICollectionView DetailsView { get; private set; }
         public ICollectionView StandardPartsView { get; private set; }
-        public ICollectionView MaterialsView { get; private set; }
+        public ICollectionView SheetMaterialsView { get; private set; }
+        public ICollectionView TubularProductsView { get; private set; }
 
         // Флаг связи с KOMPAS
         private bool _isLinkedToKompas;
@@ -140,7 +145,6 @@ namespace TankManager.Core.ViewModels
         public ICommand ToggleProductsPanelCommand { get; }
         public ICommand SwitchToProductCommand { get; }
         public ICommand CopyAllToClipboardCommand { get; }
-        //public ICommand CopyDetailsToClipboardCommand { get; }
 
         public MainViewModel() : this(new KompasService())
         {
@@ -167,8 +171,7 @@ namespace TankManager.Core.ViewModels
                 DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
                 ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
                 SwitchToProductCommand = new RelayCommand<ProductFileInfo>(info => _ = SwitchToProductAsync(info));
-                CopyAllToClipboardCommand = new RelayCommand(CopyAllToClipboard, () => Materials?.Any() == true);
-                //CopyDetailsToClipboardCommand = new RelayCommand(CopyDetailsToClipboard, () => Details?.Any() == true);
+                CopyAllToClipboardCommand = new RelayCommand(CopyAllToClipboard, () => Details?.Any() == true);
                 Debug.WriteLine("MainViewModel.Constructor: Команды созданы");
                 
                 // Загрузка последнего продукта при старте с автоматическим связыванием
@@ -237,11 +240,14 @@ namespace TankManager.Core.ViewModels
 
             SelectedDetail = null;
             SelectedStandardPart = null;
+            SelectedSheetMaterial = null;
+            SelectedTubularProduct = null;
             CurrentlySelectedPart = null;
 
             OnPropertyChanged(nameof(CurrentProduct));
             OnPropertyChanged(nameof(Details));
-            OnPropertyChanged(nameof(Materials));
+            OnPropertyChanged(nameof(SheetMaterials));
+            OnPropertyChanged(nameof(TubularProducts));
             OnPropertyChanged(nameof(StandardParts));
             OnPropertyChanged(nameof(IsLinkedToKompas));
             OnPropertyChanged(nameof(KompasLinkStatus));
@@ -265,7 +271,7 @@ namespace TankManager.Core.ViewModels
 
                 if (File.Exists(filePath))
                 {
-                    // Загружаем документ в KOMPАС
+                    // Загружаем документ в KОМПАС
                     var linkedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
                     
                     if (linkedProduct != null)
@@ -273,7 +279,7 @@ namespace TankManager.Core.ViewModels
                         // Сохраняем в кэш
                         _linkedProductsCache[filePath] = linkedProduct;
                         
-                        // Обновляем данные из KOMPАС
+                        // Обновляем данные из KОМПАС
                         SetCurrentProduct(linkedProduct, isLinked: true);
                         Debug.WriteLine($"Продукт загружен и закэширован: {filePath}");
                     }
@@ -286,7 +292,7 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка связывания с KOMPАС: {ex.Message}");
+                Debug.WriteLine($"Ошибка связывания с KОМПАС: {ex.Message}");
                 IsLinkedToKompas = false;
             }
             finally
@@ -359,12 +365,18 @@ namespace TankManager.Core.ViewModels
                 OnPropertyChanged(nameof(StandardPartsView));
             }
 
-            if (Materials != null)
+            if (SheetMaterials != null)
             {
-                MaterialsView = CollectionViewSource.GetDefaultView(Materials);
-                MaterialsView.SortDescriptions.Clear();
-                MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
-                OnPropertyChanged(nameof(MaterialsView));
+                SheetMaterialsView = CollectionViewSource.GetDefaultView(SheetMaterials);
+                ApplyMaterialSort(SheetMaterialsView);
+                OnPropertyChanged(nameof(SheetMaterialsView));
+            }
+
+            if (TubularProducts != null)
+            {
+                TubularProductsView = CollectionViewSource.GetDefaultView(TubularProducts);
+                ApplyMaterialSort(TubularProductsView);
+                OnPropertyChanged(nameof(TubularProductsView));
             }
         }
 
@@ -401,25 +413,58 @@ namespace TankManager.Core.ViewModels
             }
         }
 
-        private MaterialInfo _selectedMaterial;
-        public MaterialInfo SelectedMaterial
+        // Выбранный материал для фильтрации (листовой прокат)
+        private MaterialInfo _selectedSheetMaterial;
+        public MaterialInfo SelectedSheetMaterial
         {
-            get { return _selectedMaterial; }
+            get { return _selectedSheetMaterial; }
             set
             {
-                if (_selectedMaterial != value)
+                if (_selectedSheetMaterial != value)
                 {
-                    _selectedMaterial = value;
-                    OnPropertyChanged(nameof(SelectedMaterial));
+                    _selectedSheetMaterial = value;
+                    OnPropertyChanged(nameof(SelectedSheetMaterial));
+                    OnPropertyChanged(nameof(SelectedMaterialFilter));
                     
+                    // Сбрасываем другой выбор
+                    if (value != null)
+                        _selectedTubularProduct = null;
+                    
+                    OnPropertyChanged(nameof(SelectedTubularProduct));
                     DetailsView?.Refresh();
-                    StandardPartsView?.Refresh();
                     UpdateCalculations();
                 }
             }
         }
 
-        private bool _sortMaterialsByMass = false;
+        // Выбранный материал для фильтрации (трубный прокат)
+        private MaterialInfo _selectedTubularProduct;
+        public MaterialInfo SelectedTubularProduct
+        {
+            get { return _selectedTubularProduct; }
+            set
+            {
+                if (_selectedTubularProduct != value)
+                {
+                    _selectedTubularProduct = value;
+                    OnPropertyChanged(nameof(SelectedTubularProduct));
+                    OnPropertyChanged(nameof(SelectedMaterialFilter));
+                    
+                    // Сбрасываем другой выбор
+                    if (value != null)
+                        _selectedSheetMaterial = null;
+                    
+                    OnPropertyChanged(nameof(SelectedSheetMaterial));
+                    DetailsView?.Refresh();
+                    UpdateCalculations();
+                }
+            }
+        }
+
+        // Текущий активный фильтр по материалу
+        public MaterialInfo SelectedMaterialFilter => SelectedSheetMaterial ?? SelectedTubularProduct;
+
+        private bool _sortMaterialsByMass = true;
         public bool SortMaterialsByMass
         {
             get { return _sortMaterialsByMass; }
@@ -430,7 +475,8 @@ namespace TankManager.Core.ViewModels
                     _sortMaterialsByMass = value;
                     OnPropertyChanged(nameof(SortMaterialsByMass));
                     OnPropertyChanged(nameof(MaterialSortText));
-                    ApplyMaterialSort();
+                    ApplyMaterialSort(SheetMaterialsView);
+                    ApplyMaterialSort(TubularProductsView);
                 }
             }
         }
@@ -553,7 +599,9 @@ namespace TankManager.Core.ViewModels
         {
             if (obj is PartModel part)
             {
-                if (_selectedMaterial != null && part.Material != _selectedMaterial.Name)
+                // Фильтр по выбранному материалу
+                var materialFilter = SelectedMaterialFilter;
+                if (materialFilter != null && part.Material != materialFilter.Name)
                 {
                     return false;
                 }
@@ -582,19 +630,19 @@ namespace TankManager.Core.ViewModels
             SortMaterialsByMass = !SortMaterialsByMass;
         }
 
-        private void ApplyMaterialSort()
+        private void ApplyMaterialSort(ICollectionView view)
         {
-            if (MaterialsView == null) return;
+            if (view == null) return;
 
-            MaterialsView.SortDescriptions.Clear();
+            view.SortDescriptions.Clear();
             
             if (_sortMaterialsByMass)
             {
-                MaterialsView.SortDescriptions.Add(new SortDescription("TotalMass", ListSortDirection.Descending));
+                view.SortDescriptions.Add(new SortDescription("TotalMass", ListSortDirection.Descending));
             }
             else
             {
-                MaterialsView.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
+                view.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
             }
         }
 
@@ -616,56 +664,10 @@ namespace TankManager.Core.ViewModels
 
                 TotalMassMultipleParts = groupedParts.Sum(g => g.Sum(p => p.Mass));
                 UniquePartsCount = groupedParts.Count;
-
-                UpdateMaterialWeights();
             }
             finally
             {
                 _isUpdatingCalculations = false;
-            }
-        }
-
-        private void UpdateMaterialWeights()
-        {
-            if (Details == null || Materials == null) return;
-
-            var materialWeights = Details
-                .Where(p => !string.IsNullOrEmpty(p.Material))
-                .GroupBy(p => p.Material)
-                .ToDictionary(g => g.Key, g => g.Sum(p => p.Mass));
-
-            var existingMaterials = new HashSet<string>(Materials.Select(m => m.Name));
-
-            foreach (var material in Materials)
-            {
-                if (materialWeights.TryGetValue(material.Name, out double totalMass))
-                {
-                    material.TotalMass = totalMass;
-                }
-                else
-                {
-                    material.TotalMass = 0;
-                }
-            }
-
-            foreach (var kvp in materialWeights)
-            {
-                if (!existingMaterials.Contains(kvp.Key))
-                {
-                    Materials.Add(new MaterialInfo
-                    {
-                        Name = kvp.Key,
-                        TotalMass = kvp.Value
-                    });
-                }
-            }
-
-            for (int i = Materials.Count - 1; i >= 0; i--)
-            {
-                if (!materialWeights.ContainsKey(Materials[i].Name))
-                {
-                    Materials.RemoveAt(i);
-                }
             }
         }
 
@@ -765,6 +767,15 @@ namespace TankManager.Core.ViewModels
             SearchText = string.Empty;
         }
 
+        /// <summary>
+        /// Сбросить фильтр по материалу
+        /// </summary>
+        public void ClearMaterialFilter()
+        {
+            SelectedSheetMaterial = null;
+            SelectedTubularProduct = null;
+        }
+
         private async Task LoadProductAsync(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return;
@@ -818,37 +829,19 @@ namespace TankManager.Core.ViewModels
         }
 
         /// <summary>
-        /// Копирует список материалов в буфер обмена для Excel
+        /// Копирует список деталей в буфер обмена для Excel
         /// </summary>
         private void CopyAllToClipboard()
         {
-            if (Materials == null || !Materials.Any())
+            if (Details == null || !Details.Any())
             {
-                StatusMessage = "Список материалов пуст";
+                StatusMessage = "Список деталей пуст";
                 return;
             }
 
-            //_excelService.CopyMaterialsToClipboard(Materials);
             _excelService.CopyPartsToClipboard(Details);
-            StatusMessage = $"Скопировано материалов: {Materials.Count}";
+            StatusMessage = $"Скопировано деталей: {Details.Count}";
         }
-
-        /// <summary>
-        /// Копирует список деталей в буфер обмена для Excel
-        /// </summary>
-        //private void CopyDetailsToClipboard()
-        //{
-        //    var visibleDetails = DetailsView?.Cast<PartModel>().ToList();
-            
-        //    if (visibleDetails == null || !visibleDetails.Any())
-        //    {
-        //        StatusMessage = "Список деталей пуст";
-        //        return;
-        //    }
-
-        //    _excelService.CopyPartsToClipboard(visibleDetails);
-        //    StatusMessage = $"Скопировано деталей: {visibleDetails.Count}";
-        //}
 
         public event PropertyChangedEventHandler PropertyChanged;
 

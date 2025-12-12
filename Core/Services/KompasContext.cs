@@ -20,6 +20,8 @@ namespace TankManager.Core.Services
         public IPropertyMng PropertyManager => (IPropertyMng)Application;
         public IProperty SpecificationSectionProperty { get; private set; }
 
+        //public IProperty LengthProperty { get; private set; }
+
         public bool IsInitialized => Application != null;
         public bool IsDocumentLoaded => Document != null;
 
@@ -61,6 +63,7 @@ namespace TankManager.Core.Services
             SelectionManager = Document.SelectionManager;
             ViewProjectionManager = ((IKompasDocument3D1)Document).ViewProjectionManager;
             SpecificationSectionProperty = PropertyManager.GetProperty(Document, "Раздел спецификации");
+            //LengthProperty = PropertyManager.GetProperty(Document, "Длина профиля");
         }
 
         public string GetDetailType(IPart7 part)
@@ -98,6 +101,35 @@ namespace TankManager.Core.Services
             }
         }
 
+        public double GetDetailLengthByExtrusion(IPart7 part)
+        {
+            if (part == null)
+                return 0.0;
+
+            IModelContainer modelContainer = part as IModelContainer;
+
+            IExtrusion extrusion = (IExtrusion)modelContainer.Extrusions[0];
+
+            if (extrusion != null)
+            {
+                var opRes = (extrusion as IExtrusion1).OperationResult;
+                if ((extrusion.Depth[true] != 0) && (opRes == Kompas6Constants3D.ksOperationResultEnum.ksOperationNewBody || opRes == Kompas6Constants3D.ksOperationResultEnum.ksOperationUnion))
+                    return extrusion.Depth[true];
+            }
+
+            IFeature7 feature = part as IFeature7;
+            if (feature == null)
+                return 0.0;
+
+            IBody7 body = feature.ResultBodies;
+
+            // Исправлено: преобразование строки в double с учетом возможных ошибок
+            string lengthStr = GetBodyPropertyValue(body, "Длина профиля");
+            if (double.TryParse(lengthStr, out double length))
+                return length;
+
+            return 0.0;
+        }
         public string GetBodyPropertyValue(IBody7 body, string propertyName)
         {
             if (body == null || string.IsNullOrEmpty(propertyName))
@@ -105,10 +137,15 @@ namespace TankManager.Core.Services
 
             IProperty property = null;
             IPropertyKeeper propertyKeeper = null;
+            IKompasDocument3D parentDocument3D = null;
             
             try
             {
-                property = PropertyManager.GetProperty(Document, propertyName);
+                IPart7 parentPart = body.Parent as IPart7;
+
+                parentDocument3D = Application.Documents.Open(parentPart.FileName, false, true) as IKompasDocument3D;
+
+                property = PropertyManager.GetProperty(parentDocument3D, propertyName);
                 if (property == null)
                     return null;
 
@@ -126,6 +163,16 @@ namespace TankManager.Core.Services
             }
             finally
             {
+                // Освобождаем parentDocument3D
+                if (parentDocument3D != null && Marshal.IsComObject(parentDocument3D))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(parentDocument3D);
+                    }
+                    catch { }
+                }
+
                 // Освобождаем property, если это COM-объект
                 if (property != null && Marshal.IsComObject(property))
                 {
