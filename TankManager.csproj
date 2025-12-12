@@ -107,6 +107,7 @@
     <Compile Include="Core\Models\Product.cs" />
     <Compile Include="Core\Models\Result.cs" />
     <Compile Include="Core\Services\ComObjectManager.cs" />
+    <Compile Include="Core\Services\ExcelService.cs" />
     <Compile Include="Core\Services\FileLogger.cs" />
     <Compile Include="Core\Services\IKompasService.cs" />
     <Compile Include="Core\Services\ILogger.cs" />

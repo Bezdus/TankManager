@@ -20,6 +20,7 @@ namespace TankManager.Core.ViewModels
     {
         private readonly IKompasService _kompasService;
         private readonly ProductStorageService _storageService = new ProductStorageService();
+        private readonly ExcelService _excelService = new ExcelService();
         private bool _isUpdatingCalculations = false;
 
         // Кэш загруженных продуктов (ключ = FilePath)
@@ -138,6 +139,8 @@ namespace TankManager.Core.ViewModels
         public ICommand DeleteProductCommand { get; }
         public ICommand ToggleProductsPanelCommand { get; }
         public ICommand SwitchToProductCommand { get; }
+        public ICommand CopyAllToClipboardCommand { get; }
+        //public ICommand CopyDetailsToClipboardCommand { get; }
 
         public MainViewModel() : this(new KompasService())
         {
@@ -164,6 +167,8 @@ namespace TankManager.Core.ViewModels
                 DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
                 ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
                 SwitchToProductCommand = new RelayCommand<ProductFileInfo>(info => _ = SwitchToProductAsync(info));
+                CopyAllToClipboardCommand = new RelayCommand(CopyAllToClipboard, () => Materials?.Any() == true);
+                //CopyDetailsToClipboardCommand = new RelayCommand(CopyDetailsToClipboard, () => Details?.Any() == true);
                 Debug.WriteLine("MainViewModel.Constructor: Команды созданы");
                 
                 // Загрузка последнего продукта при старте с автоматическим связыванием
@@ -811,6 +816,39 @@ namespace TankManager.Core.ViewModels
                 SavedProducts.Add(product);
             }
         }
+
+        /// <summary>
+        /// Копирует список материалов в буфер обмена для Excel
+        /// </summary>
+        private void CopyAllToClipboard()
+        {
+            if (Materials == null || !Materials.Any())
+            {
+                StatusMessage = "Список материалов пуст";
+                return;
+            }
+
+            //_excelService.CopyMaterialsToClipboard(Materials);
+            _excelService.CopyPartsToClipboard(Details);
+            StatusMessage = $"Скопировано материалов: {Materials.Count}";
+        }
+
+        /// <summary>
+        /// Копирует список деталей в буфер обмена для Excel
+        /// </summary>
+        //private void CopyDetailsToClipboard()
+        //{
+        //    var visibleDetails = DetailsView?.Cast<PartModel>().ToList();
+            
+        //    if (visibleDetails == null || !visibleDetails.Any())
+        //    {
+        //        StatusMessage = "Список деталей пуст";
+        //        return;
+        //    }
+
+        //    _excelService.CopyPartsToClipboard(visibleDetails);
+        //    StatusMessage = $"Скопировано деталей: {visibleDetails.Count}";
+        //}
 
         public event PropertyChangedEventHandler PropertyChanged;
 
