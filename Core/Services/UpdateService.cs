@@ -11,7 +11,8 @@ namespace TankManager.Core.Services
     public class UpdateService
     {
         private const string UPDATE_URL = "https://raw.githubusercontent.com/Bezdus/TankManager/master/update.xml";
-
+        private static bool _eventHandlersInitialized = false;
+        
         /// <summary>
         /// Проверяет наличие обновлений
         /// </summary>
@@ -20,18 +21,20 @@ namespace TankManager.Core.Services
         {
             try
             {
+                // Инициализируем обработчики только один раз
+                if (!_eventHandlersInitialized)
+                {
+                    AutoUpdater.CheckForUpdateEvent += AutoUpdaterOnCheckForUpdateEvent;
+                    AutoUpdater.ApplicationExitEvent += AutoUpdater_ApplicationExitEvent;
+                    _eventHandlersInitialized = true;
+                }
+                
                 // Конфигурация AutoUpdater
                 AutoUpdater.ShowSkipButton = false;
                 AutoUpdater.ShowRemindLaterButton = false;
                 AutoUpdater.Mandatory = false;
                 AutoUpdater.RunUpdateAsAdmin = false;
                 AutoUpdater.ReportErrors = showNoUpdateMessage;
-                
-                // Обработка ошибок
-                AutoUpdater.CheckForUpdateEvent += AutoUpdaterOnCheckForUpdateEvent;
-                
-                // Настройки UI
-                AutoUpdater.ApplicationExitEvent += AutoUpdater_ApplicationExitEvent;
                 
                 // Запуск проверки обновлений
                 AutoUpdater.Start(UPDATE_URL);
@@ -67,7 +70,15 @@ namespace TankManager.Core.Services
                 }
                 else
                 {
-                    // Обновлений нет
+                    // Обновлений нет - показываем сообщение только при ручной проверке
+                    if (AutoUpdater.ReportErrors)
+                    {
+                        MessageBox.Show(
+                            $"У вас установлена последняя версия приложения.\n\nТекущая версия: {args.CurrentVersion}",
+                            "Обновления не требуются",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
                 }
             }
             else

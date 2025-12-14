@@ -16,7 +16,7 @@ namespace TankManager
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
 
-            // Проверка обновлений при запуске приложения (тихая проверка)
+            // Проверка обновлений при запуске приложения
             UpdateService.CheckForUpdates(showNoUpdateMessage: false);
 
             try

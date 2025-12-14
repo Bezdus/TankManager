@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# TankManager - локальные данные приложения
+# Раскомментируйте если не хотите сохранять пользовательские данные в репозитории
+# TankManagerStorage/
+
+# Copilot snapshots (уже игнорируется через .vs/)
+# но на всякий случай добавим явно
+.vs/CopilotSnapshots/
