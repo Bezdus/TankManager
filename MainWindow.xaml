@@ -4,6 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TankManager"
+        xmlns:models="clr-namespace:TankManager.Core.Models"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="Tank Manager" Height="900" Width="1800"
         AllowDrop="True"
@@ -18,6 +20,14 @@
         <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
         <local:GroupItemPropertyConverter x:Key="GroupItemPropertyConverter"/>
+        <local:MaterialSortTypeConverter x:Key="MaterialSortTypeConverter"/>
+
+        <!-- ObjectDataProvider для MaterialSortType enum -->
+        <ObjectDataProvider x:Key="SheetMaterialSortOptions" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="models:MaterialSortType"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
 
         <!-- Цветовая палитра -->
         <SolidColorBrush x:Key="PrimaryBackground" Color="#FFFFFFFF"/>
@@ -114,6 +124,123 @@
                     <Setter Property="Opacity" Value="0.5"/>
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- Стиль для ComboBox сортировки -->
+        <Style x:Key="SortComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <Grid>
+                                <ToggleButton x:Name="ToggleButton"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Focusable="False"
+                                             IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                             ClickMode="Press">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Grid Background="Transparent">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Grid.Column="0"
+                                                                 Content="{TemplateBinding Content}"
+                                                                 Margin="8,4,4,4"
+                                                                 HorizontalAlignment="Left"
+                                                                 VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="1"
+                                                          Text="▼"
+                                                          FontSize="8"
+                                                          Margin="4,4,8,4"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{StaticResource TextSecondary}"/>
+                                            </Grid>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <ContentPresenter x:Name="ContentSite"
+                                                 Content="{TemplateBinding SelectionBoxItem}"
+                                                 ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                 ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                 Margin="8,4,24,4"
+                                                 HorizontalAlignment="Left"
+                                                 VerticalAlignment="Center"
+                                                 IsHitTestVisible="False"/>
+                                <Popup x:Name="Popup"
+                                      Placement="Bottom"
+                                      IsOpen="{TemplateBinding IsDropDownOpen}"
+                                      AllowsTransparency="True"
+                                      Focusable="False"
+                                      PopupAnimation="Slide">
+                                    <Border Background="{StaticResource PrimaryBackground}"
+                                           BorderBrush="{StaticResource BorderColor}"
+                                           BorderThickness="1"
+                                           CornerRadius="3"
+                                           Margin="0,2,0,0">
+                                        <Border.Effect>
+                                            <DropShadowEffect ShadowDepth="2" Opacity="0.2" BlurRadius="5"/>
+                                        </Border.Effect>
+                                        <ScrollViewer MaxHeight="200">
+                                            <StackPanel IsItemsHost="True"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Padding" Value="8,4"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                        <Setter Property="FontSize" Value="10"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border Background="{TemplateBinding Background}"
+                                           Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Общий шаблон для списка деталей с группировкой -->
@@ -643,14 +770,20 @@
                                     <TextBlock Text="📄" Margin="0,0,5,0"/>
                                     <TextBlock Text="Листовой" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" 
-                                        Content="{Binding MaterialSortText}"
-                                        Command="{Binding ToggleMaterialSortCommand}"
-                                        FontSize="9"
-                                        Padding="4,2"
-                                        Margin="4,0"
-                                        Style="{StaticResource CopyButtonStyle}"
-                                        ToolTip="Сортировка"/>
+                                <ComboBox Grid.Column="1"
+                                          SelectedValue="{Binding SheetMaterialsSortType, Mode=TwoWay}"
+                                          Style="{StaticResource SortComboBoxStyle}"
+                                          Width="110"
+                                          Margin="4,0"
+                                          ToolTip="Выберите тип сортировки">
+                                    <models:MaterialSortType>ByName</models:MaterialSortType>
+                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                                 <Button Grid.Column="2" 
                                         Content="📋" 
                                         Style="{StaticResource CopyButtonStyle}"
@@ -685,12 +818,28 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="🔩" Margin="0,0,5,0"/>
                                     <TextBlock Text="Трубный" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" 
+                                <ComboBox Grid.Column="1"
+                                          SelectedValue="{Binding TubularProductsSortType, Mode=TwoWay}"
+                                          Style="{StaticResource SortComboBoxStyle}"
+                                          Width="110"
+                                          Margin="4,0"
+                                          ToolTip="Выберите тип сортировки">
+                                    <models:MaterialSortType>ByLength</models:MaterialSortType>
+                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                    <models:MaterialSortType>ByName</models:MaterialSortType>
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="2" 
                                         Content="📋" 
                                         Style="{StaticResource CopyButtonStyle}"
                                         Command="{Binding CopyTubularProductsToClipboardCommand}"
@@ -726,12 +875,27 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="🔩" Margin="0,0,5,0"/>
                                     <TextBlock Text="Прочие" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" 
+                                 <ComboBox Grid.Column="1"
+                                          SelectedValue="{Binding OtherMaterialsSortType, Mode=TwoWay}"
+                                          Style="{StaticResource SortComboBoxStyle}"
+                                          Width="110"
+                                          Margin="4,0"
+                                          ToolTip="Выберите тип сортировки">
+                                    <models:MaterialSortType>ByName</models:MaterialSortType>
+                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="2" 
                                         Content="📋" 
                                         Style="{StaticResource CopyButtonStyle}"
                                         Command="{Binding CopyOtherMaterialsToClipboardCommand}"

@@ -99,9 +99,11 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Converters\MaterialSortTypeConverter.cs" />
     <Compile Include="Converters\NullToVisibilityConverter.cs" />
     <Compile Include="Core\Constants\KompasConstants.cs" />
     <Compile Include="Core\Models\MaterialInfo.cs" />
+    <Compile Include="Core\Models\MaterialSortType.cs" />
     <Compile Include="Core\Models\PartModel.cs" />
     <Compile Include="Core\Models\PartModelFromStorage.cs" />
     <Compile Include="Core\Models\Product.cs" />
@@ -174,6 +176,7 @@
     <PackageReference Include="MvvmLightLibs">
       <Version>5.4.1.1</Version>
     </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="System.Runtime.Serialization.Json">
       <Version>4.3.0</Version>
     </PackageReference>

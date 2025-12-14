@@ -35,7 +35,9 @@ namespace TankManager.Core.ViewModels
         private string _searchText;
         private MaterialInfo _selectedSheetMaterial;
         private MaterialInfo _selectedTubularProduct;
-        private bool _sortMaterialsByMass = true;
+        private MaterialSortType _sheetMaterialsSortType = MaterialSortType.ByMass;
+        private MaterialSortType _tubularProductsSortType = MaterialSortType.ByLength;
+        private MaterialSortType _otherMaterialsSortType = MaterialSortType.ByMass;
         private PartModel _currentlySelectedPart;
         private PartModel _selectedDetail;
         private PartModel _selectedStandardPart;
@@ -176,20 +178,91 @@ namespace TankManager.Core.ViewModels
 
         public MaterialInfo SelectedMaterialFilter => SelectedSheetMaterial ?? SelectedTubularProduct;
 
-        public bool SortMaterialsByMass
+        public MaterialSortType SheetMaterialsSortType
         {
-            get => _sortMaterialsByMass;
+            get => _sheetMaterialsSortType;
             set
             {
-                if (SetProperty(ref _sortMaterialsByMass, value, nameof(SortMaterialsByMass), nameof(MaterialSortText)))
+                if (SetProperty(ref _sheetMaterialsSortType, value, nameof(SheetMaterialsSortType), nameof(SheetMaterialsSortText)))
                 {
-                    ApplyMaterialSort(SheetMaterialsView);
-                    ApplyMaterialSort(TubularProductsView);
+                    ApplyMaterialSort(SheetMaterialsView, value);
                 }
             }
         }
 
-        public string MaterialSortText => _sortMaterialsByMass ? "Сортировка: по массе ↓" : "Сортировка: по названию ↑";
+        public MaterialSortType TubularProductsSortType
+        {
+            get => _tubularProductsSortType;
+            set
+            {
+                if (SetProperty(ref _tubularProductsSortType, value, nameof(TubularProductsSortType), nameof(TubularProductsSortText)))
+                {
+                    ApplyMaterialSort(TubularProductsView, value);
+                }
+            }
+        }
+
+        public MaterialSortType OtherMaterialsSortType
+        {
+            get => _otherMaterialsSortType;
+            set
+            {
+                if (SetProperty(ref _otherMaterialsSortType, value, nameof(OtherMaterialsSortType), nameof(OtherMaterialsSortText)))
+                {
+                    ApplyMaterialSort(OtherMaterialsView, value);
+                }
+            }
+        }
+
+        public string SheetMaterialsSortText
+        {
+            get
+            {
+                switch (_sheetMaterialsSortType)
+                {
+                    case MaterialSortType.ByName:
+                        return "по названию ↑";
+                    case MaterialSortType.ByMass:
+                        return "по массе ↓";
+                    default:
+                        return "сортировка";
+                }
+            }
+        }
+
+        public string TubularProductsSortText
+        {
+            get
+            {
+                switch (_tubularProductsSortType)
+                {
+                    case MaterialSortType.ByName:
+                        return "по названию ↑";
+                    case MaterialSortType.ByLength:
+                        return "по длине ↓";
+                    case MaterialSortType.ByMass:
+                        return "по массе ↓";
+                    default:
+                        return "сортировка";
+                }
+            }
+        }
+
+        public string OtherMaterialsSortText
+        {
+            get
+            {
+                switch (_otherMaterialsSortType)
+                {
+                    case MaterialSortType.ByName:
+                        return "по названию ↑";
+                    case MaterialSortType.ByMass:
+                        return "по массе ↓";
+                    default:
+                        return "сортировка";
+                }
+            }
+        }
 
         #endregion
 
@@ -268,7 +341,6 @@ namespace TankManager.Core.ViewModels
         #region Commands
 
         public ICommand ShowInKompasCommand { get; private set; }
-        public ICommand ToggleMaterialSortCommand { get; private set; }
         public ICommand LoadFromActiveDocumentCommand { get; private set; }
         public ICommand ClearSearchCommand { get; private set; }
         public ICommand LoadProductCommand { get; private set; }
@@ -303,7 +375,6 @@ namespace TankManager.Core.ViewModels
         private void InitializeCommands()
         {
             ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null && IsLinkedToKompas);
-            ToggleMaterialSortCommand = new RelayCommand(() => SortMaterialsByMass = !SortMaterialsByMass);
             LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync());
             ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
             LoadProductCommand = new RelayCommand<string>(fileName => _ = LoadProductAsync(fileName));
@@ -563,9 +634,9 @@ namespace TankManager.Core.ViewModels
         {
             DetailsView = CreatePartView(Details);
             StandardPartsView = CreatePartView(StandardParts);
-            SheetMaterialsView = CreateMaterialView(SheetMaterials);
-            TubularProductsView = CreateMaterialView(TubularProducts);
-            OtherMaterialsView = CreateMaterialView(OtherMaterials);
+            SheetMaterialsView = CreateMaterialView(SheetMaterials, SheetMaterialsSortType);
+            TubularProductsView = CreateMaterialView(TubularProducts, TubularProductsSortType);
+            OtherMaterialsView = CreateMaterialView(OtherMaterials, OtherMaterialsSortType);
 
             OnPropertyChanged(nameof(DetailsView));
             OnPropertyChanged(nameof(StandardPartsView));
@@ -585,12 +656,12 @@ namespace TankManager.Core.ViewModels
             return view;
         }
 
-        private ICollectionView CreateMaterialView(ObservableCollection<MaterialInfo> materials)
+        private ICollectionView CreateMaterialView(ObservableCollection<MaterialInfo> materials, MaterialSortType sortType)
         {
             if (materials == null) return null;
 
             var view = CollectionViewSource.GetDefaultView(materials);
-            ApplyMaterialSort(view);
+            ApplyMaterialSort(view, sortType);
             return view;
         }
 
@@ -610,14 +681,23 @@ namespace TankManager.Core.ViewModels
                    (part.Marking?.ToLower().Contains(searchLower) ?? false);
         }
 
-        private void ApplyMaterialSort(ICollectionView view)
+        private void ApplyMaterialSort(ICollectionView view, MaterialSortType sortType)
         {
             if (view == null) return;
 
             view.SortDescriptions.Clear();
-            view.SortDescriptions.Add(_sortMaterialsByMass
-                ? new SortDescription("TotalMass", ListSortDirection.Descending)
-                : new SortDescription("Name", ListSortDirection.Ascending));
+            switch (sortType)
+            {
+                case MaterialSortType.ByName:
+                    view.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
+                    break;
+                case MaterialSortType.ByMass:
+                    view.SortDescriptions.Add(new SortDescription("TotalMass", ListSortDirection.Descending));
+                    break;
+                case MaterialSortType.ByLength:
+                    view.SortDescriptions.Add(new SortDescription("TotalLength", ListSortDirection.Descending));
+                    break;
+            }
         }
 
         private void RefreshViews()
