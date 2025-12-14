@@ -279,6 +279,9 @@ namespace TankManager.Core.ViewModels
         public ICommand CopySheetToClipboardCommand { get; private set; }
         public ICommand CopyTubularProductsToClipboardCommand { get; private set; }
         public ICommand CopyStandartPartsToClipboardCommand { get; private set; }
+        public ICommand CopyOtherMaterialsToClipboardCommand { get; private set; }
+        public ICommand CopyAllDataToClipboardCommand { get; private set; }
+        public ICommand CheckForUpdatesCommand { get; private set; }
 
         #endregion
 
@@ -311,6 +314,9 @@ namespace TankManager.Core.ViewModels
             CopySheetToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, SheetMaterials), () => SheetMaterials?.Any() == true);
             CopyTubularProductsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyTubularProductsToClipboard, TubularProducts), () => TubularProducts?.Any() == true);
             CopyStandartPartsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyPartsToClipboard, StandardParts), () => StandardParts?.Any() == true);
+            CopyOtherMaterialsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, OtherMaterials), () => OtherMaterials?.Any() == true);
+            CopyAllDataToClipboardCommand = new RelayCommand(CopyAllDataToClipboard, () => StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
+            CheckForUpdatesCommand = new RelayCommand(() => UpdateService.CheckForUpdates(showNoUpdateMessage: true));
         }
 
         #endregion
@@ -375,7 +381,7 @@ namespace TankManager.Core.ViewModels
             finally
             {
                 IsLoading = false;
-                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+                NotifyCopyCommandsCanExecuteChanged();
             }
         }
 
@@ -403,7 +409,7 @@ namespace TankManager.Core.ViewModels
             finally
             {
                 IsLoading = false;
-                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+                NotifyCopyCommandsCanExecuteChanged();
             }
         }
 
@@ -432,7 +438,7 @@ namespace TankManager.Core.ViewModels
             finally
             {
                 IsLoading = false;
-                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+                NotifyCopyCommandsCanExecuteChanged();
             }
         }
 
@@ -472,7 +478,7 @@ namespace TankManager.Core.ViewModels
             OnPropertyChanged(nameof(KompasLinkStatus));
             InitializeCollectionViews();
             UpdateCalculations();
-            ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+            NotifyCopyCommandsCanExecuteChanged();
         }
 
         private void AutoSaveProduct()
@@ -668,6 +674,14 @@ namespace TankManager.Core.ViewModels
             StatusMessage = $"Скопировано элементов: {items.Count()}";
         }
 
+        private void CopyAllDataToClipboard()
+        {
+            _excelService.CopyAllDataToClipboard(StandardParts, SheetMaterials, TubularProducts, OtherMaterials);
+            
+            int count = (StandardParts?.Count ?? 0) + (SheetMaterials?.Count ?? 0) + (TubularProducts?.Count ?? 0) + (OtherMaterials?.Count ?? 0);
+            StatusMessage = $"Скопировано все данные: {count} элементов";
+        }
+
         #endregion
 
         #region Helper Methods
@@ -680,6 +694,17 @@ namespace TankManager.Core.ViewModels
             OnPropertyChanged(nameof(TubularProducts));
             OnPropertyChanged(nameof(StandardParts));
             OnPropertyChanged(nameof(OtherMaterials));
+        }
+
+        private void NotifyCopyCommandsCanExecuteChanged()
+        {
+            ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)CopyAllToClipboardCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)CopySheetToClipboardCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)CopyTubularProductsToClipboardCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)CopyStandartPartsToClipboardCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)CopyOtherMaterialsToClipboardCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)CopyAllDataToClipboardCommand)?.NotifyCanExecuteChanged();
         }
 
         private void ResetSelections()
@@ -706,7 +731,7 @@ namespace TankManager.Core.ViewModels
             MessageBox.Show($"{message}: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
-        private bool SetProperty<T>(ref T field, T value, params string[] propertyNames)
+        private bool SetProperty<T>(ref T field, T value, params String[] propertyNames)
         {
             if (EqualityComparer<T>.Default.Equals(field, value)) return false;
             

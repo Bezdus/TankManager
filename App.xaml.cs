@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows;
+using TankManager.Core.Services;
 
 namespace TankManager
 {
@@ -14,6 +15,9 @@ namespace TankManager
             
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
+
+            // Проверка обновлений при запуске приложения
+            UpdateService.CheckForUpdates();
 
             try
             {

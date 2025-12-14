@@ -121,6 +121,7 @@
     <Compile Include="Core\Services\PartIntersectionDetector.cs" />
     <Compile Include="Core\Services\ProductStorageService.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />
+    <Compile Include="Core\Services\UpdateService.cs" />
     <Compile Include="Core\ViewModels\MainViewModel.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
@@ -166,6 +167,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Autoupdater.NET.Official" Version="1.9.2" />
     <PackageReference Include="CommunityToolkit.Mvvm">
       <Version>8.4.0</Version>
     </PackageReference>
@@ -184,6 +186,9 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Views\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="update.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

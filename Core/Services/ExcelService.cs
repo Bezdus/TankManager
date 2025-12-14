@@ -73,6 +73,129 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
+        /// Копирует все данные в буфер обмена: покупные детали, листовые материалы, трубные материалы, прочие материалы через пустой столбец
+        /// </summary>
+        public void CopyAllDataToClipboard(
+            IEnumerable<PartModel> standardParts,
+            IEnumerable<MaterialInfo> sheetMaterials,
+            IEnumerable<MaterialInfo> tubularProducts,
+            IEnumerable<MaterialInfo> otherMaterials)
+        {
+            try
+            {
+                var standardPartsList = standardParts?.ToList() ?? new List<PartModel>();
+                var sheetMaterialsList = sheetMaterials?.ToList() ?? new List<MaterialInfo>();
+                var tubularProductsList = tubularProducts?.ToList() ?? new List<MaterialInfo>();
+                var otherMaterialsList = otherMaterials?.ToList() ?? new List<MaterialInfo>();
+
+                if (!standardPartsList.Any() && !sheetMaterialsList.Any() && !tubularProductsList.Any() && !otherMaterialsList.Any())
+                {
+                    MessageBox.Show("Нет данных для копирования", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // Подготовка данных покупных деталей с группировкой
+                var groupedParts = standardPartsList
+                    .GroupBy(p => new { p.Name, p.Marking, p.Material })
+                    .OrderBy(g => g.Key.Name)
+                    .ThenBy(g => g.Key.Marking)
+                    .Select(g => new
+                    {
+                        Name = g.Key.Name,
+                        Marking = g.Key.Marking,
+                        Material = g.Key.Material,
+                        Count = g.Count(),
+                        UnitMass = g.First().Mass,
+                        TotalMass = g.Sum(p => p.Mass)
+                    })
+                    .ToList();
+
+                // Определяем максимальное количество строк
+                int maxRows = Math.Max(Math.Max(Math.Max(groupedParts.Count, sheetMaterialsList.Count), tubularProductsList.Count), otherMaterialsList.Count);
+
+                var sb = new StringBuilder();
+
+                // Заголовки: Покупные детали | пустой столбец | Листовые материалы | пустой столбец | Трубные материалы | пустой столбец | Прочие материалы
+                sb.AppendLine("Наименование\tОбозначение\tМатериал\tКоличество\tМасса ед. (кг)\tМасса общ. (кг)\t\tМатериал\tМасса (кг)\t\tМатериал\tДлина (мм)\t\tМатериал\tМасса (кг)");
+
+                for (int i = 0; i < maxRows; i++)
+                {
+                    var row = new List<string>();
+
+                    // Покупные детали (6 столбцов)
+                    if (i < groupedParts.Count)
+                    {
+                        var part = groupedParts[i];
+                        row.Add(part.Name ?? "");
+                        row.Add(part.Marking ?? "");
+                        row.Add(part.Material ?? "");
+                        row.Add(part.Count.ToString());
+                        row.Add(part.UnitMass.ToString("F3"));
+                        row.Add(part.TotalMass.ToString("F3"));
+                    }
+                    else
+                    {
+                        row.AddRange(new[] { "", "", "", "", "", "" });
+                    }
+
+                    // Пустой столбец
+                    row.Add("");
+
+                    // Листовые материалы (2 столбца)
+                    if (i < sheetMaterialsList.Count)
+                    {
+                        var material = sheetMaterialsList[i];
+                        row.Add(material.Name ?? "");
+                        row.Add(material.TotalMass.ToString("F2"));
+                    }
+                    else
+                    {
+                        row.AddRange(new[] { "", "" });
+                    }
+
+                    // Пустой столбец
+                    row.Add("");
+
+                    // Трубные материалы (2 столбца)
+                    if (i < tubularProductsList.Count)
+                    {
+                        var tubular = tubularProductsList[i];
+                        row.Add(tubular.Name ?? "");
+                        row.Add(tubular.TotalLength.ToString("F2"));
+                    }
+                    else
+                    {
+                        row.AddRange(new[] { "", "" });
+                    }
+
+                    // Пустой столбец
+                    row.Add("");
+
+                    // Прочие материалы (2 столбца)
+                    if (i < otherMaterialsList.Count)
+                    {
+                        var other = otherMaterialsList[i];
+                        row.Add(other.Name ?? "");
+                        row.Add(other.TotalMass.ToString("F2"));
+                    }
+                    else
+                    {
+                        row.AddRange(new[] { "", "" });
+                    }
+
+                    sb.AppendLine(string.Join("\t", row));
+                }
+
+                Clipboard.SetText(sb.ToString());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при копировании в буфер обмена: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
         /// Универсальный метод копирования коллекции в буфер обмена
         /// </summary>
         private void CopyToClipboard<T>(

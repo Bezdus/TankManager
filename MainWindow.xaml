@@ -264,27 +264,50 @@
 
         <!-- Панель инструментов -->
         <Border Grid.Row="0" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="8,6">
-            <StackPanel Orientation="Horizontal">
-                <Button Command="{Binding ToggleProductsPanelCommand}"
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <Button Command="{Binding ToggleProductsPanelCommand}"
+                            Style="{StaticResource PanelButtonStyle}"
+                            ToolTip="Список сохранённых изделий">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📋" Margin="0,0,5,0"/>
+                            <TextBlock Text="Изделия"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+
+                    <Button x:Name="LoadDocumentButton" 
+                            Click="LoadDocumentButton_Click"
+                            Style="{StaticResource PanelButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📂" Margin="0,0,5,0"/>
+                            <TextBlock Text="Загрузить"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+
+                    <Button Command="{Binding CopyAllDataToClipboardCommand}"
+                            Style="{StaticResource PanelButtonStyle}"
+                            ToolTip="Копировать покупные детали, листовые и трубные материалы в Excel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📊" Margin="0,0,5,0"/>
+                            <TextBlock Text="Копировать всё в Excel"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <Button HorizontalAlignment="Right"
+                        Command="{Binding CheckForUpdatesCommand}"
                         Style="{StaticResource PanelButtonStyle}"
-                        ToolTip="Список сохранённых изделий">
+                        ToolTip="Проверить наличие обновлений">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="📋" Margin="0,0,5,0"/>
-                        <TextBlock Text="Изделия"/>
+                        <TextBlock Text="🔄" Margin="0,0,5,0"/>
+                        <TextBlock Text="Проверить обновления"/>
                     </StackPanel>
                 </Button>
-
-                <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
-
-                <Button x:Name="LoadDocumentButton" 
-                        Click="LoadDocumentButton_Click"
-                        Style="{StaticResource PanelButtonStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="📂" Margin="0,0,5,0"/>
-                        <TextBlock Text="Загрузить"/>
-                    </StackPanel>
-                </Button>
-            </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Информация об изделии -->
@@ -699,10 +722,21 @@
                     <!-- Прочие материалы -->
                     <GroupBox Grid.Row="2" Grid.Column="0" Margin="3">
                         <GroupBox.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🔩" Margin="0,0,5,0"/>
-                                <TextBlock Text="Прочие" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🔩" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Прочие" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" 
+                                        Content="📋" 
+                                        Style="{StaticResource CopyButtonStyle}"
+                                        Command="{Binding CopyOtherMaterialsToClipboardCommand}"
+                                        ToolTip="Копировать в Excel"/>
+                            </Grid>
                         </GroupBox.Header>
                         <ListBox ItemsSource="{Binding OtherMaterialsView}"
                                  SelectedItem="{Binding SelectedTubularProduct}"
