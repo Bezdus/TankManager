@@ -53,20 +53,20 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Kompas6API5">
-      <HintPath>KompasApiDll\Kompas6API5.dll</HintPath>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <HintPath>..\KompasLibs\Kompas6API5.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="Kompas6Constants">
-      <HintPath>KompasApiDll\Kompas6Constants.dll</HintPath>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <HintPath>..\KompasLibs\Kompas6Constants.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="Kompas6Constants3D">
-      <HintPath>KompasApiDll\Kompas6Constants3D.dll</HintPath>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <HintPath>..\KompasLibs\Kompas6Constants3D.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="KompasAPI7">
-      <HintPath>KompasApiDll\KompasAPI7.dll</HintPath>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <HintPath>..\KompasLibs\KompasAPI7.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />

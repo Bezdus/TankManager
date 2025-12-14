@@ -70,6 +70,7 @@ namespace TankManager.Core.Services
         public static Gabarit GetPartGabarit(IPart7 part)
         {
             var gabarit = new Gabarit();
+
             part.GetGabarit(true, true,
                 out gabarit.X1, out gabarit.Y1, out gabarit.Z1,
                 out gabarit.X2, out gabarit.Y2, out gabarit.Z2);

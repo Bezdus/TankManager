@@ -124,7 +124,7 @@ namespace TankManager.Core.Services
             IFeature7 feature = part as IFeature7;
             if (feature != null)
             {
-                IBody7 body = feature.ResultBodies;
+                IBody7 body = feature.ResultBodies as IBody7;
                 string lengthStr = GetBodyPropertyValue(body, "Длина профиля");
                 if (double.TryParse(lengthStr, out double length))
                     return length;
