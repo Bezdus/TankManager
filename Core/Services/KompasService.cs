@@ -9,10 +9,14 @@ using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
 {
+    /// <summary>
+    /// Сервис для работы с KOMPAS-3D
+    /// </summary>
     public class KompasService : IKompasService
     {
         private readonly ILogger _logger;
         private readonly ComObjectManager _comManager;
+        private readonly MaterialAggregator _materialAggregator;
 
         public KompasService() : this(new FileLogger())
         {
@@ -22,13 +26,18 @@ namespace TankManager.Core.Services
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _comManager = new ComObjectManager(_logger);
+            _materialAggregator = new MaterialAggregator(_logger);
         }
 
+        /// <summary>
+        /// Загружает документ из файла
+        /// </summary>
+        /// <param name="filePath">Путь к файлу документа</param>
+        /// <returns>Загруженный продукт</returns>
         public Product LoadDocument(string filePath)
         {
             _logger.LogInfo($"Loading document: {filePath}");
 
-            // Создаём новый контекст для каждого документа
             var context = new KompasContext();
             EnsureKompasInitialized(context);
 
@@ -56,6 +65,10 @@ namespace TankManager.Core.Services
             }
         }
 
+        /// <summary>
+        /// Загружает активный документ из KOMPAS
+        /// </summary>
+        /// <returns>Загруженный продукт</returns>
         public Product LoadActiveDocument()
         {
             _logger.LogInfo("Loading active document from KOMPAS");
@@ -87,12 +100,26 @@ namespace TankManager.Core.Services
             }
         }
 
+        /// <summary>
+        /// Создает продукт из верхней детали контекста
+        /// </summary>
         private Product CreateProductFromTopPart(KompasContext context)
         {
             var topPart = context.TopPart;
             var product = new Product(topPart, context);
 
-            var partExtractor = new PartExtractor(context, _logger, _comManager);
+            ExtractAllParts(product, topPart);
+            _materialAggregator.AggregateMaterials(product);
+
+            return product;
+        }
+
+        /// <summary>
+        /// Извлекает все детали из верхней детали
+        /// </summary>
+        private void ExtractAllParts(Product product, IPart7 topPart)
+        {
+            var partExtractor = new PartExtractor(context: product.Context, logger: _logger, comManager: _comManager);
             var parts = new List<PartModel>();
             partExtractor.ExtractParts(topPart, parts);
 
@@ -100,95 +127,35 @@ namespace TankManager.Core.Services
             {
                 product.Details.Add(part);
 
-                switch (part.ProductType)
+                if (part.ProductType == ProductType.PurchasedPart)
                 {
-                    case ProductType.PurchasedPart:
-                        product.StandardParts.Add(part);
-                        break;
+                    product.StandardParts.Add(part);
                 }
             }
-
-            // Агрегируем материалы по типам
-            AggregateMaterials(product);
-
-            return product;
         }
 
         /// <summary>
-        /// Агрегирует материалы из деталей в соответствующие коллекции
+        /// Отображает деталь в KOMPAS (выделяет и центрирует камеру)
         /// </summary>
-        private void AggregateMaterials(Product product)
-        {
-            // Группируем листовой прокат по материалу
-            var sheetMaterials = product.Details
-                .Where(p => p.ProductType == ProductType.SheetMaterial && !string.IsNullOrEmpty(p.Material))
-                .GroupBy(p => p.Material)
-                .Select(g => new MaterialInfo
-                {
-                    Name = g.Key,
-                    TotalMass = g.Sum(p => p.Mass)
-                })
-                .OrderByDescending(m => m.TotalMass);
-
-            foreach (var material in sheetMaterials)
-            {
-                product.SheetMaterials.Add(material);
-            }
-
-            // Группируем трубный прокат по материалу
-            var tubularProducts = product.Details
-                .Where(p => p.ProductType == ProductType.TubularProduct && !string.IsNullOrEmpty(p.Material))
-                .GroupBy(p => p.Material)
-                .Select(g => new MaterialInfo
-                {
-                    Name = g.Key,
-                    TotalMass = g.Sum(p => p.Mass)
-                })
-                .OrderByDescending(m => m.TotalMass);
-
-            foreach (var material in tubularProducts)
-            {
-                product.TubularProducts.Add(material);
-            }
-
-            _logger.LogInfo($"Aggregated materials: {product.SheetMaterials.Count} sheet, {product.TubularProducts.Count} tubular");
-        }
-
+        /// <param name="detail">Деталь для отображения</param>
+        /// <param name="product">Продукт, содержащий деталь</param>
         public void ShowDetailInKompas(PartModel detail, Product product)
         {
-            if (detail == null)
-            {
-                _logger.LogWarning("Detail is null");
+            if (!ValidateShowDetailParameters(detail, product))
                 return;
-            }
-
-            if (product?.Context == null || !product.Context.IsDocumentLoaded)
-            {
-                _logger.LogWarning("Product context not loaded");
-                return;
-            }
 
             var context = product.Context;
 
             try
             {
-                Debug.WriteLine(context.TopPart.Name);
-                
-                var partFinder = new PartFinder(_logger);
-                IPart7 targetPart = partFinder.FindPartByModel(detail, context.TopPart);
-                
+                var targetPart = FindTargetPart(detail, context);
                 if (targetPart == null)
                 {
                     _logger.LogWarning($"Could not find part: {detail.Name}");
                     return;
                 }
 
-                context.Document.Active = true;
-
-                SelectDetail(context, targetPart);
-                
-                var cameraController = new KompasCameraController(context, _logger);
-                cameraController.FocusOnPart(targetPart);
+                ActivateDocumentAndShowPart(context, targetPart);
             }
             catch (Exception ex)
             {
@@ -197,6 +164,52 @@ namespace TankManager.Core.Services
             }
         }
 
+        /// <summary>
+        /// Валидирует параметры для отображения детали
+        /// </summary>
+        private bool ValidateShowDetailParameters(PartModel detail, Product product)
+        {
+            if (detail == null)
+            {
+                _logger.LogWarning("Detail is null");
+                return false;
+            }
+
+            if (product?.Context == null || !product.Context.IsDocumentLoaded)
+            {
+                _logger.LogWarning("Product context not loaded");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Находит деталь в контексте по модели
+        /// </summary>
+        private IPart7 FindTargetPart(PartModel detail, KompasContext context)
+        {
+            Debug.WriteLine(context.TopPart.Name);
+            
+            var partFinder = new PartFinder(_logger);
+            return partFinder.FindPartByModel(detail, context.TopPart);
+        }
+
+        /// <summary>
+        /// Активирует документ, выделяет и центрирует камеру на детали
+        /// </summary>
+        private void ActivateDocumentAndShowPart(KompasContext context, IPart7 targetPart)
+        {
+            context.Document.Active = true;
+            SelectDetail(context, targetPart);
+            
+            var cameraController = new KompasCameraController(context, _logger);
+            cameraController.FocusOnPart(targetPart);
+        }
+
+        /// <summary>
+        /// Проверяет инициализацию KOMPAS
+        /// </summary>
         private void EnsureKompasInitialized(KompasContext context)
         {
             if (!context.IsInitialized)
@@ -207,6 +220,9 @@ namespace TankManager.Core.Services
             }
         }
 
+        /// <summary>
+        /// Выделяет деталь в документе
+        /// </summary>
         private void SelectDetail(KompasContext context, IPart7 part)
         {
             context.SelectionManager.UnselectAll();

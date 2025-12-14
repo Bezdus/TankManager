@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 
 namespace TankManager.Core.Models
 {
@@ -6,6 +7,7 @@ namespace TankManager.Core.Models
     {
         private string _name;
         private double _totalMass;
+        private double _totalLength;
 
         public string Name
         {
@@ -29,6 +31,20 @@ namespace TankManager.Core.Models
                 {
                     _totalMass = value;
                     OnPropertyChanged(nameof(TotalMass));
+                    OnPropertyChanged(nameof(DisplayText));
+                }
+            }
+        }
+
+        public double TotalLength
+        {
+            get => _totalLength;
+            set
+            {
+                if (Math.Abs(_totalLength - value) > 0.0001)
+                {
+                    _totalLength = value;
+                    OnPropertyChanged(nameof(TotalLength));
                     OnPropertyChanged(nameof(DisplayText));
                 }
             }

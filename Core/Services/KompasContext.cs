@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 
 namespace TankManager.Core.Services
 {
+    /// <summary>
+    /// Контекст работы с KOMPAS-3D документом
+    /// </summary>
     public class KompasContext : IDisposable
     {
         public IApplication Application { get; private set; }
@@ -20,20 +23,21 @@ namespace TankManager.Core.Services
         public IPropertyMng PropertyManager => (IPropertyMng)Application;
         public IProperty SpecificationSectionProperty { get; private set; }
 
-        //public IProperty LengthProperty { get; private set; }
-
         public bool IsInitialized => Application != null;
-        public bool IsDocumentLoaded => Document != null;
+        public bool IsDocumentLoaded => Document != null && TopPart != null;
 
         public KompasContext()
         {
             Application = GetKompasApplication();
         }
 
+        /// <summary>
+        /// Загружает документ из файла
+        /// </summary>
+        /// <param name="filePath">Путь к файлу документа</param>
         public void LoadDocument(string filePath)
         {
-            if (Application == null)
-                throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
+            ValidateApplication();
 
             Document = Application.Documents.Open(filePath) as IKompasDocument3D;
 
@@ -43,10 +47,12 @@ namespace TankManager.Core.Services
             }
         }
 
+        /// <summary>
+        /// Загружает активный документ
+        /// </summary>
         public void LoadActiveDocument()
         {
-            if (Application == null)
-                throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
+            ValidateApplication();
 
             Document = Application.ActiveDocument as IKompasDocument3D;
 
@@ -56,6 +62,9 @@ namespace TankManager.Core.Services
             InitializeDocumentComponents();
         }
 
+        /// <summary>
+        /// Инициализирует компоненты документа
+        /// </summary>
         private void InitializeDocumentComponents()
         {
             TopPart = Document.TopPart;
@@ -63,9 +72,13 @@ namespace TankManager.Core.Services
             SelectionManager = Document.SelectionManager;
             ViewProjectionManager = ((IKompasDocument3D1)Document).ViewProjectionManager;
             SpecificationSectionProperty = PropertyManager.GetProperty(Document, "Раздел спецификации");
-            //LengthProperty = PropertyManager.GetProperty(Document, "Длина профиля");
         }
 
+        /// <summary>
+        /// Получает тип детали из свойств спецификации
+        /// </summary>
+        /// <param name="part">Деталь для анализа</param>
+        /// <returns>Тип детали или null</returns>
         public string GetDetailType(IPart7 part)
         {
             if (SpecificationSectionProperty == null || part == null)
@@ -88,48 +101,76 @@ namespace TankManager.Core.Services
             }
             finally
             {
-                // Приведение типа (as) не создает новый RCW, поэтому освобождать не нужно
-                // Проверяем на всякий случай
-                if (propertyKeeper != null && propertyKeeper != (object)part && Marshal.IsComObject(propertyKeeper))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(propertyKeeper);
-                    }
-                    catch { }
-                }
+                ReleaseComObjectIfNeeded(propertyKeeper, part);
             }
         }
 
+        /// <summary>
+        /// Получает длину детали по выдавливанию
+        /// </summary>
+        /// <param name="part">Деталь для анализа</param>
+        /// <returns>Длина детали</returns>
         public double GetDetailLengthByExtrusion(IPart7 part)
         {
             if (part == null)
                 return 0.0;
 
-            IModelContainer modelContainer = part as IModelContainer;
+            // Пытаемся получить длину из выдавливания
+            double extrusionDepth = TryGetExtrusionDepth(part);
+            if (extrusionDepth > 0)
+                return extrusionDepth;
 
-            IExtrusion extrusion = (IExtrusion)modelContainer.Extrusions[0];
-
-            if (extrusion != null)
+            // Пытаемся получить длину из свойства "Длина профиля"
+            IFeature7 feature = part as IFeature7;
+            if (feature != null)
             {
-                var opRes = (extrusion as IExtrusion1).OperationResult;
-                if ((extrusion.Depth[true] != 0) && (opRes == Kompas6Constants3D.ksOperationResultEnum.ksOperationNewBody || opRes == Kompas6Constants3D.ksOperationResultEnum.ksOperationUnion))
-                    return extrusion.Depth[true];
+                IBody7 body = feature.ResultBodies;
+                string lengthStr = GetBodyPropertyValue(body, "Длина профиля");
+                if (double.TryParse(lengthStr, out double length))
+                    return length;
             }
 
-            IFeature7 feature = part as IFeature7;
-            if (feature == null)
-                return 0.0;
-
-            IBody7 body = feature.ResultBodies;
-
-            // Исправлено: преобразование строки в double с учетом возможных ошибок
-            string lengthStr = GetBodyPropertyValue(body, "Длина профиля");
-            if (double.TryParse(lengthStr, out double length))
-                return length;
-
-            return 0.0;
+            // Возвращаем максимальный габарит
+            var partGabarit = KompasCameraController.GetPartGabarit(part);
+            return partGabarit.MaxSize;
         }
+
+        /// <summary>
+        /// Пытается получить глубину выдавливания
+        /// </summary>
+        private double TryGetExtrusionDepth(IPart7 part)
+        {
+            try
+            {
+                IModelContainer modelContainer = part as IModelContainer;
+                if (modelContainer == null || modelContainer.Extrusions.Count == 0)
+                    return 0.0;
+
+                IExtrusion extrusion = (IExtrusion)modelContainer.Extrusions[0];
+                if (extrusion == null)
+                    return 0.0;
+
+                var opRes = (extrusion as IExtrusion1).OperationResult;
+                bool isValidOperation = opRes == Kompas6Constants3D.ksOperationResultEnum.ksOperationNewBody 
+                                     || opRes == Kompas6Constants3D.ksOperationResultEnum.ksOperationUnion;
+
+                if (extrusion.Depth[true] != 0 && isValidOperation)
+                    return extrusion.Depth[true];
+
+                return 0.0;
+            }
+            catch
+            {
+                return 0.0;
+            }
+        }
+
+        /// <summary>
+        /// Получает значение свойства тела
+        /// </summary>
+        /// <param name="body">Тело детали</param>
+        /// <param name="propertyName">Имя свойства</param>
+        /// <returns>Значение свойства или null</returns>
         public string GetBodyPropertyValue(IBody7 body, string propertyName)
         {
             if (body == null || string.IsNullOrEmpty(propertyName))
@@ -142,7 +183,6 @@ namespace TankManager.Core.Services
             try
             {
                 IPart7 parentPart = body.Parent as IPart7;
-
                 parentDocument3D = Application.Documents.Open(parentPart.FileName, false, true) as IKompasDocument3D;
 
                 property = PropertyManager.GetProperty(parentDocument3D, propertyName);
@@ -163,43 +203,19 @@ namespace TankManager.Core.Services
             }
             finally
             {
-                // Освобождаем parentDocument3D
-                if (parentDocument3D != null && Marshal.IsComObject(parentDocument3D))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(parentDocument3D);
-                    }
-                    catch { }
-                }
-
-                // Освобождаем property, если это COM-объект
-                if (property != null && Marshal.IsComObject(property))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(property);
-                    }
-                    catch { }
-                }
-
-                // Приведение типа не создает новый RCW
-                if (propertyKeeper != null && propertyKeeper != (object)body && Marshal.IsComObject(propertyKeeper))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(propertyKeeper);
-                    }
-                    catch { }
-                }
+                ReleaseComObject(parentDocument3D);
+                ReleaseComObject(property);
+                ReleaseComObjectIfNeeded(propertyKeeper, body);
             }
         }
 
+        /// <summary>
+        /// Закрывает документ и освобождает ресурсы
+        /// </summary>
         public void CloseDocument()
         {
             if (Document != null)
             {
-                // Освобождаем COM-объекты в обратном порядке
                 ReleaseComObject(SpecificationSectionProperty);
                 ReleaseComObject(ViewProjectionManager);
                 ReleaseComObject(SelectionManager);
@@ -216,6 +232,18 @@ namespace TankManager.Core.Services
             }
         }
 
+        /// <summary>
+        /// Проверяет, что приложение инициализировано
+        /// </summary>
+        private void ValidateApplication()
+        {
+            if (Application == null)
+                throw new InvalidOperationException("Не удалось подключиться к KOMPAS-3D");
+        }
+
+        /// <summary>
+        /// Получает экземпляр приложения KOMPAS
+        /// </summary>
         private static IApplication GetKompasApplication()
         {
             try
@@ -228,6 +256,9 @@ namespace TankManager.Core.Services
             }
         }
 
+        /// <summary>
+        /// Освобождает COM-объект
+        /// </summary>
         private void ReleaseComObject(object obj)
         {
             if (obj != null && Marshal.IsComObject(obj))
@@ -235,6 +266,21 @@ namespace TankManager.Core.Services
                 try
                 {
                     Marshal.ReleaseComObject(obj);
+                }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Освобождает COM-объект, если он отличается от базового объекта
+        /// </summary>
+        private void ReleaseComObjectIfNeeded(object comObject, object baseObject)
+        {
+            if (comObject != null && comObject != (object)baseObject && Marshal.IsComObject(comObject))
+            {
+                try
+                {
+                    Marshal.ReleaseComObject(comObject);
                 }
                 catch { }
             }

@@ -212,6 +212,8 @@ namespace TankManager.Core.Models
                 DetailType = KompasConstants.PartType;
                 Material = FormatMaterial(
                     context.GetBodyPropertyValue(body, KompasConstants.MaterialPropertyName));
+
+
                 Mass = ParseMass(
                     context.GetBodyPropertyValue(body, KompasConstants.MassPropertyName));
                 
@@ -284,7 +286,10 @@ namespace TankManager.Core.Models
 
                 // Трубный прокат
                 if (materialLower.Contains("труба") || 
-                    materialLower.Contains("труб"))
+                    materialLower.Contains("труб") ||
+                    materialLower.Contains("круг") ||
+                    materialLower.Contains("уголок") ||
+                    materialLower.Contains("стержень"))
                 {
                     return ProductType.TubularProduct;
                 }
@@ -331,37 +336,62 @@ namespace TankManager.Core.Models
             if (string.IsNullOrWhiteSpace(material))
                 return material ?? string.Empty;
 
-            // Удаляем состояние поверхности
-            string result = Regex.Replace(material,
-                @"\s+х/к\s*\([^)]+\)", "", RegexOptions.IgnoreCase);
+            string result = material;
 
-            // Извлекаем толщину
-            var thicknessMatch = Regex.Match(result, @"\$d(\d+\.?\d*)");
-            string thickness = thicknessMatch.Success ? thicknessMatch.Groups[1].Value : null;
+            // 1. Заменяем $d на пробел
+            result = Regex.Replace(result, @"\$d", " ");
 
-            // Извлекаем марку стали
-            var steelGradeMatch = Regex.Match(result, @";([A-Z]+\s*\d*)");
-            string steelGrade = steelGradeMatch.Success
-                ? steelGradeMatch.Groups[1].Value.Trim()
-                : null;
+            // 2. Убираем ГОСТы и ТУ с номерами
+            result = Regex.Replace(result, @"\s*(ГОСТ|ТУ)\s*[\d\-;]+", " ", RegexOptions.IgnoreCase);
 
-            if (thicknessMatch.Success || steelGradeMatch.Success)
-            {
-                var baseMatch = Regex.Match(result, @"^([А-Яа-яA-Za-z]+)");
-                string basePart = baseMatch.Success ? baseMatch.Groups[1].Value : "Лист";
+            // 3. Убираем лишние $ и ;
+            result = result.Replace("$", "").Replace(";", "");
 
-                var parts = new[]
-                {
-                    basePart,
-                    thickness != null ? $"{thickness} мм" : null,
-                    steelGrade ?? DefaultSteelGrade
-                };
+            // 4. Разделяем размерные параметры (например, "d60" → "60")
+            result = Regex.Replace(result, @"\b[dD](\d+)", "$1");
 
-                return string.Join(" ", Array.FindAll(parts, p => p != null));
-            }
+            // 5. Убираем лишние пробелы
+            //result = Regex.Replace(result, @"\s+", " ").Trim();
 
             return result;
         }
+
+        //private static string FormatMaterial(string material)
+        //{
+        //    if (string.IsNullOrWhiteSpace(material))
+        //        return material ?? string.Empty;
+
+        //    // Удаляем состояние поверхности
+        //    string result = Regex.Replace(material,
+        //        @"\s+х/к\s*\([^)]+\)", "", RegexOptions.IgnoreCase);
+
+        //    // Извлекаем толщину
+        //    var thicknessMatch = Regex.Match(result, @"\$d(\d+\.?\d*)");
+        //    string thickness = thicknessMatch.Success ? thicknessMatch.Groups[1].Value : null;
+
+        //    // Извлекаем марку стали
+        //    var steelGradeMatch = Regex.Match(result, @";([A-Z]+\s*\d*)");
+        //    string steelGrade = steelGradeMatch.Success
+        //        ? steelGradeMatch.Groups[1].Value.Trim()
+        //        : null;
+
+        //    if (thicknessMatch.Success || steelGradeMatch.Success)
+        //    {
+        //        var baseMatch = Regex.Match(result, @"^([А-Яа-яA-Za-z]+)");
+        //        string basePart = baseMatch.Success ? baseMatch.Groups[1].Value : "Лист";
+
+        //        var parts = new[]
+        //        {
+        //            basePart,
+        //            thickness != null ? $"{thickness} мм" : null,
+        //            steelGrade ?? DefaultSteelGrade
+        //        };
+
+        //        return string.Join(" ", Array.FindAll(parts, p => p != null));
+        //    }
+
+        //    return result;
+        //}
 
         public event PropertyChangedEventHandler PropertyChanged;
 

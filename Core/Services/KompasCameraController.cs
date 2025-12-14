@@ -8,7 +8,7 @@ namespace TankManager.Core.Services
     /// <summary>
     /// Управляет камерой и позиционированием в KOMPAS
     /// </summary>
-    internal class KompasCameraController
+    class KompasCameraController
     {
         private readonly KompasContext _context;
         private readonly ILogger _logger;
@@ -67,7 +67,7 @@ namespace TankManager.Core.Services
             return (globalX, globalY, globalZ);
         }
 
-        public Gabarit GetPartGabarit(IPart7 part)
+        public static Gabarit GetPartGabarit(IPart7 part)
         {
             var gabarit = new Gabarit();
             part.GetGabarit(true, true,
@@ -131,6 +131,13 @@ namespace TankManager.Core.Services
         internal struct Gabarit
         {
             public double X1, Y1, Z1, X2, Y2, Z2;
+
+            public double SizeX => Math.Abs(X2 - X1);
+            public double SizeY => Math.Abs(Y2 - Y1);
+            public double SizeZ => Math.Abs(Z2 - Z1);
+
+            public double MaxSize => Math.Max(SizeX, Math.Max(SizeY, SizeZ));
+            public double Height => Math.Abs(Z2 - Z1);
         }
     }
 }

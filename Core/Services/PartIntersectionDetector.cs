@@ -63,7 +63,7 @@ namespace TankManager.Core.Services
                     IPart7 topPart = _context.Document.TopPart as IPart7;
                     IntPtr targetPtr = Marshal.GetIUnknownForObject(targetDetail);
 
-                    var targetGabarit = _cameraController.GetPartGabarit(targetDetail);
+                    var targetGabarit = KompasCameraController.GetPartGabarit(targetDetail);
                     double targetMaxDim = CalculateMaxDimension(targetGabarit);
 
                     _logger.LogInfo($"Camera position: ({cameraPosition.x:F2}, {cameraPosition.y:F2}, {cameraPosition.z:F2})");

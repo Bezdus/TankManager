@@ -21,6 +21,7 @@ namespace TankManager.Core.Models
             StandardParts = new ObservableCollection<PartModel>();
             SheetMaterials = new ObservableCollection<MaterialInfo>();
             TubularProducts = new ObservableCollection<MaterialInfo>();
+            OtherMaterials = new ObservableCollection<MaterialInfo>();
         }
 
         public Product(IPart7 part, KompasContext context, int instanceIndex = 0) 
@@ -31,6 +32,7 @@ namespace TankManager.Core.Models
             StandardParts = new ObservableCollection<PartModel>();
             SheetMaterials = new ObservableCollection<MaterialInfo>();
             TubularProducts = new ObservableCollection<MaterialInfo>();
+            OtherMaterials = new ObservableCollection<MaterialInfo>();
         }
 
         /// <summary>
@@ -52,6 +54,11 @@ namespace TankManager.Core.Models
         /// Трубный прокат (материал -> суммарная масса)
         /// </summary>
         public ObservableCollection<MaterialInfo> TubularProducts { get; }
+
+        /// <summary>
+        /// Трубный прокат (материал -> суммарная масса)
+        /// </summary>
+        public ObservableCollection<MaterialInfo> OtherMaterials { get; }
 
         /// <summary>
         /// Проверяет, связан ли продукт с активным документом KOMPAS

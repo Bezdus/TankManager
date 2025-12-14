@@ -18,281 +18,358 @@ namespace TankManager.Core.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
+        #region Fields
+
         private readonly IKompasService _kompasService;
         private readonly ProductStorageService _storageService = new ProductStorageService();
         private readonly ExcelService _excelService = new ExcelService();
-        private bool _isUpdatingCalculations = false;
-
-        // Кэш загруженных продуктов (ключ = FilePath)
         private readonly Dictionary<string, Product> _linkedProductsCache = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
-
+        
+        private bool _isUpdatingCalculations;
         private Product _currentProduct;
+        private bool _isLinkedToKompas;
+        private ObservableCollection<ProductFileInfo> _savedProducts;
+        private ProductFileInfo _selectedSavedProduct;
+        private bool _isProductsPanelOpen;
+        private string _filePath;
+        private string _searchText;
+        private MaterialInfo _selectedSheetMaterial;
+        private MaterialInfo _selectedTubularProduct;
+        private bool _sortMaterialsByMass = true;
+        private PartModel _currentlySelectedPart;
+        private PartModel _selectedDetail;
+        private PartModel _selectedStandardPart;
+        private bool _isLoading;
+        private string _statusMessage;
+        private double _totalMassMultipleParts;
+        private int _uniquePartsCount;
+
+        #endregion
+
+        #region Properties - Product
+
         public Product CurrentProduct
         {
             get => _currentProduct;
             private set
             {
-                if (_currentProduct != value)
-                {
-                    _currentProduct = value;
-                    OnPropertyChanged(nameof(CurrentProduct));
-                    OnPropertyChanged(nameof(Details));
-                    OnPropertyChanged(nameof(SheetMaterials));
-                    OnPropertyChanged(nameof(TubularProducts));
-                    OnPropertyChanged(nameof(StandardParts));
-
-                    // Сброс выбранных элементов при смене продукта
-                    SelectedDetail = null;
-                    SelectedStandardPart = null;
-                    SelectedSheetMaterial = null;
-                    SelectedTubularProduct = null;
-                    CurrentlySelectedPart = null;
-
-                    // Пересоздаём представления для новых коллекций
-                    InitializeCollectionViews();
-                    
-                    // Автосохранение при установке нового продукта
-                    AutoSaveProduct();
-                }
+                if (_currentProduct == value) return;
+                
+                _currentProduct = value;
+                NotifyProductChanged();
+                ResetSelections();
+                InitializeCollectionViews();
+                AutoSaveProduct();
             }
         }
 
-        // Делегируем коллекции к Product
         public ObservableCollection<PartModel> Details => CurrentProduct?.Details;
         public ObservableCollection<MaterialInfo> SheetMaterials => CurrentProduct?.SheetMaterials;
         public ObservableCollection<MaterialInfo> TubularProducts => CurrentProduct?.TubularProducts;
         public ObservableCollection<PartModel> StandardParts => CurrentProduct?.StandardParts;
+        public ObservableCollection<MaterialInfo> OtherMaterials => CurrentProduct?.OtherMaterials;
+
+        #endregion
+
+        #region Properties - Collection Views
 
         public ICollectionView DetailsView { get; private set; }
         public ICollectionView StandardPartsView { get; private set; }
         public ICollectionView SheetMaterialsView { get; private set; }
         public ICollectionView TubularProductsView { get; private set; }
+        public ICollectionView OtherMaterialsView { get; private set; }
 
-        // Флаг связи с KOMPAS
-        private bool _isLinkedToKompas;
+        #endregion
+
+        #region Properties - KOMPAS Link
+
         public bool IsLinkedToKompas
         {
             get => _isLinkedToKompas;
-            private set
-            {
-                if (_isLinkedToKompas != value)
-                {
-                    _isLinkedToKompas = value;
-                    OnPropertyChanged(nameof(IsLinkedToKompas));
-                    OnPropertyChanged(nameof(KompasLinkStatus));
-                }
-            }
+            private set => SetProperty(ref _isLinkedToKompas, value, nameof(IsLinkedToKompas), nameof(KompasLinkStatus));
         }
 
-        public string KompasLinkStatus => IsLinkedToKompas 
-            ? "🔗 Связан с KOMPАС" 
-            : "⚠️ Нет связи с KOMPАС";
+        public string KompasLinkStatus => IsLinkedToKompas ? "🔗 Связан с КОМПАС" : "⚠️ Нет связи с КОМПАС";
 
-        // Список сохранённых продуктов
-        private ObservableCollection<ProductFileInfo> _savedProducts;
+        #endregion
+
+        #region Properties - Saved Products
+
         public ObservableCollection<ProductFileInfo> SavedProducts
         {
             get => _savedProducts;
-            private set
-            {
-                _savedProducts = value;
-                OnPropertyChanged(nameof(SavedProducts));
-            }
+            private set => SetProperty(ref _savedProducts, value, nameof(SavedProducts));
         }
 
-        // Выбранный продукт в списке
-        private ProductFileInfo _selectedSavedProduct;
         public ProductFileInfo SelectedSavedProduct
         {
             get => _selectedSavedProduct;
             set
             {
-                if (_selectedSavedProduct != value)
-                {
-                    _selectedSavedProduct = value;
-                    OnPropertyChanged(nameof(SelectedSavedProduct));
+                if (SetProperty(ref _selectedSavedProduct, value, nameof(SelectedSavedProduct)))
                     ((RelayCommand)DeleteProductCommand)?.NotifyCanExecuteChanged();
-                }
             }
         }
 
-        // Видимость панели продуктов
-        private bool _isProductsPanelOpen;
         public bool IsProductsPanelOpen
         {
             get => _isProductsPanelOpen;
             set
             {
-                if (_isProductsPanelOpen != value)
+                if (SetProperty(ref _isProductsPanelOpen, value, nameof(IsProductsPanelOpen)) && value)
+                    RefreshSavedProducts();
+            }
+        }
+
+        #endregion
+
+        #region Properties - Filters & Search
+
+        public string FilePath
+        {
+            get => _filePath;
+            set
+            {
+                if (SetProperty(ref _filePath, value, nameof(FilePath)))
+                    _ = LoadDocumentAsync(value);
+            }
+        }
+
+        public string SearchText
+        {
+            get => _searchText;
+            set
+            {
+                if (SetProperty(ref _searchText, value, nameof(SearchText)))
                 {
-                    _isProductsPanelOpen = value;
-                    OnPropertyChanged(nameof(IsProductsPanelOpen));
-                    
-                    if (value)
-                    {
-                        RefreshSavedProducts();
-                    }
+                    RefreshViews();
+                    UpdateCalculations();
                 }
             }
         }
 
-        public ICommand ShowInKompasCommand { get; }
-        public ICommand ToggleMaterialSortCommand { get; }
-        public ICommand LoadFromActiveDocumentCommand { get; }
-        public ICommand ClearSearchCommand { get; }
-        public ICommand LoadProductCommand { get; }
-        public ICommand DeleteProductCommand { get; }
-        public ICommand ToggleProductsPanelCommand { get; }
-        public ICommand SwitchToProductCommand { get; }
-        public ICommand CopyAllToClipboardCommand { get; }
-
-        public MainViewModel() : this(new KompasService())
+        public MaterialInfo SelectedSheetMaterial
         {
+            get => _selectedSheetMaterial;
+            set
+            {
+                if (SetProperty(ref _selectedSheetMaterial, value, nameof(SelectedSheetMaterial)))
+                {
+                    if (value != null) _selectedTubularProduct = null;
+                    OnMaterialFilterChanged();
+                }
+            }
         }
+
+        public MaterialInfo SelectedTubularProduct
+        {
+            get => _selectedTubularProduct;
+            set
+            {
+                if (SetProperty(ref _selectedTubularProduct, value, nameof(SelectedTubularProduct)))
+                {
+                    if (value != null) _selectedSheetMaterial = null;
+                    OnMaterialFilterChanged();
+                }
+            }
+        }
+
+        public MaterialInfo SelectedMaterialFilter => SelectedSheetMaterial ?? SelectedTubularProduct;
+
+        public bool SortMaterialsByMass
+        {
+            get => _sortMaterialsByMass;
+            set
+            {
+                if (SetProperty(ref _sortMaterialsByMass, value, nameof(SortMaterialsByMass), nameof(MaterialSortText)))
+                {
+                    ApplyMaterialSort(SheetMaterialsView);
+                    ApplyMaterialSort(TubularProductsView);
+                }
+            }
+        }
+
+        public string MaterialSortText => _sortMaterialsByMass ? "Сортировка: по массе ↓" : "Сортировка: по названию ↑";
+
+        #endregion
+
+        #region Properties - Selection
+
+        public PartModel CurrentlySelectedPart
+        {
+            get => _currentlySelectedPart;
+            private set
+            {
+                if (SetProperty(ref _currentlySelectedPart, value, nameof(CurrentlySelectedPart)))
+                    ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+            }
+        }
+
+        public PartModel SelectedDetail
+        {
+            get => _selectedDetail;
+            set
+            {
+                if (SetProperty(ref _selectedDetail, value, nameof(SelectedDetail)) && value != null)
+                {
+                    SelectedStandardPart = null;
+                    CurrentlySelectedPart = value;
+                }
+            }
+        }
+
+        public PartModel SelectedStandardPart
+        {
+            get => _selectedStandardPart;
+            set
+            {
+                if (SetProperty(ref _selectedStandardPart, value, nameof(SelectedStandardPart)) && value != null)
+                {
+                    SelectedDetail = null;
+                    CurrentlySelectedPart = value;
+                }
+            }
+        }
+
+        #endregion
+
+        #region Properties - Status
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set => SetProperty(ref _isLoading, value, nameof(IsLoading));
+        }
+
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            set => SetProperty(ref _statusMessage, value, nameof(StatusMessage));
+        }
+
+        public double TotalMassMultipleParts
+        {
+            get => _totalMassMultipleParts;
+            set
+            {
+                if (Math.Abs(_totalMassMultipleParts - value) > 0.0001)
+                    SetProperty(ref _totalMassMultipleParts, value, nameof(TotalMassMultipleParts));
+            }
+        }
+
+        public int UniquePartsCount
+        {
+            get => _uniquePartsCount;
+            set => SetProperty(ref _uniquePartsCount, value, nameof(UniquePartsCount));
+        }
+
+        #endregion
+
+        #region Commands
+
+        public ICommand ShowInKompasCommand { get; private set; }
+        public ICommand ToggleMaterialSortCommand { get; private set; }
+        public ICommand LoadFromActiveDocumentCommand { get; private set; }
+        public ICommand ClearSearchCommand { get; private set; }
+        public ICommand LoadProductCommand { get; private set; }
+        public ICommand DeleteProductCommand { get; private set; }
+        public ICommand ToggleProductsPanelCommand { get; private set; }
+        public ICommand SwitchToProductCommand { get; private set; }
+        public ICommand CopyAllToClipboardCommand { get; private set; }
+        public ICommand CopySheetToClipboardCommand { get; private set; }
+        public ICommand CopyTubularProductsToClipboardCommand { get; private set; }
+        public ICommand CopyStandartPartsToClipboardCommand { get; private set; }
+
+        #endregion
+
+        #region Constructors
+
+        public MainViewModel() : this(new KompasService()) { }
 
         public MainViewModel(IKompasService kompasService)
         {
-            Debug.WriteLine("MainViewModel.Constructor: Начало");
+            _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
             
-            try
-            {
-                _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
-                Debug.WriteLine("MainViewModel.Constructor: KompasService установлен");
+            SavedProducts = new ObservableCollection<ProductFileInfo>();
+            CurrentProduct = new Product();
 
-                SavedProducts = new ObservableCollection<ProductFileInfo>();
-                CurrentProduct = new Product();
-                Debug.WriteLine("MainViewModel.Constructor: Product создан");
-
-                ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null && IsLinkedToKompas);
-                ToggleMaterialSortCommand = new RelayCommand(ToggleMaterialSort);
-                LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync());
-                ClearSearchCommand = new RelayCommand(ClearSearch);
-                LoadProductCommand = new RelayCommand<string>(fileName => _ = LoadProductAsync(fileName));
-                DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
-                ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
-                SwitchToProductCommand = new RelayCommand<ProductFileInfo>(info => _ = SwitchToProductAsync(info));
-                CopyAllToClipboardCommand = new RelayCommand(CopyAllToClipboard, () => Details?.Any() == true);
-                Debug.WriteLine("MainViewModel.Constructor: Команды созданы");
-                
-                // Загрузка последнего продукта при старте с автоматическим связыванием
-                _ = LoadLastProductAsync();
-
-                Debug.WriteLine("MainViewModel.Constructor: ЗавершеноSuccessfully");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"MainViewModel.Constructor: ИСКЛЮЧЕНИЕ - {ex.Message}");
-                Debug.WriteLine($"MainViewModel.Constructor: StackTrace - {ex.StackTrace}");
-                throw;
-            }
+            InitializeCommands();
+            _ = LoadLastProductAsync();
         }
 
-        /// <summary>
-        /// Загрузка последнего продукта при старте с автоматическим связыванием с KOMPАС
-        /// </summary>
+        private void InitializeCommands()
+        {
+            ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null && IsLinkedToKompas);
+            ToggleMaterialSortCommand = new RelayCommand(() => SortMaterialsByMass = !SortMaterialsByMass);
+            LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync());
+            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
+            LoadProductCommand = new RelayCommand<string>(fileName => _ = LoadProductAsync(fileName));
+            DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
+            ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
+            SwitchToProductCommand = new RelayCommand<ProductFileInfo>(info => _ = SwitchToProductAsync(info));
+            CopyAllToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyPartsToClipboard, Details), () => Details?.Any() == true);
+            CopySheetToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, SheetMaterials), () => SheetMaterials?.Any() == true);
+            CopyTubularProductsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyTubularProductsToClipboard, TubularProducts), () => TubularProducts?.Any() == true);
+            CopyStandartPartsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyPartsToClipboard, StandardParts), () => StandardParts?.Any() == true);
+        }
+
+        #endregion
+
+        #region Product Loading
+
         private async Task LoadLastProductAsync()
         {
             var lastProduct = _storageService.LoadLast();
-            if (lastProduct == null || string.IsNullOrEmpty(lastProduct.Name))
-                return;
-
-            await LoadAndLinkProductAsync(lastProduct, "Загружен последний Product");
+            if (lastProduct != null && !string.IsNullOrEmpty(lastProduct.Name))
+                await LoadAndLinkProductAsync(lastProduct, "Загружен последний Product");
         }
 
-        /// <summary>
-        /// Загрузить продукт и автоматически связать с KOMPАС (с кэшированием)
-        /// </summary>
         private async Task LoadAndLinkProductAsync(Product savedProduct, string successMessage)
         {
-            string filePath = savedProduct.FilePath;
+            var filePath = savedProduct.FilePath;
 
-            // Проверяем кэш — если уже загружали этот продукт, используем его
             if (!string.IsNullOrEmpty(filePath) && _linkedProductsCache.TryGetValue(filePath, out var cachedProduct))
             {
-                // Мгновенное переключение из кэша
                 SetCurrentProduct(cachedProduct, isLinked: true);
                 StatusMessage = $"{successMessage} (из кэша)";
-                Debug.WriteLine($"Продукт загружен из кэша: {filePath}");
                 return;
             }
 
-            // Сначала показываем сохранённые данные (мгновенно)
             SetCurrentProduct(savedProduct, isLinked: false);
 
-            // Затем пытаемся связать с KOMPАС в фоне
             if (!string.IsNullOrEmpty(filePath))
-            {
                 await TryLinkToKompasAsync(filePath);
-            }
 
-            StatusMessage = IsLinkedToKompas 
-                ? $"{successMessage} (связан с KOMPАС)" 
-                : $"{successMessage} (без связи с KOMPАС)";
+            StatusMessage = IsLinkedToKompas
+                ? $"{successMessage} (связан с КОМПАС)"
+                : $"{successMessage} (без связи с КОМПАС)";
         }
 
-        /// <summary>
-        /// Установить текущий продукт без вызова сеттера (для избежания автосохранения при переключении)
-        /// </summary>
-        private void SetCurrentProduct(Product product, bool isLinked)
-        {
-            _currentProduct = product;
-            _isLinkedToKompas = isLinked;
-
-            SelectedDetail = null;
-            SelectedStandardPart = null;
-            SelectedSheetMaterial = null;
-            SelectedTubularProduct = null;
-            CurrentlySelectedPart = null;
-
-            OnPropertyChanged(nameof(CurrentProduct));
-            OnPropertyChanged(nameof(Details));
-            OnPropertyChanged(nameof(SheetMaterials));
-            OnPropertyChanged(nameof(TubularProducts));
-            OnPropertyChanged(nameof(StandardParts));
-            OnPropertyChanged(nameof(IsLinkedToKompas));
-            OnPropertyChanged(nameof(KompasLinkStatus));
-            InitializeCollectionViews();
-            UpdateCalculations();
-            ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
-        }
-
-        /// <summary>
-        /// Попытаться связать с KOMPАС — загрузить документ по пути (с кэшированием)
-        /// </summary>
         private async Task TryLinkToKompasAsync(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath))
-                return;
+            if (string.IsNullOrEmpty(filePath)) return;
 
             try
             {
                 IsLoading = true;
-                StatusMessage = "Связывание с KOMPАС...";
+                StatusMessage = "Связывание с КОМПАС...";
 
-                if (File.Exists(filePath))
+                if (!File.Exists(filePath))
                 {
-                    // Загружаем документ в KОМПАС
-                    var linkedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
-                    
-                    if (linkedProduct != null)
-                    {
-                        // Сохраняем в кэш
-                        _linkedProductsCache[filePath] = linkedProduct;
-                        
-                        // Обновляем данные из KОМПАС
-                        SetCurrentProduct(linkedProduct, isLinked: true);
-                        Debug.WriteLine($"Продукт загружен и закэширован: {filePath}");
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine($"Файл не найден: {filePath}");
                     StatusMessage = $"Файл не найден: {Path.GetFileName(filePath)}";
+                    return;
+                }
+
+                var linkedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
+                if (linkedProduct != null)
+                {
+                    _linkedProductsCache[filePath] = linkedProduct;
+                    SetCurrentProduct(linkedProduct, isLinked: true);
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка связывания с KОМПАС: {ex.Message}");
+                Debug.WriteLine($"Ошибка связывания с КОМПАС: {ex.Message}");
                 IsLinkedToKompas = false;
             }
             finally
@@ -302,402 +379,9 @@ namespace TankManager.Core.ViewModels
             }
         }
 
-        /// <summary>
-        /// Очистить кэш загруженных продуктов (например, при обновлении данных)
-        /// </summary>
-        public void ClearProductCache()
-        {
-            _linkedProductsCache.Clear();
-            Debug.WriteLine("Кэш продуктов очищен");
-        }
-
-        /// <summary>
-        /// Очистить конкретный продукт из кэша (при изменении файла)
-        /// </summary>
-        public void InvalidateProductCache(string filePath)
-        {
-            if (!string.IsNullOrEmpty(filePath) && _linkedProductsCache.Remove(filePath))
-            {
-                Debug.WriteLine($"Продукт удалён из кэша: {filePath}");
-            }
-        }
-
-        /// <summary>
-        /// Автоматическое сохранение продукта в список (если ещё не существует)
-        /// </summary>
-        private void AutoSaveProduct()
-        {
-            if (CurrentProduct == null || string.IsNullOrEmpty(CurrentProduct.Name))
-                return;
-
-            // Проверяем, существует ли уже такой продукт
-            var existingProducts = _storageService.GetSavedProducts();
-            var existing = existingProducts.FirstOrDefault(p => 
-                p.ProductName == CurrentProduct.Name && 
-                p.Marking == CurrentProduct.Marking);
-
-            if (existing == null)
-            {
-                // Сохраняем только если такого продукта ещё нет
-                string filePath = _storageService.Save(CurrentProduct);
-                StatusMessage = $"Автосохранено: {Path.GetFileName(filePath)}";
-                RefreshSavedProducts();
-            }
-        }
-
-        private void InitializeCollectionViews()
-        {
-            if (Details != null)
-            {
-                DetailsView = CollectionViewSource.GetDefaultView(Details);
-                DetailsView.Filter = FilterDetails;
-                DetailsView.GroupDescriptions.Clear();
-                DetailsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
-                OnPropertyChanged(nameof(DetailsView));
-            }
-
-            if (StandardParts != null)
-            {
-                StandardPartsView = CollectionViewSource.GetDefaultView(StandardParts);
-                StandardPartsView.Filter = FilterDetails;
-                StandardPartsView.GroupDescriptions.Clear();
-                StandardPartsView.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
-                OnPropertyChanged(nameof(StandardPartsView));
-            }
-
-            if (SheetMaterials != null)
-            {
-                SheetMaterialsView = CollectionViewSource.GetDefaultView(SheetMaterials);
-                ApplyMaterialSort(SheetMaterialsView);
-                OnPropertyChanged(nameof(SheetMaterialsView));
-            }
-
-            if (TubularProducts != null)
-            {
-                TubularProductsView = CollectionViewSource.GetDefaultView(TubularProducts);
-                ApplyMaterialSort(TubularProductsView);
-                OnPropertyChanged(nameof(TubularProductsView));
-            }
-        }
-
-        private string _filePath;
-        public string FilePath
-        {
-            get { return _filePath; }
-            set
-            {
-                if (_filePath != value)
-                {
-                    _filePath = value;
-                    OnPropertyChanged(nameof(FilePath));
-                    _ = LoadDocumentAsync(value);
-                }
-            }
-        }
-
-        private string _searchText;
-        public string SearchText
-        {
-            get { return _searchText; }
-            set
-            {
-                if (_searchText != value)
-                {
-                    _searchText = value;
-                    OnPropertyChanged(nameof(SearchText));
-                    
-                    DetailsView?.Refresh();
-                    StandardPartsView?.Refresh();
-                    UpdateCalculations();
-                }
-            }
-        }
-
-        // Выбранный материал для фильтрации (листовой прокат)
-        private MaterialInfo _selectedSheetMaterial;
-        public MaterialInfo SelectedSheetMaterial
-        {
-            get { return _selectedSheetMaterial; }
-            set
-            {
-                if (_selectedSheetMaterial != value)
-                {
-                    _selectedSheetMaterial = value;
-                    OnPropertyChanged(nameof(SelectedSheetMaterial));
-                    OnPropertyChanged(nameof(SelectedMaterialFilter));
-                    
-                    // Сбрасываем другой выбор
-                    if (value != null)
-                        _selectedTubularProduct = null;
-                    
-                    OnPropertyChanged(nameof(SelectedTubularProduct));
-                    DetailsView?.Refresh();
-                    UpdateCalculations();
-                }
-            }
-        }
-
-        // Выбранный материал для фильтрации (трубный прокат)
-        private MaterialInfo _selectedTubularProduct;
-        public MaterialInfo SelectedTubularProduct
-        {
-            get { return _selectedTubularProduct; }
-            set
-            {
-                if (_selectedTubularProduct != value)
-                {
-                    _selectedTubularProduct = value;
-                    OnPropertyChanged(nameof(SelectedTubularProduct));
-                    OnPropertyChanged(nameof(SelectedMaterialFilter));
-                    
-                    // Сбрасываем другой выбор
-                    if (value != null)
-                        _selectedSheetMaterial = null;
-                    
-                    OnPropertyChanged(nameof(SelectedSheetMaterial));
-                    DetailsView?.Refresh();
-                    UpdateCalculations();
-                }
-            }
-        }
-
-        // Текущий активный фильтр по материалу
-        public MaterialInfo SelectedMaterialFilter => SelectedSheetMaterial ?? SelectedTubularProduct;
-
-        private bool _sortMaterialsByMass = true;
-        public bool SortMaterialsByMass
-        {
-            get { return _sortMaterialsByMass; }
-            set
-            {
-                if (_sortMaterialsByMass != value)
-                {
-                    _sortMaterialsByMass = value;
-                    OnPropertyChanged(nameof(SortMaterialsByMass));
-                    OnPropertyChanged(nameof(MaterialSortText));
-                    ApplyMaterialSort(SheetMaterialsView);
-                    ApplyMaterialSort(TubularProductsView);
-                }
-            }
-        }
-
-        public string MaterialSortText
-        {
-            get { return _sortMaterialsByMass ? "Сортировка: по массе ↓" : "Сортировка: по названию ↑"; }
-        }
-
-        private PartModel _currentlySelectedPart;
-        public PartModel CurrentlySelectedPart
-        {
-            get { return _currentlySelectedPart; }
-            private set
-            {
-                if (_currentlySelectedPart != value)
-                {
-                    _currentlySelectedPart = value;
-                    OnPropertyChanged(nameof(CurrentlySelectedPart));
-                    ((RelayCommand)ShowInKompasCommand).NotifyCanExecuteChanged();
-                }
-            }
-        }
-
-        private PartModel _selectedDetail;
-        public PartModel SelectedDetail
-        {
-            get { return _selectedDetail; }
-            set
-            {
-                if (_selectedDetail != value)
-                {
-                    _selectedDetail = value;
-                    OnPropertyChanged(nameof(SelectedDetail));
-                    if (value != null)
-                    {
-                        SelectedStandardPart = null;
-                        CurrentlySelectedPart = value;
-                    }
-                }
-            }
-        }
-
-        private PartModel _selectedStandardPart;
-        public PartModel SelectedStandardPart
-        {
-            get { return _selectedStandardPart; }
-            set
-            {
-                if (_selectedStandardPart != value)
-                {
-                    _selectedStandardPart = value;
-                    OnPropertyChanged(nameof(SelectedStandardPart));
-                    if (value != null)
-                    {
-                        SelectedDetail = null;
-                        CurrentlySelectedPart = value;
-                    }
-                }
-            }
-        }
-
-        private bool _isLoading;
-        public bool IsLoading
-        {
-            get { return _isLoading; }
-            set
-            {
-                if (_isLoading != value)
-                {
-                    _isLoading = value;
-                    OnPropertyChanged(nameof(IsLoading));
-                }
-            }
-        }
-
-        private string _statusMessage;
-        public string StatusMessage
-        {
-            get { return _statusMessage; }
-            set
-            {
-                if (_statusMessage != value)
-                {
-                    _statusMessage = value;
-                    OnPropertyChanged(nameof(StatusMessage));
-                }
-            }
-        }
-
-        private double _totalMassMultipleParts;
-        public double TotalMassMultipleParts
-        {
-            get { return _totalMassMultipleParts; }
-            set
-            {
-                if (Math.Abs(_totalMassMultipleParts - value) > 0.0001)
-                {
-                    _totalMassMultipleParts = value;
-                    OnPropertyChanged(nameof(TotalMassMultipleParts));
-                }
-            }
-        }
-
-        private int _uniquePartsCount;
-        public int UniquePartsCount
-        {
-            get { return _uniquePartsCount; }
-            set
-            {
-                if (_uniquePartsCount != value)
-                {
-                    _uniquePartsCount = value;
-                    OnPropertyChanged(nameof(UniquePartsCount));
-                }
-            }
-        }
-
-        private bool FilterDetails(object obj)
-        {
-            if (obj is PartModel part)
-            {
-                // Фильтр по выбранному материалу
-                var materialFilter = SelectedMaterialFilter;
-                if (materialFilter != null && part.Material != materialFilter.Name)
-                {
-                    return false;
-                }
-
-                if (!string.IsNullOrWhiteSpace(_searchText))
-                {
-                    string searchLower = _searchText.ToLower();
-                    
-                    bool nameMatch = part.Name != null && part.Name.ToLower().Contains(searchLower);
-                    bool markingMatch = part.Marking != null && part.Marking.ToLower().Contains(searchLower);
-                    
-                    if (!nameMatch && !markingMatch)
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            return false;
-        }
-
-        private void ToggleMaterialSort()
-        {
-            SortMaterialsByMass = !SortMaterialsByMass;
-        }
-
-        private void ApplyMaterialSort(ICollectionView view)
-        {
-            if (view == null) return;
-
-            view.SortDescriptions.Clear();
-            
-            if (_sortMaterialsByMass)
-            {
-                view.SortDescriptions.Add(new SortDescription("TotalMass", ListSortDirection.Descending));
-            }
-            else
-            {
-                view.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
-            }
-        }
-
-        private void UpdateCalculations()
-        {
-            if (_isUpdatingCalculations || DetailsView == null)
-                return;
-
-            _isUpdatingCalculations = true;
-
-            try
-            {
-                var visibleParts = DetailsView.Cast<PartModel>().ToList();
-
-                var groupedParts = visibleParts
-                    .GroupBy(p => new { p.Name, p.Marking })
-                    .Where(g => g.Count() > 1)
-                    .ToList();
-
-                TotalMassMultipleParts = groupedParts.Sum(g => g.Sum(p => p.Mass));
-                UniquePartsCount = groupedParts.Count;
-            }
-            finally
-            {
-                _isUpdatingCalculations = false;
-            }
-        }
-
-        private void ShowDetailInKompas()
-        {
-            if (CurrentlySelectedPart == null) return;
-
-            if (!IsLinkedToKompas || CurrentProduct?.Context == null)
-            {
-                StatusMessage = "Нет связи с KOMPАС. Дождитесь загрузки документа.";
-                return;
-            }
-
-            try
-            {
-                _kompasService.ShowDetailInKompas(CurrentlySelectedPart, CurrentProduct);
-                StatusMessage = $"Показана деталь: {CurrentlySelectedPart.Name}";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Ошибка: {ex.Message}";
-                MessageBox.Show($"Не удалось показать деталь в KOMPАС: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
         private async Task LoadDocumentAsync(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath))
-                return;
+            if (string.IsNullOrEmpty(filePath)) return;
 
             try
             {
@@ -705,26 +389,21 @@ namespace TankManager.Core.ViewModels
                 StatusMessage = "Загрузка документа...";
 
                 var product = await Task.Run(() => _kompasService.LoadDocument(filePath));
-                
-                // Сохраняем в кэш
                 _linkedProductsCache[filePath] = product;
-                
                 CurrentProduct = product;
                 IsLinkedToKompas = true;
 
                 UpdateCalculations();
-                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Ошибка: {ex.Message}";
-                MessageBox.Show($"Ошибка при загрузке файла: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowError("Ошибка при загрузке файла", ex);
             }
             finally
             {
                 IsLoading = false;
+                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
             }
         }
 
@@ -736,44 +415,25 @@ namespace TankManager.Core.ViewModels
                 StatusMessage = "Загрузка документа из КОМПАС...";
 
                 var product = await Task.Run(() => _kompasService.LoadActiveDocument());
-                
-                // Сохраняем в кэш по FilePath
+
                 if (!string.IsNullOrEmpty(product.FilePath))
-                {
                     _linkedProductsCache[product.FilePath] = product;
-                }
-                
+
                 CurrentProduct = product;
                 IsLinkedToKompas = true;
 
                 UpdateCalculations();
-                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Ошибка: {ex.Message}";
-                MessageBox.Show($"Ошибка при загрузке из КОМПАС: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowError("Ошибка при загрузке из КОМПАС", ex);
             }
             finally
             {
                 IsLoading = false;
+                ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
             }
-        }
-
-        private void ClearSearch()
-        {
-            SearchText = string.Empty;
-        }
-
-        /// <summary>
-        /// Сбросить фильтр по материалу
-        /// </summary>
-        public void ClearMaterialFilter()
-        {
-            SelectedSheetMaterial = null;
-            SelectedTubularProduct = null;
         }
 
         private async Task LoadProductAsync(string fileName)
@@ -782,9 +442,7 @@ namespace TankManager.Core.ViewModels
 
             var product = _storageService.Load(fileName);
             if (product != null)
-            {
                 await LoadAndLinkProductAsync(product, $"Загружено: {product.Name}");
-            }
         }
 
         private async Task SwitchToProductAsync(ProductFileInfo productInfo)
@@ -799,6 +457,41 @@ namespace TankManager.Core.ViewModels
             }
         }
 
+        #endregion
+
+        #region Product Management
+
+        private void SetCurrentProduct(Product product, bool isLinked)
+        {
+            _currentProduct = product;
+            _isLinkedToKompas = isLinked;
+
+            ResetSelections();
+            NotifyProductChanged();
+            OnPropertyChanged(nameof(IsLinkedToKompas));
+            OnPropertyChanged(nameof(KompasLinkStatus));
+            InitializeCollectionViews();
+            UpdateCalculations();
+            ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+        }
+
+        private void AutoSaveProduct()
+        {
+            if (CurrentProduct == null || string.IsNullOrEmpty(CurrentProduct.Name)) return;
+
+            var existingProducts = _storageService.GetSavedProducts();
+            var exists = existingProducts.Any(p =>
+                p.ProductName == CurrentProduct.Name &&
+                p.Marking == CurrentProduct.Marking);
+
+            if (!exists)
+            {
+                var filePath = _storageService.Save(CurrentProduct);
+                StatusMessage = $"Автосохранено: {Path.GetFileName(filePath)}";
+                RefreshSavedProducts();
+            }
+        }
+
         private void DeleteSelectedProduct()
         {
             if (SelectedSavedProduct == null) return;
@@ -809,13 +502,10 @@ namespace TankManager.Core.ViewModels
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (result == MessageBoxResult.Yes)
+            if (result == MessageBoxResult.Yes && _storageService.Delete(SelectedSavedProduct.FileName))
             {
-                if (_storageService.Delete(SelectedSavedProduct.FileName))
-                {
-                    StatusMessage = $"Удалено: {SelectedSavedProduct.ProductName}";
-                    RefreshSavedProducts();
-                }
+                StatusMessage = $"Удалено: {SelectedSavedProduct.ProductName}";
+                RefreshSavedProducts();
             }
         }
 
@@ -823,25 +513,212 @@ namespace TankManager.Core.ViewModels
         {
             SavedProducts.Clear();
             foreach (var product in _storageService.GetSavedProducts())
-            {
                 SavedProducts.Add(product);
-            }
         }
 
-        /// <summary>
-        /// Копирует список деталей в буфер обмена для Excel
-        /// </summary>
-        private void CopyAllToClipboard()
+        public void ClearProductCache() => _linkedProductsCache.Clear();
+
+        public void InvalidateProductCache(string filePath)
         {
-            if (Details == null || !Details.Any())
+            if (!string.IsNullOrEmpty(filePath))
+                _linkedProductsCache.Remove(filePath);
+        }
+
+        #endregion
+
+        #region KOMPAS Integration
+
+        private void ShowDetailInKompas()
+        {
+            if (CurrentlySelectedPart == null) return;
+
+            if (!IsLinkedToKompas || CurrentProduct?.Context == null)
             {
-                StatusMessage = "Список деталей пуст";
+                StatusMessage = "Нет связи с КОМПАС. Дождитесь загрузки документа.";
                 return;
             }
 
-            _excelService.CopyPartsToClipboard(Details);
-            StatusMessage = $"Скопировано деталей: {Details.Count}";
+            try
+            {
+                _kompasService.ShowDetailInKompas(CurrentlySelectedPart, CurrentProduct);
+                StatusMessage = $"Показана деталь: {CurrentlySelectedPart.Name}";
+            }
+            catch (Exception ex)
+            {
+                ShowError("Не удалось показать деталь в КОМПАС", ex);
+            }
         }
+
+        #endregion
+
+        #region Collection Views & Filtering
+
+        private void InitializeCollectionViews()
+        {
+            DetailsView = CreatePartView(Details);
+            StandardPartsView = CreatePartView(StandardParts);
+            SheetMaterialsView = CreateMaterialView(SheetMaterials);
+            TubularProductsView = CreateMaterialView(TubularProducts);
+            OtherMaterialsView = CreateMaterialView(OtherMaterials);
+
+            OnPropertyChanged(nameof(DetailsView));
+            OnPropertyChanged(nameof(StandardPartsView));
+            OnPropertyChanged(nameof(SheetMaterialsView));
+            OnPropertyChanged(nameof(TubularProductsView));
+            OnPropertyChanged(nameof(OtherMaterialsView));
+        }
+
+        private ICollectionView CreatePartView(ObservableCollection<PartModel> parts)
+        {
+            if (parts == null) return null;
+
+            var view = CollectionViewSource.GetDefaultView(parts);
+            view.Filter = FilterDetails;
+            view.GroupDescriptions.Clear();
+            view.GroupDescriptions.Add(new PartNameAndMarkingGroupDescription());
+            return view;
+        }
+
+        private ICollectionView CreateMaterialView(ObservableCollection<MaterialInfo> materials)
+        {
+            if (materials == null) return null;
+
+            var view = CollectionViewSource.GetDefaultView(materials);
+            ApplyMaterialSort(view);
+            return view;
+        }
+
+        private bool FilterDetails(object obj)
+        {
+            if (!(obj is PartModel part)) return false;
+
+            var materialFilter = SelectedMaterialFilter;
+            if (materialFilter != null && part.Material != materialFilter.Name)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(_searchText))
+                return true;
+
+            var searchLower = _searchText.ToLower();
+            return (part.Name?.ToLower().Contains(searchLower) ?? false) ||
+                   (part.Marking?.ToLower().Contains(searchLower) ?? false);
+        }
+
+        private void ApplyMaterialSort(ICollectionView view)
+        {
+            if (view == null) return;
+
+            view.SortDescriptions.Clear();
+            view.SortDescriptions.Add(_sortMaterialsByMass
+                ? new SortDescription("TotalMass", ListSortDirection.Descending)
+                : new SortDescription("Name", ListSortDirection.Ascending));
+        }
+
+        private void RefreshViews()
+        {
+            DetailsView?.Refresh();
+            StandardPartsView?.Refresh();
+        }
+
+        public void ClearMaterialFilter()
+        {
+            SelectedSheetMaterial = null;
+            SelectedTubularProduct = null;
+        }
+
+        #endregion
+
+        #region Calculations
+
+        private void UpdateCalculations()
+        {
+            if (_isUpdatingCalculations || DetailsView == null) return;
+
+            _isUpdatingCalculations = true;
+            try
+            {
+                var visibleParts = DetailsView.Cast<PartModel>().ToList();
+                var groupedParts = visibleParts
+                    .GroupBy(p => new { p.Name, p.Marking, p.Material })
+                    .Where(g => g.Count() > 1)
+                    .ToList();
+
+                TotalMassMultipleParts = groupedParts.Sum(g => g.Sum(p => p.Mass));
+                UniquePartsCount = groupedParts.Count;
+            }
+            finally
+            {
+                _isUpdatingCalculations = false;
+            }
+        }
+
+        #endregion
+
+        #region Clipboard
+
+        private void CopyToClipboard<T>(Action<IEnumerable<T>> copyAction, IEnumerable<T> items)
+        {
+            if (items == null || !items.Any())
+            {
+                StatusMessage = "Список пуст";
+                return;
+            }
+
+            copyAction(items);
+            StatusMessage = $"Скопировано элементов: {items.Count()}";
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        private void NotifyProductChanged()
+        {
+            OnPropertyChanged(nameof(CurrentProduct));
+            OnPropertyChanged(nameof(Details));
+            OnPropertyChanged(nameof(SheetMaterials));
+            OnPropertyChanged(nameof(TubularProducts));
+            OnPropertyChanged(nameof(StandardParts));
+            OnPropertyChanged(nameof(OtherMaterials));
+        }
+
+        private void ResetSelections()
+        {
+            SelectedDetail = null;
+            SelectedStandardPart = null;
+            SelectedSheetMaterial = null;
+            SelectedTubularProduct = null;
+            CurrentlySelectedPart = null;
+        }
+
+        private void OnMaterialFilterChanged()
+        {
+            OnPropertyChanged(nameof(SelectedSheetMaterial));
+            OnPropertyChanged(nameof(SelectedTubularProduct));
+            OnPropertyChanged(nameof(SelectedMaterialFilter));
+            DetailsView?.Refresh();
+            UpdateCalculations();
+        }
+
+        private void ShowError(string message, Exception ex)
+        {
+            StatusMessage = $"Ошибка: {ex.Message}";
+            MessageBox.Show($"{message}: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        private bool SetProperty<T>(ref T field, T value, params string[] propertyNames)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+            
+            field = value;
+            foreach (var name in propertyNames.Length > 0 ? propertyNames : new[] { "" })
+                if (!string.IsNullOrEmpty(name)) OnPropertyChanged(name);
+            return true;
+        }
+
+        #endregion
+
+        #region INotifyPropertyChanged
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -849,6 +726,10 @@ namespace TankManager.Core.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        #endregion
+
+        #region IDisposable
 
         public void Dispose()
         {
@@ -858,21 +739,23 @@ namespace TankManager.Core.ViewModels
             _kompasService?.Dispose();
         }
 
+        #endregion
+
+        #region Nested Types
+
         private class PartNameAndMarkingGroupDescription : GroupDescription
         {
             public override object GroupNameFromItem(object item, int level, CultureInfo culture)
             {
-                if (item is PartModel part)
-                {
-                    return $"{part.Name}|{part.Marking}";
-                }
-                return string.Empty;
+                return item is PartModel part ? $"{part.Name}|{part.Marking}|{part.Material}" : string.Empty;
             }
 
             public override bool NamesMatch(object groupName, object itemName)
             {
-                return object.Equals(groupName, itemName);
+                return Equals(groupName, itemName);
             }
         }
+
+        #endregion
     }
 }
