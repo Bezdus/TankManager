@@ -91,6 +91,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Views\MaterialsPanel.xaml.cs" />
+    <Compile Include="Views\PartPropertiesPanel.xaml.cs" />
+    <Compile Include="Views\PartsListPanel.xaml.cs" />
+    <Compile Include="Views\SavedProductsPanel.xaml.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -188,7 +192,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Views\" />
+    <Folder Include="Resources\" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="update.xml" />

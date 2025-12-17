@@ -3,6 +3,8 @@ using KompasAPI7;
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Contexts;
 using System.Text.RegularExpressions;
@@ -15,7 +17,7 @@ namespace TankManager.Core.Models
 {
     public class PartModel : INotifyPropertyChanged, IDisposable
     {
-        private const string DefaultSteelGrade = "AISI 304";
+        //private const string DefaultSteelGrade = "AISI 304";
 
         private string _name;
         private string _marking;
@@ -28,7 +30,7 @@ namespace TankManager.Core.Models
         private bool _previewLoaded;
         private ProductType _productType;
         private double _length;
-
+        private string _cdfFilePath;
 
         // Уникальные идентификаторы для поиска в KOMPAS
         public string PartId { get; private set; }
@@ -126,6 +128,19 @@ namespace TankManager.Core.Models
             }
         }
 
+        public string CdfFilePath
+        {
+            get { return _cdfFilePath; }
+            set
+            {
+                if (_cdfFilePath != value)
+                {
+                    _cdfFilePath = value;
+                    OnPropertyChanged(nameof(_cdfFilePath));
+                }
+            }
+        }
+
         public ProductType ProductType
         {
             get { return _productType; }
@@ -193,6 +208,8 @@ namespace TankManager.Core.Models
                 Length = GetLength(part, context);
             else
                 Length = -1;
+
+
         }
 
         public PartModel(IBody7 body, KompasContext context, int instanceIndex = 0)
@@ -228,6 +245,7 @@ namespace TankManager.Core.Models
                     Length = GetLength(body, context);
                 else
                     Length = -1;
+
             }
             finally
             {
@@ -235,7 +253,23 @@ namespace TankManager.Core.Models
             }
         }
 
-        private static double GetLength(object detail, KompasContext context)
+        private string GetCdfFilePath(IPart7 part, KompasContext context)
+        {
+            OpenDocumentParam param = part.GetOpenDocumentParam();
+            param.Visible = false;
+            IKompasDocument3D kompasDocument3D = part.OpenSourceDocument(param);
+            IPropertyKeeper propertyKeeper = kompasDocument3D as IPropertyKeeper;
+            IProductDataManager productDataManager = kompasDocument3D as IProductDataManager;
+            var arrAttachDoc = productDataManager.ObjectAttachedDocuments[propertyKeeper];
+
+            string cdwPath = ((object[])arrAttachDoc)
+                .Cast<string>()
+                .FirstOrDefault(path => Path.GetExtension(path).Equals(".cdw", StringComparison.OrdinalIgnoreCase));
+
+            return cdwPath;
+        }
+
+        private  double GetLength(object detail, KompasContext context)
         {
             if (detail == null || context == null)
                 return 0;
