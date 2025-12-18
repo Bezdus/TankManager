@@ -1,0 +1,189 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using System.Windows.Media.Imaging;
+using Kompas6Constants;
+using KompasAPI7;
+
+namespace TankManager.Core.Services
+{
+    /// <summary>
+    /// Сервис для создания и кэширования PNG-превью чертежей
+    /// </summary>
+    public class DrawingPreviewService
+    {
+        private readonly string _cacheDirectory;
+
+        public DrawingPreviewService()
+        {
+            // Папка кэша рядом с исполняемым файлом
+            string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            _cacheDirectory = Path.Combine(appDirectory, "DrawingCache");
+            Directory.CreateDirectory(_cacheDirectory);
+        }
+
+        /// <summary>
+        /// Получает или создаёт PNG-превью чертежа детали
+        /// </summary>
+        public string GetOrCreatePreview(IPart7 part, KompasContext context)
+        {
+            if (part == null || context == null)
+                return null;
+
+            IKompasDocument3D kompasDocument3D = null;
+            IKompasDocument cdwDocument = null;
+
+            try
+            {
+                // Получаем путь к чертежу
+                string cdwPath = GetAttachedDrawingPath(part, ref kompasDocument3D);
+                if (string.IsNullOrEmpty(cdwPath) || !File.Exists(cdwPath))
+                    return null;
+
+                // Проверяем кэш
+                string pngPath = GetCachedPngPath(cdwPath);
+                if (IsCacheValid(cdwPath, pngPath))
+                    return pngPath;
+
+                // Генерируем PNG
+                cdwDocument = context.Application.Documents.Open(cdwPath, false, false);
+                if (cdwDocument == null)
+                    return null;
+
+                var cdwDocument1 = cdwDocument as IKompasDocument1;
+                if (cdwDocument1 == null)
+                    return null;
+
+                var rasterParams = (IRasterConvertParameters)cdwDocument1
+                    .GetInterface(KompasAPIObjectTypeEnum.ksObjectRasterConvertParameters);
+                rasterParams.ColorType = ksObjectColorTypeEnum.ksColorObject;
+
+                cdwDocument1.SaveAsToRasterFormat(pngPath, (RasterConvertParameters)rasterParams);
+
+                return pngPath;
+            }
+            catch (COMException)
+            {
+                return null;
+            }
+            finally
+            {
+                CloseAndReleaseDocument(cdwDocument);
+                CloseAndReleaseDocument(kompasDocument3D);
+            }
+        }
+
+        /// <summary>
+        /// Загружает PNG-изображение для отображения в UI
+        /// </summary>
+        public BitmapImage LoadPreviewImage(string pngPath)
+        {
+            if (string.IsNullOrEmpty(pngPath) || !File.Exists(pngPath))
+                return null;
+
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(pngPath);
+            bitmap.EndInit();
+            bitmap.Freeze(); // Для потокобезопасности WPF
+            return bitmap;
+        }
+
+        /// <summary>
+        /// Очищает папку кэша
+        /// </summary>
+        public void ClearCache()
+        {
+            if (Directory.Exists(_cacheDirectory))
+            {
+                foreach (var file in Directory.GetFiles(_cacheDirectory, "*.png"))
+                {
+                    try { File.Delete(file); }
+                    catch { /* Игнорируем ошибки удаления */ }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Возвращает путь к папке кэша
+        /// </summary>
+        public string CacheDirectory => _cacheDirectory;
+
+        private string GetAttachedDrawingPath(IPart7 part, ref IKompasDocument3D kompasDocument3D)
+        {
+            OpenDocumentParam param = part.GetOpenDocumentParam();
+            param.Visible = false;
+            kompasDocument3D = part.OpenSourceDocument(param);
+
+            if (kompasDocument3D == null)
+                return null;
+
+            var propertyKeeper = kompasDocument3D as IPropertyKeeper;
+            var productDataManager = kompasDocument3D as IProductDataManager;
+
+            if (propertyKeeper == null || productDataManager == null)
+                return null;
+
+            var arrAttachDoc = productDataManager.ObjectAttachedDocuments[propertyKeeper];
+            if (arrAttachDoc == null)
+                return null;
+
+            return ((object[])arrAttachDoc)
+                .Cast<string>()
+                .FirstOrDefault(path => Path.GetExtension(path)
+                    .Equals(".cdw", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private string GetCachedPngPath(string cdwPath)
+        {
+            string hash = ComputeHash(cdwPath);
+            string fileName = Path.GetFileNameWithoutExtension(cdwPath);
+            // Убираем недопустимые символы из имени файла
+            string safeFileName = string.Join("_", fileName.Split(Path.GetInvalidFileNameChars()));
+            return Path.Combine(_cacheDirectory, $"{safeFileName}_{hash}.png");
+        }
+
+        private static bool IsCacheValid(string sourcePath, string cachedPath)
+        {
+            if (!File.Exists(cachedPath))
+                return false;
+
+            return File.GetLastWriteTimeUtc(cachedPath) >= File.GetLastWriteTimeUtc(sourcePath);
+        }
+
+        private static string ComputeHash(string input)
+        {
+            using (var md5 = MD5.Create())
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(input.ToLowerInvariant());
+                byte[] hash = md5.ComputeHash(bytes);
+                return BitConverter.ToString(hash).Replace("-", "").Substring(0, 8);
+            }
+        }
+
+        private static void CloseAndReleaseDocument(object document)
+        {
+            if (document == null)
+                return;
+
+            try
+            {
+                var kompasDoc = document as IKompasDocument;
+                kompasDoc?.Close(DocumentCloseOptions.kdDoNotSaveChanges);
+            }
+            catch { /* Игнорируем ошибки закрытия */ }
+            finally
+            {
+                if (Marshal.IsComObject(document))
+                {
+                    try { Marshal.ReleaseComObject(document); }
+                    catch { }
+                }
+            }
+        }
+    }
+}

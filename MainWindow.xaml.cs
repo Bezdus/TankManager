@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using TankManager.Core.Models;
 using TankManager.Core.ViewModels;
@@ -167,6 +168,57 @@ namespace TankManager
         private void OverlayBackground_MouseDown(object sender, MouseButtonEventArgs e)
         {
             _viewModel.IsProductsPanelOpen = false;
+        }
+
+        private void DrawingPreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var part = _viewModel.CurrentlySelectedPart;
+            if (part?.DrawingPreview == null)
+                return;
+
+            var previewWindow = new Window
+            {
+                Title = $"Чертёж: {part.Name} {part.Marking}",
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Width = SystemParameters.WorkArea.Width * 0.9,
+                Height = SystemParameters.WorkArea.Height * 0.9,
+                Background = System.Windows.Media.Brushes.White,
+                WindowState = WindowState.Maximized
+            };
+
+            var scrollViewer = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Background = System.Windows.Media.Brushes.LightGray
+            };
+
+            var image = new Image
+            {
+                Source = part.DrawingPreview,
+                Stretch = System.Windows.Media.Stretch.None,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(20)
+            };
+
+            // Закрытие по Escape
+            previewWindow.KeyDown += (s, args) =>
+            {
+                if (args.Key == Key.Escape)
+                    previewWindow.Close();
+            };
+
+            // Двойной клик для закрытия
+            image.MouseLeftButtonDown += (s, args) =>
+            {
+                if (args.ClickCount == 2)
+                    previewWindow.Close();
+            };
+
+            scrollViewer.Content = image;
+            previewWindow.Content = scrollViewer;
+            previewWindow.ShowDialog();
         }
     }
 

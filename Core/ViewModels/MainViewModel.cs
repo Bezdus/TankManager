@@ -287,6 +287,7 @@ namespace TankManager.Core.ViewModels
                 {
                     SelectedStandardPart = null;
                     CurrentlySelectedPart = value;
+                    _ = LoadDrawingPreviewForSelectedPartAsync();
                 }
             }
         }
@@ -300,6 +301,7 @@ namespace TankManager.Core.ViewModels
                 {
                     SelectedDetail = null;
                     CurrentlySelectedPart = value;
+                    _ = LoadDrawingPreviewForSelectedPartAsync();
                 }
             }
         }
@@ -623,6 +625,26 @@ namespace TankManager.Core.ViewModels
             catch (Exception ex)
             {
                 ShowError("Не удалось показать деталь в КОМПАС", ex);
+            }
+        }
+
+        private async Task LoadDrawingPreviewForSelectedPartAsync()
+        {
+            var part = CurrentlySelectedPart;
+            if (part == null || !IsLinkedToKompas || CurrentProduct?.Context == null)
+                return;
+
+            // Если превью уже загружено, пропускаем
+            if (!string.IsNullOrEmpty(part.CdfFilePath))
+                return;
+
+            try
+            {
+                await Task.Run(() => _kompasService.LoadDrawingPreview(part, CurrentProduct));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка загрузки превью чертежа: {ex.Message}");
             }
         }
 

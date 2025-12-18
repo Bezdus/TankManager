@@ -17,6 +17,7 @@ namespace TankManager.Core.Services
         private readonly ILogger _logger;
         private readonly ComObjectManager _comManager;
         private readonly MaterialAggregator _materialAggregator;
+        private readonly DrawingPreviewService _previewService;
 
         public KompasService() : this(new FileLogger())
         {
@@ -27,6 +28,7 @@ namespace TankManager.Core.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _comManager = new ComObjectManager(_logger);
             _materialAggregator = new MaterialAggregator(_logger);
+            _previewService = new DrawingPreviewService();
         }
 
         /// <summary>
@@ -227,6 +229,43 @@ namespace TankManager.Core.Services
         {
             context.SelectionManager.UnselectAll();
             context.SelectionManager.Select(part);
+        }
+
+        /// <summary>
+        /// Загружает превью чертежа для детали
+        /// </summary>
+        /// <param name="detail">Деталь для загрузки превью</param>
+        /// <param name="product">Продукт, содержащий деталь</param>
+        public void LoadDrawingPreview(PartModel detail, Product product)
+        {
+            if (detail == null || product?.Context == null || !product.Context.IsDocumentLoaded)
+                return;
+
+            // Пропускаем Body-based детали (у них нет своего чертежа)
+            if (detail.IsBodyBased)
+                return;
+
+            // Если превью уже загружено, пропускаем
+            if (!string.IsNullOrEmpty(detail.CdfFilePath))
+                return;
+
+            try
+            {
+                var targetPart = FindTargetPart(detail, product.Context);
+                if (targetPart != null)
+                {
+                    var pngPath = _previewService.GetOrCreatePreview(targetPart, product.Context);
+                    if (!string.IsNullOrEmpty(pngPath))
+                    {
+                        detail.CdfFilePath = pngPath;
+                        _logger.LogInfo($"Drawing preview loaded for: {detail.Name}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to load drawing preview for {detail.Name}: {ex.Message}");
+            }
         }
 
         public void Dispose()

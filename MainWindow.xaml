@@ -249,7 +249,7 @@
                 <TextBlock FontSize="11" FontWeight="SemiBold">
                     <Run Text="{Binding Name, Mode=OneWay}"/>
                     <Run Text=" "/>
-                    <Run Text="{Binding Marking, Mode=OneWay}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ContentPresenter}}"/>
+                    <Run Text="{Binding Marking, Mode=OneWay}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                 </TextBlock>
                 <TextBlock FontSize="10" Margin="0,2,0,0" Opacity="0.7">
                     <Run Text="{Binding DetailType}"/>
@@ -495,11 +495,11 @@
             <!-- Основной контент -->
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.7*" MinWidth="250"/>
+                    <ColumnDefinition Width="1*" MinWidth="250"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="2*" MinWidth="250"/>
+                    <ColumnDefinition Width="2.5*" MinWidth="250"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="2*" MinWidth="200"/>
+                    <ColumnDefinition Width="1.5*" MinWidth="200"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ЛЕВАЯ ПАНЕЛЬ: Список всех деталей -->
@@ -641,101 +641,161 @@
 
                 <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Свойства выбранной детали -->
                 <GroupBox Grid.Column="2" Header="Свойства детали">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel DataContext="{Binding CurrentlySelectedPart}">
-                            <TextBlock Text="Выберите деталь из списка" 
-                                       HorizontalAlignment="Center" 
-                                       VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       FontStyle="Italic"
-                                       FontSize="11"
-                                       Margin="15"
-                                       Visibility="{Binding Converter={StaticResource NullToVisibilityConverter}}"/>
+                    <Grid>
+                        <TextBlock Text="Выберите деталь из списка" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   FontStyle="Italic"
+                                   FontSize="11"
+                                   Margin="15"
+                                   Visibility="{Binding CurrentlySelectedPart, Converter={StaticResource NullToVisibilityConverter}}"/>
 
-                            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="3" Padding="8" Margin="3"
-                                    Visibility="{Binding Converter={StaticResource InverseNullToVisibilityConverter}}">
-                                <StackPanel>
-                                    <Image Source="{Binding FilePreview}" 
-                                           Width="500" Height="500" 
-                                           Stretch="Uniform"
-                                           StretchDirection="DownOnly"
-                                           Margin="0,0,0,8"
-                                           HorizontalAlignment="Center"
-                                           Visibility="{Binding FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}"/>
+                        <Grid Visibility="{Binding CurrentlySelectedPart, Converter={StaticResource InverseNullToVisibilityConverter}}"
+                              DataContext="{Binding CurrentlySelectedPart}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Название:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Обозначение:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Marking}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Тип детали:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DetailType}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Тип продукта:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ProductType}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Материал:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Material}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
-                                    </Grid>
-
-                                    <Button Content="Показать в КОМПАС" 
-                                            Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            Margin="0,12,0,0"
-                                            Padding="12,6"
-                                            FontSize="12"
-                                            FontWeight="SemiBold"
-                                            Background="{StaticResource AccentColor}"
-                                            Foreground="White"
-                                            BorderThickness="0"
-                                            Cursor="Hand">
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                                <Style.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Background" Value="#FF707070"/>
-                                                    </Trigger>
-                                                    <Trigger Property="IsPressed" Value="True">
-                                                        <Setter Property="Background" Value="#FF404040"/>
-                                                    </Trigger>
-                                                    <Trigger Property="IsEnabled" Value="False">
-                                                        <Setter Property="Background" Value="#FFB0B0B0"/>
-                                                        <Setter Property="Cursor" Value="Arrow"/>
-                                                    </Trigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                </StackPanel>
+                            <!-- Превью 3D модели -->
+                            <Border Grid.Row="0" 
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3" 
+                                    Padding="8" 
+                                    Margin="3"
+                                    Visibility="{Binding FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                <Image Source="{Binding FilePreview}" 
+                                       MaxHeight="200"
+                                       Stretch="Uniform"
+                                       StretchDirection="DownOnly"
+                                       HorizontalAlignment="Center"/>
                             </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+
+                            <!-- Свойства детали -->
+                            <Border Grid.Row="1" 
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3" 
+                                    Padding="8" 
+                                    Margin="3">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Название:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Обозначение:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Marking}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Тип детали:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DetailType}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Тип продукта:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ProductType}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Материал:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Material}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Кнопка показать в КОМПАС -->
+                            <Button Grid.Row="2"
+                                    Content="Показать в КОМПАС" 
+                                    Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Margin="3,3,3,6"
+                                    Padding="12,6"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    Background="{StaticResource AccentColor}"
+                                    Foreground="White"
+                                    BorderThickness="0"
+                                    Cursor="Hand">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#FF707070"/>
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter Property="Background" Value="#FF404040"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Background" Value="#FFB0B0B0"/>
+                                                <Setter Property="Cursor" Value="Arrow"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+
+                            <!-- Превью чертежа (занимает оставшееся пространство) -->
+                            <Border Grid.Row="3"
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3"
+                                    Padding="8"
+                                    Margin="3"
+                                    Visibility="{Binding DrawingPreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                        <TextBlock Text="Чертёж детали" 
+                                                   FontSize="12" 
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text=" (клик для увеличения)" 
+                                                   FontSize="10" 
+                                                   Foreground="{StaticResource TextSecondary}"
+                                                   VerticalAlignment="Center"
+                                                   FontStyle="Italic"/>
+                                    </StackPanel>
+
+                                    <Border Grid.Row="1" 
+                                            Background="Transparent"
+                                            Cursor="Hand"
+                                            MouseLeftButtonDown="DrawingPreview_MouseLeftButtonDown">
+                                        <Image Source="{Binding DrawingPreview}" 
+                                               Stretch="Uniform"
+                                               StretchDirection="DownOnly"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
                 </GroupBox>
 
                 <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>

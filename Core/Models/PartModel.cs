@@ -6,12 +6,10 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Runtime.Remoting.Contexts;
 using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
 using TankManager.Core.Constants;
 using TankManager.Core.Services;
-using static Microsoft.WindowsAPICodePack.Shell.PropertySystem.SystemProperties.System;
 
 namespace TankManager.Core.Models
 {
@@ -30,7 +28,11 @@ namespace TankManager.Core.Models
         private bool _previewLoaded;
         private ProductType _productType;
         private double _length;
-        private string _cdfFilePath;
+        private string _pngFilePath;
+        private BitmapSource _drawingPreview;
+        private bool _drawingPreviewLoaded;
+
+        private static readonly DrawingPreviewService _previewService = new DrawingPreviewService();
 
         // Уникальные идентификаторы для поиска в KOMPAS
         public string PartId { get; private set; }
@@ -130,14 +132,32 @@ namespace TankManager.Core.Models
 
         public string CdfFilePath
         {
-            get { return _cdfFilePath; }
+            get { return _pngFilePath; }
             set
             {
-                if (_cdfFilePath != value)
+                if (_pngFilePath != value)
                 {
-                    _cdfFilePath = value;
-                    OnPropertyChanged(nameof(_cdfFilePath));
+                    _pngFilePath = value;
+                    _drawingPreviewLoaded = false; // Сбрасываем флаг загрузки при изменении пути
+                    OnPropertyChanged(nameof(CdfFilePath));
+                    OnPropertyChanged(nameof(DrawingPreview));
                 }
+            }
+        }
+
+        /// <summary>
+        /// Превью чертежа для отображения в UI
+        /// </summary>
+        public BitmapSource DrawingPreview
+        {
+            get
+            {
+                if (!_drawingPreviewLoaded)
+                {
+                    _drawingPreviewLoaded = true;
+                    _drawingPreview = _previewService.LoadPreviewImage(_pngFilePath);
+                }
+                return _drawingPreview;
             }
         }
 
@@ -253,21 +273,18 @@ namespace TankManager.Core.Models
             }
         }
 
-        private string GetCdfFilePath(IPart7 part, KompasContext context)
+        /// <summary>
+        /// Загружает превью чертежа для детали
+        /// </summary>
+        public void LoadDrawingPreview(IPart7 part, KompasContext context)
         {
-            OpenDocumentParam param = part.GetOpenDocumentParam();
-            param.Visible = false;
-            IKompasDocument3D kompasDocument3D = part.OpenSourceDocument(param);
-            IPropertyKeeper propertyKeeper = kompasDocument3D as IPropertyKeeper;
-            IProductDataManager productDataManager = kompasDocument3D as IProductDataManager;
-            var arrAttachDoc = productDataManager.ObjectAttachedDocuments[propertyKeeper];
-
-            string cdwPath = ((object[])arrAttachDoc)
-                .Cast<string>()
-                .FirstOrDefault(path => Path.GetExtension(path).Equals(".cdw", StringComparison.OrdinalIgnoreCase));
-
-            return cdwPath;
+            CdfFilePath = _previewService.GetOrCreatePreview(part, context);
         }
+
+        /// <summary>
+        /// Статический доступ к сервису превью (для очистки кэша и т.д.)
+        /// </summary>
+        public static DrawingPreviewService PreviewService => _previewService;
 
         private  double GetLength(object detail, KompasContext context)
         {
