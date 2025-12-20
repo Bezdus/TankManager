@@ -245,19 +245,14 @@ namespace TankManager.Core.Services
             if (detail.IsBodyBased)
                 return;
 
-            // Если превью уже загружено, пропускаем
-            if (!string.IsNullOrEmpty(detail.CdfFilePath))
-                return;
-
             try
             {
                 var targetPart = FindTargetPart(detail, product.Context);
                 if (targetPart != null)
                 {
-                    var pngPath = _previewService.GetOrCreatePreview(targetPart, product.Context);
-                    if (!string.IsNullOrEmpty(pngPath))
+                    detail.LoadDrawingPreview(targetPart, product.Context);
+                    if (!string.IsNullOrEmpty(detail.CdfFilePath))
                     {
-                        detail.CdfFilePath = pngPath;
                         _logger.LogInfo($"Drawing preview loaded for: {detail.Name}");
                     }
                 }

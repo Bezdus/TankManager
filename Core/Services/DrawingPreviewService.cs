@@ -28,8 +28,14 @@ namespace TankManager.Core.Services
         /// <summary>
         /// Получает или создаёт PNG-превью чертежа детали
         /// </summary>
-        public string GetOrCreatePreview(IPart7 part, KompasContext context)
+        /// <param name="part">Деталь</param>
+        /// <param name="context">Контекст KOMPAS</param>
+        /// <param name="sourceCdwPath">Выходной параметр: путь к исходному файлу чертежа</param>
+        /// <returns>Путь к PNG-файлу превью</returns>
+        public string GetOrCreatePreview(IPart7 part, KompasContext context, out string sourceCdwPath)
         {
+            sourceCdwPath = null;
+
             if (part == null || context == null)
                 return null;
 
@@ -42,6 +48,8 @@ namespace TankManager.Core.Services
                 string cdwPath = GetAttachedDrawingPath(part, ref kompasDocument3D);
                 if (string.IsNullOrEmpty(cdwPath) || !File.Exists(cdwPath))
                     return null;
+
+                sourceCdwPath = cdwPath;
 
                 // Проверяем кэш
                 string pngPath = GetCachedPngPath(cdwPath);
@@ -71,17 +79,26 @@ namespace TankManager.Core.Services
             }
             finally
             {
-                CloseAndReleaseDocument(cdwDocument);
-                CloseAndReleaseDocument(kompasDocument3D);
+
+                    CloseAndReleaseDocument(cdwDocument);
+                    CloseAndReleaseDocument(kompasDocument3D);
             }
         }
 
         /// <summary>
-        /// Загружает PNG-изображение для отображения в UI
+        /// Загружает PNG-изображение для отображения в UI.
+        /// Проверяет актуальность кэша перед загрузкой.
         /// </summary>
-        public BitmapImage LoadPreviewImage(string pngPath)
+        /// <param name="pngPath">Путь к PNG-файлу</param>
+        /// <param name="sourceCdwPath">Путь к исходному файлу чертежа для проверки актуальности</param>
+        /// <returns>Изображение или null, если кэш устарел или файл не существует</returns>
+        public BitmapImage LoadPreviewImage(string pngPath, string sourceCdwPath = null)
         {
             if (string.IsNullOrEmpty(pngPath) || !File.Exists(pngPath))
+                return null;
+
+            // Если указан исходный файл, проверяем актуальность кэша
+            if (!string.IsNullOrEmpty(sourceCdwPath) && !IsCacheValid(sourceCdwPath, pngPath))
                 return null;
 
             var bitmap = new BitmapImage();
@@ -173,7 +190,8 @@ namespace TankManager.Core.Services
             try
             {
                 var kompasDoc = document as IKompasDocument;
-                kompasDoc?.Close(DocumentCloseOptions.kdDoNotSaveChanges);
+                if (kompasDoc != null && !kompasDoc.Visible)
+                    kompasDoc.Close(DocumentCloseOptions.kdDoNotSaveChanges);
             }
             catch { /* Игнорируем ошибки закрытия */ }
             finally

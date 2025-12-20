@@ -29,6 +29,7 @@ namespace TankManager.Core.Models
         private ProductType _productType;
         private double _length;
         private string _pngFilePath;
+        private string _cdwFilePath; // Путь к исходному файлу чертежа
         private BitmapSource _drawingPreview;
         private bool _drawingPreviewLoaded;
 
@@ -146,6 +147,22 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
+        /// Путь к исходному файлу чертежа (.cdw) для проверки актуальности кэша
+        /// </summary>
+        public string SourceCdwPath
+        {
+            get { return _cdwFilePath; }
+            set
+            {
+                if (_cdwFilePath != value)
+                {
+                    _cdwFilePath = value;
+                    OnPropertyChanged(nameof(SourceCdwPath));
+                }
+            }
+        }
+
+        /// <summary>
         /// Превью чертежа для отображения в UI
         /// </summary>
         public BitmapSource DrawingPreview
@@ -155,10 +172,20 @@ namespace TankManager.Core.Models
                 if (!_drawingPreviewLoaded)
                 {
                     _drawingPreviewLoaded = true;
-                    _drawingPreview = _previewService.LoadPreviewImage(_pngFilePath);
+                    _drawingPreview = _previewService.LoadPreviewImage(_pngFilePath, _cdwFilePath);
                 }
                 return _drawingPreview;
             }
+        }
+
+        /// <summary>
+        /// Сбрасывает кэш превью чертежа для принудительной перепроверки актуальности
+        /// </summary>
+        public void InvalidateDrawingPreviewCache()
+        {
+            _drawingPreviewLoaded = false;
+            _drawingPreview = null;
+            OnPropertyChanged(nameof(DrawingPreview));
         }
 
         public ProductType ProductType
@@ -278,7 +305,22 @@ namespace TankManager.Core.Models
         /// </summary>
         public void LoadDrawingPreview(IPart7 part, KompasContext context)
         {
-            CdfFilePath = _previewService.GetOrCreatePreview(part, context);
+            string sourceCdwPath;
+            string pngPath = _previewService.GetOrCreatePreview(part, context, out sourceCdwPath);
+            
+            // Сначала устанавливаем путь к исходному файлу
+            _cdwFilePath = sourceCdwPath;
+            
+            // Принудительно сбрасываем кэш изображения перед установкой пути
+            _drawingPreviewLoaded = false;
+            _drawingPreview = null;
+            
+            // Устанавливаем путь к PNG (напрямую, чтобы избежать проверки на равенство)
+            _pngFilePath = pngPath;
+            
+            // Уведомляем UI об изменениях
+            OnPropertyChanged(nameof(CdfFilePath));
+            OnPropertyChanged(nameof(DrawingPreview));
         }
 
         /// <summary>
@@ -446,7 +488,7 @@ namespace TankManager.Core.Models
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        protected virtual void OnPropertyChanged(string propertyName)
+        public virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

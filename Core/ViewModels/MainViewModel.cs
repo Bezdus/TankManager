@@ -474,6 +474,10 @@ namespace TankManager.Core.ViewModels
                 if (refreshedProduct != null)
                 {
                     _linkedProductsCache[filePath] = refreshedProduct;
+                    
+                    // Инвалидируем кэш превью чертежей для всех деталей
+                    InvalidateDrawingPreviewsCache(refreshedProduct);
+                    
                     SetCurrentProduct(refreshedProduct, isLinked: true);
                     StatusMessage = $"Данные обновлены: {CurrentProduct.Name}, деталей: {Details?.Count ?? 0}";
                 }
@@ -487,6 +491,19 @@ namespace TankManager.Core.ViewModels
             {
                 IsLoading = false;
                 NotifyCopyCommandsCanExecuteChanged();
+            }
+        }
+
+        /// <summary>
+        /// Инвалидирует кэш превью чертежей для всех деталей продукта
+        /// </summary>
+        private void InvalidateDrawingPreviewsCache(Product product)
+        {
+            if (product?.Details == null) return;
+
+            foreach (var detail in product.Details)
+            {
+                detail.InvalidateDrawingPreviewCache();
             }
         }
 
@@ -696,12 +713,10 @@ namespace TankManager.Core.ViewModels
             if (part == null || !IsLinkedToKompas || CurrentProduct?.Context == null)
                 return;
 
-            // Если превью уже загружено, пропускаем
-            if (!string.IsNullOrEmpty(part.CdfFilePath))
-                return;
-
             try
             {
+                // Всегда вызываем LoadDrawingPreview - он сам проверит актуальность кэша
+                // и перегенерирует PNG при необходимости
                 await Task.Run(() => _kompasService.LoadDrawingPreview(part, CurrentProduct));
             }
             catch (Exception ex)
