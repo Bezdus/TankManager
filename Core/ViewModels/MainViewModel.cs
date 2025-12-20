@@ -61,7 +61,7 @@ namespace TankManager.Core.ViewModels
                 NotifyProductChanged();
                 ResetSelections();
                 InitializeCollectionViews();
-                AutoSaveProduct();
+                NotifySaveCommandCanExecuteChanged();
             }
         }
 
@@ -356,6 +356,9 @@ namespace TankManager.Core.ViewModels
         public ICommand CopyOtherMaterialsToClipboardCommand { get; private set; }
         public ICommand CopyAllDataToClipboardCommand { get; private set; }
         public ICommand CheckForUpdatesCommand { get; private set; }
+        public ICommand LinkToKompasCommand { get; private set; }
+        public ICommand SaveProductCommand { get; private set; }
+        public ICommand RefreshFromKompasCommand { get; private set; }
 
         #endregion
 
@@ -371,7 +374,6 @@ namespace TankManager.Core.ViewModels
             CurrentProduct = new Product();
 
             InitializeCommands();
-            _ = LoadLastProductAsync();
         }
 
         private void InitializeCommands()
@@ -390,18 +392,14 @@ namespace TankManager.Core.ViewModels
             CopyOtherMaterialsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, OtherMaterials), () => OtherMaterials?.Any() == true);
             CopyAllDataToClipboardCommand = new RelayCommand(CopyAllDataToClipboard, () => StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
             CheckForUpdatesCommand = new RelayCommand(() => UpdateService.CheckForUpdates(showNoUpdateMessage: true));
+            LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
+            SaveProductCommand = new RelayCommand(SaveProduct, () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name));
+            RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
         }
 
         #endregion
 
         #region Product Loading
-
-        private async Task LoadLastProductAsync()
-        {
-            var lastProduct = _storageService.LoadLast();
-            if (lastProduct != null && !string.IsNullOrEmpty(lastProduct.Name))
-                await LoadAndLinkProductAsync(lastProduct, "Загружен последний Product");
-        }
 
         private async Task LoadAndLinkProductAsync(Product savedProduct, string successMessage)
         {
@@ -416,12 +414,80 @@ namespace TankManager.Core.ViewModels
 
             SetCurrentProduct(savedProduct, isLinked: false);
 
-            if (!string.IsNullOrEmpty(filePath))
-                await TryLinkToKompasAsync(filePath);
+            StatusMessage = $"{successMessage} (без связи с КОМПАС)";
+            NotifyLinkCommandCanExecuteChanged();
+        }
 
-            StatusMessage = IsLinkedToKompas
-                ? $"{successMessage} (связан с КОМПАС)"
-                : $"{successMessage} (без связи с КОМПАС)";
+        private async Task LinkToKompasAsync()
+        {
+            var filePath = CurrentProduct?.FilePath;
+            if (string.IsNullOrEmpty(filePath)) return;
+
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Связывание с КОМПАС...";
+
+                if (!File.Exists(filePath))
+                {
+                    StatusMessage = $"Файл не найден: {Path.GetFileName(filePath)}";
+                    return;
+                }
+
+                var linkedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
+                if (linkedProduct != null)
+                {
+                    _linkedProductsCache[filePath] = linkedProduct;
+                    SetCurrentProduct(linkedProduct, isLinked: true);
+                    StatusMessage = $"Связано с КОМПАС: {CurrentProduct.Name}";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка связывания с КОМПАС: {ex.Message}");
+                StatusMessage = $"Ошибка связи с КОМПАС: {ex.Message}";
+                IsLinkedToKompas = false;
+            }
+            finally
+            {
+                IsLoading = false;
+                NotifyCopyCommandsCanExecuteChanged();
+                NotifyLinkCommandCanExecuteChanged();
+                NotifyRefreshCommandCanExecuteChanged();
+            }
+        }
+
+        private async Task RefreshFromKompasAsync()
+        {
+            var filePath = CurrentProduct?.FilePath;
+            if (string.IsNullOrEmpty(filePath) || !IsLinkedToKompas) return;
+
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Обновление данных из КОМПАС...";
+
+                // Удаляем из кэша, чтобы загрузить актуальные данные
+                _linkedProductsCache.Remove(filePath);
+
+                var refreshedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
+                if (refreshedProduct != null)
+                {
+                    _linkedProductsCache[filePath] = refreshedProduct;
+                    SetCurrentProduct(refreshedProduct, isLinked: true);
+                    StatusMessage = $"Данные обновлены: {CurrentProduct.Name}, деталей: {Details?.Count ?? 0}";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка обновления из КОМПАС: {ex.Message}");
+                StatusMessage = $"Ошибка обновления: {ex.Message}";
+            }
+            finally
+            {
+                IsLoading = false;
+                NotifyCopyCommandsCanExecuteChanged();
+            }
         }
 
         private async Task TryLinkToKompasAsync(string filePath)
@@ -483,6 +549,7 @@ namespace TankManager.Core.ViewModels
             {
                 IsLoading = false;
                 NotifyCopyCommandsCanExecuteChanged();
+                NotifyRefreshCommandCanExecuteChanged();
             }
         }
 
@@ -512,6 +579,7 @@ namespace TankManager.Core.ViewModels
             {
                 IsLoading = false;
                 NotifyCopyCommandsCanExecuteChanged();
+                NotifyRefreshCommandCanExecuteChanged();
             }
         }
 
@@ -552,23 +620,17 @@ namespace TankManager.Core.ViewModels
             InitializeCollectionViews();
             UpdateCalculations();
             NotifyCopyCommandsCanExecuteChanged();
+            NotifySaveCommandCanExecuteChanged();
+            NotifyRefreshCommandCanExecuteChanged();
         }
 
-        private void AutoSaveProduct()
+        private void SaveProduct()
         {
             if (CurrentProduct == null || string.IsNullOrEmpty(CurrentProduct.Name)) return;
 
-            var existingProducts = _storageService.GetSavedProducts();
-            var exists = existingProducts.Any(p =>
-                p.ProductName == CurrentProduct.Name &&
-                p.Marking == CurrentProduct.Marking);
-
-            if (!exists)
-            {
-                var filePath = _storageService.Save(CurrentProduct);
-                StatusMessage = $"Автосохранено: {Path.GetFileName(filePath)}";
-                RefreshSavedProducts();
-            }
+            var filePath = _storageService.Save(CurrentProduct);
+            StatusMessage = $"Сохранено: {Path.GetFileName(filePath)}";
+            RefreshSavedProducts();
         }
 
         private void DeleteSelectedProduct()
@@ -809,6 +871,21 @@ namespace TankManager.Core.ViewModels
             ((RelayCommand)CopyAllDataToClipboardCommand)?.NotifyCanExecuteChanged();
         }
 
+        private void NotifyLinkCommandCanExecuteChanged()
+        {
+            ((RelayCommand)LinkToKompasCommand)?.NotifyCanExecuteChanged();
+        }
+
+        private void NotifySaveCommandCanExecuteChanged()
+        {
+            ((RelayCommand)SaveProductCommand)?.NotifyCanExecuteChanged();
+        }
+
+        private void NotifyRefreshCommandCanExecuteChanged()
+        {
+            ((RelayCommand)RefreshFromKompasCommand)?.NotifyCanExecuteChanged();
+        }
+
         private void ResetSelections()
         {
             SelectedDetail = null;
@@ -860,7 +937,6 @@ namespace TankManager.Core.ViewModels
 
         public void Dispose()
         {
-            _storageService.SaveAsLast(CurrentProduct);
             _linkedProductsCache.Clear();
             CurrentProduct?.Clear();
             _kompasService?.Dispose();

@@ -49,11 +49,55 @@ namespace TankManager.Core.Services
         {
             if (product == null) return null;
 
+            // Проверяем, есть ли уже сохранённый файл с таким же продуктом
+            string existingFileName = FindExistingProduct(product);
+            
+            if (existingFileName != null)
+            {
+                // Перезаписываем существующий файл
+                string existingFilePath = Path.Combine(ProductsDirectory, existingFileName);
+                SaveToFile(product, existingFilePath);
+                return existingFilePath;
+            }
+
+            // Создаём новый файл
             string fileName = GenerateFileName(product, customName);
             string filePath = Path.Combine(ProductsDirectory, fileName);
 
             SaveToFile(product, filePath);
             return filePath;
+        }
+
+        /// <summary>
+        /// Найти существующий файл продукта по имени и обозначению
+        /// </summary>
+        private string FindExistingProduct(Product product)
+        {
+            if (!Directory.Exists(ProductsDirectory))
+                return null;
+
+            var files = Directory.GetFiles(ProductsDirectory, "*" + FileExtension)
+                .Where(f => !Path.GetFileName(f).Equals(LastProductFileName, StringComparison.OrdinalIgnoreCase));
+
+            foreach (var file in files)
+            {
+                try
+                {
+                    var existingProduct = LoadFromFile(file);
+                    if (existingProduct != null &&
+                        existingProduct.Name == product.Name &&
+                        existingProduct.Marking == product.Marking)
+                    {
+                        return Path.GetFileName(file);
+                    }
+                }
+                catch
+                {
+                    // Пропускаем повреждённые файлы
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
