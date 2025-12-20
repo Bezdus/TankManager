@@ -695,9 +695,9 @@
                                    FontStyle="Italic"
                                    FontSize="11"
                                    Margin="15"
-                                   Visibility="{Binding CurrentlySelectedPart, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                   Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}"/>
 
-                        <Grid Visibility="{Binding CurrentlySelectedPart, Converter={StaticResource InverseNullToVisibilityConverter}}"
+                        <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseNullToVisibilityConverter}}"
                               DataContext="{Binding CurrentlySelectedPart}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>

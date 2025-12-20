@@ -132,7 +132,9 @@ namespace TankManager.Core.Services
 
                 foreach (IPart7 subPart in partsCollection)
                 {
-                    if (subPart == null) continue;
+                    IFeature7 feature = subPart as IFeature7;
+
+                    if (subPart == null || feature.Excluded) continue;
 
                     _comManager.Track(subPart);
 
