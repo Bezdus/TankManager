@@ -450,7 +450,7 @@ namespace TankManager.Core.ViewModels
             CopyAllDataToClipboardCommand = new RelayCommand(CopyAllDataToClipboard, () => StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
             CheckForUpdatesCommand = new RelayCommand(() => UpdateService.CheckForUpdates(showNoUpdateMessage: true));
             LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
-            SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name));
+            SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name) && IsLinkedToKompas);
             RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
             SelectServerStorageFolderCommand = new RelayCommand(SelectServerStorageFolder);
             ClearServerStorageFolderCommand = new RelayCommand(ClearServerStorageFolder, () => HasServerStorageFolder);
@@ -507,6 +507,7 @@ namespace TankManager.Core.ViewModels
                 Debug.WriteLine($"Ошибка связывания с КОМПАС: {ex.Message}");
                 StatusMessage = $"Ошибка связи с КОМПАС: {ex.Message}";
                 IsLinkedToKompas = false;
+                NotifySaveCommandCanExecuteChanged();
             }
             finally
             {
@@ -719,6 +720,7 @@ namespace TankManager.Core.ViewModels
             NotifyCopyCommandsCanExecuteChanged();
             NotifySaveCommandCanExecuteChanged();
             NotifyRefreshCommandCanExecuteChanged();
+            NotifyLinkCommandCanExecuteChanged();
             
             // Принудительная сборка мусора после смены продукта
             GC.Collect();

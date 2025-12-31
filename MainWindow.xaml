@@ -412,8 +412,19 @@
                     <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
 
                     <Button Command="{Binding SaveProductCommand}"
-                            Style="{StaticResource PanelButtonStyle}"
-                            ToolTip="Сохранить текущее изделие">
+                            ToolTipService.ShowOnDisabled="True">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PanelButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsLinkedToKompas}" Value="True">
+                                        <Setter Property="ToolTip" Value="Сохранить текущее изделие"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsLinkedToKompas}" Value="False">
+                                        <Setter Property="ToolTip" Value="Для сохранения необходима связь с КОМПАС"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="💾" Margin="0,0,5,0"/>
                             <TextBlock Text="Сохранить"/>
