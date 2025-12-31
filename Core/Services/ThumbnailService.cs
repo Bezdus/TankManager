@@ -52,7 +52,9 @@ namespace TankManager.Core.Services
 
                     if (thumbnail != null)
                     {
-                        return ConvertBitmapToBitmapSource(thumbnail, width, height);
+                        var bitmapSource = ConvertBitmapToBitmapSource(thumbnail, width, height);
+                        thumbnail.Dispose(); // Освобождаем ресурсы
+                        return bitmapSource;
                     }
                 }
             }

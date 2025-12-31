@@ -509,7 +509,11 @@ namespace TankManager.Core.Models
 
             if (disposing)
             {
+                // Очищаем все превью
                 _filePreview = null;
+                _drawingPreview = null;
+                _previewLoaded = false;
+                _drawingPreviewLoaded = false;
             }
 
             _disposed = true;

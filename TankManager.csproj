@@ -92,6 +92,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Core\Services\DrawingPreviewService.cs" />
+    <Compile Include="Core\Services\FileLockDiagnostics.cs" />
     <Compile Include="Views\MaterialsPanel.xaml.cs" />
     <Compile Include="Views\PartPropertiesPanel.xaml.cs" />
     <Compile Include="Views\PartsListPanel.xaml.cs" />
@@ -157,6 +158,8 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <None Include="РЕШЕНИЕ_БЛОКИРОВКИ.md" />
+    <None Include="ФАЙЛОВЫЕ_БЛОКИРОВКИ.md" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

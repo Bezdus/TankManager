@@ -67,14 +67,34 @@ namespace TankManager.Core.Models
 
         public void Clear()
         {
+            // Очищаем превью у всех деталей перед очисткой коллекций
+            foreach (var detail in Details)
+            {
+                detail.FilePreview = null;
+                detail.InvalidateDrawingPreviewCache();
+                detail.Dispose();
+            }
+            
+            foreach (var part in StandardParts)
+            {
+                part.FilePreview = null;
+                part.InvalidateDrawingPreviewCache();
+                part.Dispose();
+            }
+            
             Details.Clear();
             StandardParts.Clear();
             SheetMaterials.Clear();
             TubularProducts.Clear();
+            OtherMaterials.Clear();
             Name = null;
             Marking = null;
             Mass = 0;
             Context = null;
+            
+            // Освобождаем собственные ресурсы
+            FilePreview = null;
+            InvalidateDrawingPreviewCache();
         }
     }
 }

@@ -218,6 +218,15 @@ namespace TankManager
 
             scrollViewer.Content = image;
             previewWindow.Content = scrollViewer;
+            
+            // Очистка ресурсов при закрытии окна
+            previewWindow.Closed += (s, args) =>
+            {
+                image.Source = null;
+                scrollViewer.Content = null;
+                previewWindow.Content = null;
+            };
+            
             previewWindow.ShowDialog();
         }
     }

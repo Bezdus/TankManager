@@ -10,22 +10,222 @@ using TankManager.Core.Models;
 namespace TankManager.Core.Services
 {
     /// <summary>
-    /// Сервис для сохранения и загрузки Product в локальную базу
+    /// Результат синхронизации
+    /// </summary>
+    public class SyncResult
+    {
+        public int NewProducts { get; set; }
+        public int UpdatedProducts { get; set; }
+        public int FailedProducts { get; set; }
+        public List<string> Errors { get; set; } = new List<string>();
+        public bool Success => FailedProducts == 0 && Errors.Count == 0;
+    }
+
+    /// <summary>
+    /// Сервис для сохранения и загрузки Product в локальную базу с синхронизацией с сервером
     /// </summary>
     public class ProductStorageService
     {
         private static readonly string ProductsDirectory =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "products");
 
+        private static readonly string SettingsFilePath =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "storage_settings.json");
+
         private const string LastProductFileName = "_last_product.json";
         private const string ProductJsonFileName = "product.json";
         private const string ImagesSubfolder = "images";
         private const string FileExtension = ".json";
 
+        private string _serverStorageFolder;
+
+        /// <summary>
+        /// Серверная (сетевая) папка для хранения изделий
+        /// </summary>
+        public string ServerStorageFolder
+        {
+            get => _serverStorageFolder;
+            set
+            {
+                _serverStorageFolder = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Проверяет, установлена ли серверная папка
+        /// </summary>
+        public bool HasServerFolder => !string.IsNullOrEmpty(_serverStorageFolder);
+
+        /// <summary>
+        /// Проверяет, доступна ли серверная папка
+        /// </summary>
+        public bool IsServerAvailable => HasServerFolder && Directory.Exists(_serverStorageFolder);
+
         public ProductStorageService()
         {
             Directory.CreateDirectory(ProductsDirectory);
+            LoadSettings();
         }
+
+        #region Settings
+
+        private void LoadSettings()
+        {
+            try
+            {
+                if (File.Exists(SettingsFilePath))
+                {
+                    var serializer = new DataContractJsonSerializer(typeof(StorageSettings));
+                    using (var fileStream = new FileStream(SettingsFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        fileStream.CopyTo(memoryStream);
+                        memoryStream.Position = 0;
+                        var settings = (StorageSettings)serializer.ReadObject(memoryStream);
+                        _serverStorageFolder = settings?.ServerStorageFolder;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка загрузки настроек хранения: {ex.Message}");
+            }
+        }
+
+        private void SaveSettings()
+        {
+            try
+            {
+                var settings = new StorageSettings { ServerStorageFolder = _serverStorageFolder };
+                var serializer = new DataContractJsonSerializer(typeof(StorageSettings));
+                
+                using (var memoryStream = new MemoryStream())
+                {
+                    serializer.WriteObject(memoryStream, settings);
+                    memoryStream.Position = 0;
+                    
+                    using (var fileStream = new FileStream(SettingsFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        memoryStream.CopyTo(fileStream);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка сохранения настроек хранения: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Synchronization
+
+        /// <summary>
+        /// Синхронизирует данные с сервера в локальную папку.
+        /// Копирует новые и обновлённые изделия с сервера.
+        /// </summary>
+        public SyncResult SyncFromServer()
+        {
+            var result = new SyncResult();
+
+            if (!IsServerAvailable)
+            {
+                if (HasServerFolder)
+                    result.Errors.Add("Серверная папка недоступна");
+                return result;
+            }
+
+            try
+            {
+                var serverFolders = Directory.GetDirectories(_serverStorageFolder)
+                    .Where(f => !Path.GetFileName(f).StartsWith("_"))
+                    .ToList();
+
+                foreach (var serverFolder in serverFolders)
+                {
+                    try
+                    {
+                        string folderName = Path.GetFileName(serverFolder);
+                        string localFolder = Path.Combine(ProductsDirectory, folderName);
+                        string serverJsonPath = Path.Combine(serverFolder, ProductJsonFileName);
+
+                        if (!File.Exists(serverJsonPath))
+                            continue;
+
+                        var serverFileInfo = new FileInfo(serverJsonPath);
+                        string localJsonPath = Path.Combine(localFolder, ProductJsonFileName);
+
+                        bool needsCopy = false;
+                        bool isNew = false;
+
+                        if (!Directory.Exists(localFolder) || !File.Exists(localJsonPath))
+                        {
+                            // Новое изделие - нужно скопировать
+                            needsCopy = true;
+                            isNew = true;
+                        }
+                        else
+                        {
+                            // Проверяем дату модификации
+                            var localFileInfo = new FileInfo(localJsonPath);
+                            if (serverFileInfo.LastWriteTimeUtc > localFileInfo.LastWriteTimeUtc)
+                            {
+                                // Серверная версия новее - нужно обновить
+                                needsCopy = true;
+                                isNew = false;
+                            }
+                        }
+
+                        if (needsCopy)
+                        {
+                            CopyProductFolder(serverFolder, localFolder);
+                            
+                            if (isNew)
+                                result.NewProducts++;
+                            else
+                                result.UpdatedProducts++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        result.FailedProducts++;
+                        result.Errors.Add($"Ошибка синхронизации {Path.GetFileName(serverFolder)}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add($"Ошибка доступа к серверной папке: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Копирует папку продукта с сервера в локальную директорию
+        /// </summary>
+        private void CopyProductFolder(string sourceFolder, string destFolder)
+        {
+            // Создаём целевую папку
+            Directory.CreateDirectory(destFolder);
+
+            // Копируем все файлы
+            foreach (var file in Directory.GetFiles(sourceFolder))
+            {
+                string destFile = Path.Combine(destFolder, Path.GetFileName(file));
+                File.Copy(file, destFile, true);
+            }
+
+            // Копируем подпапки (например, images)
+            foreach (var dir in Directory.GetDirectories(sourceFolder))
+            {
+                string destSubDir = Path.Combine(destFolder, Path.GetFileName(dir));
+                CopyProductFolder(dir, destSubDir);
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// Возвращает путь к папке с изображениями для продукта
@@ -62,26 +262,54 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Сохранить продукт в базу с уникальным именем
+        /// Сохранить продукт в локальную папку и на сервер (если доступен)
         /// </summary>
         public string Save(Product product, string customName = null)
         {
             if (product == null) return null;
 
+            // Сохраняем в локальную папку
+            string localFilePath = SaveToDirectory(product, ProductsDirectory, customName);
+
+            // Если сервер доступен - сохраняем и туда
+            if (IsServerAvailable)
+            {
+                try
+                {
+                    SaveToDirectory(product, _serverStorageFolder, customName);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Ошибка сохранения на сервер: {ex.Message}");
+                }
+            }
+
+            return localFilePath;
+        }
+
+        /// <summary>
+        /// Сохранить продукт в указанную директорию
+        /// </summary>
+        private string SaveToDirectory(Product product, string baseDirectory, string customName)
+        {
             // Проверяем, есть ли уже сохранённый продукт
-            string existingFolderPath = FindExistingProductFolder(product);
+            string existingFolderPath = FindExistingProductFolder(product, baseDirectory);
             
             if (existingFolderPath != null)
             {
                 // Перезаписываем существующий продукт
                 string existingFilePath = Path.Combine(existingFolderPath, ProductJsonFileName);
                 SaveToFile(product, existingFilePath);
+                
+                // Копируем изображения если они есть в локальной папке
+                CopyImagesIfNeeded(product, existingFolderPath);
+                
                 return existingFilePath;
             }
 
             // Создаём новую папку для продукта
-            string productFolderName = GenerateProductFolderName(product, customName);
-            string productFolderPath = Path.Combine(ProductsDirectory, productFolderName);
+            string productFolderName = GenerateProductFolderName(product, baseDirectory, customName);
+            string productFolderPath = Path.Combine(baseDirectory, productFolderName);
             Directory.CreateDirectory(productFolderPath);
             
             // Создаём папку для изображений
@@ -91,20 +319,57 @@ namespace TankManager.Core.Services
             // Сохраняем JSON
             string filePath = Path.Combine(productFolderPath, ProductJsonFileName);
             SaveToFile(product, filePath);
+            
+            // Копируем изображения если они есть в локальной папке
+            CopyImagesIfNeeded(product, productFolderPath);
+            
             return filePath;
         }
 
         /// <summary>
-        /// Найти существующую папку продукта по имени и обозначению
+        /// Копирует изображения из локальной папки продукта в целевую папку
         /// </summary>
-        private string FindExistingProductFolder(Product product)
+        private void CopyImagesIfNeeded(Product product, string destProductFolder)
         {
-            if (!Directory.Exists(ProductsDirectory))
+            // Находим локальную папку продукта
+            string localFolder = FindExistingProductFolder(product, ProductsDirectory);
+            if (localFolder == null || localFolder == destProductFolder)
+                return;
+
+            string sourceImagesFolder = Path.Combine(localFolder, ImagesSubfolder);
+            string destImagesFolder = Path.Combine(destProductFolder, ImagesSubfolder);
+
+            if (!Directory.Exists(sourceImagesFolder))
+                return;
+
+            Directory.CreateDirectory(destImagesFolder);
+
+            foreach (var file in Directory.GetFiles(sourceImagesFolder))
+            {
+                string destFile = Path.Combine(destImagesFolder, Path.GetFileName(file));
+                if (!File.Exists(destFile))
+                {
+                    try
+                    {
+                        File.Copy(file, destFile, false);
+                    }
+                    catch { /* Игнорируем ошибки копирования */ }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Найти существующую папку продукта по имени и обозначению в указанной директории
+        /// </summary>
+        private string FindExistingProductFolder(Product product, string baseDirectory)
+        {
+            if (!Directory.Exists(baseDirectory))
                 return null;
 
-            var folders = Directory.GetDirectories(ProductsDirectory)
+            var folders = Directory.GetDirectories(baseDirectory)
                 .Where(f => !Path.GetFileName(f).StartsWith("_"));
 
+            // Сначала ищем папку с product.json (полностью сохранённый продукт)
             foreach (var folder in folders)
             {
                 try
@@ -127,21 +392,36 @@ namespace TankManager.Core.Services
                 }
             }
 
+            // Если не нашли сохранённый продукт, ищем папку по имени (для превью)
+            string expectedFolderName = GetProductFolderName(product);
+            string expectedFolder = Path.Combine(baseDirectory, expectedFolderName);
+            
+            if (Directory.Exists(expectedFolder))
+            {
+                return expectedFolder;
+            }
+
             return null;
         }
 
         /// <summary>
-        /// Загрузить продукт по имени папки
+        /// Загрузить продукт по имени папки (только из локальной папки)
         /// </summary>
         public Product Load(string folderName)
         {
             string folderPath = Path.Combine(ProductsDirectory, folderName);
             string filePath = Path.Combine(folderPath, ProductJsonFileName);
-            return LoadFromFile(filePath, folderPath);
+            
+            if (File.Exists(filePath))
+            {
+                return LoadFromFile(filePath, folderPath);
+            }
+
+            return null;
         }
 
         /// <summary>
-        /// Получить список всех сохранённых продуктов
+        /// Получить список всех сохранённых продуктов (только из локальной папки)
         /// </summary>
         public List<ProductFileInfo> GetSavedProducts()
         {
@@ -186,24 +466,86 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Удалить продукт из базы
+        /// Удалить продукт из базы (из локальной папки и с сервера)
         /// </summary>
         public bool Delete(string folderName)
         {
+            bool deletedAny = false;
+
+            // Принудительная сборка мусора перед удалением
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            // Удаляем из локальной папки
             try
             {
                 string folderPath = Path.Combine(ProductsDirectory, folderName);
                 if (Directory.Exists(folderPath))
                 {
-                    Directory.Delete(folderPath, true);
-                    return true;
+                    // Пытаемся удалить файлы по одному, чтобы определить заблокированные
+                    DeleteDirectoryRecursive(folderPath);
+                    deletedAny = true;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ошибка удаления
+                System.Diagnostics.Debug.WriteLine($"Ошибка удаления из локальной папки: {ex.Message}");
             }
-            return false;
+
+            // Удаляем с сервера если доступен
+            if (IsServerAvailable)
+            {
+                try
+                {
+                    string folderPath = Path.Combine(_serverStorageFolder, folderName);
+                    if (Directory.Exists(folderPath))
+                    {
+                        DeleteDirectoryRecursive(folderPath);
+                        deletedAny = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Ошибка удаления с сервера: {ex.Message}");
+                }
+            }
+
+            return deletedAny;
+        }
+
+        /// <summary>
+        /// Рекурсивное удаление директории с повторными попытками
+        /// </summary>
+        private void DeleteDirectoryRecursive(string path)
+        {
+            if (!Directory.Exists(path))
+                return;
+
+            System.Diagnostics.Debug.WriteLine($"🗑️ Попытка удаления: {path}");
+
+            // Используем диагностическую утилиту для детального анализа
+            if (!FileLockDiagnostics.ForceDeleteDirectory(path, maxAttempts: 5, delayMs: 200))
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ Не удалось удалить папку после всех попыток");
+                
+                // Пробуем ещё раз с более длительной задержкой
+                System.Threading.Thread.Sleep(1000);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                
+                try
+                {
+                    Directory.Delete(path, true);
+                    System.Diagnostics.Debug.WriteLine($"✅ Папка удалена после дополнительной задержки");
+                }
+                catch (IOException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"❌ Окончательная ошибка удаления: {ex.Message}");
+                    throw; // Пробрасываем исключение выше
+                }
+            }
         }
 
         /// <summary>
@@ -224,20 +566,20 @@ namespace TankManager.Core.Services
             return string.Join("_", baseName.Split(Path.GetInvalidFileNameChars()));
         }
 
-        private string GenerateProductFolderName(Product product, string customName)
+        private string GenerateProductFolderName(Product product, string baseDirectory, string customName)
         {
             string baseName = customName ?? $"{product.Name}_{product.Marking}";
             // Убираем недопустимые символы
             baseName = string.Join("_", baseName.Split(Path.GetInvalidFileNameChars()));
 
-            string folderPath = Path.Combine(ProductsDirectory, baseName);
+            string folderPath = Path.Combine(baseDirectory, baseName);
 
             // Если папка существует, добавляем номер
             int counter = 1;
             while (Directory.Exists(folderPath))
             {
                 string folderName = $"{baseName}_{counter}";
-                folderPath = Path.Combine(ProductsDirectory, folderName);
+                folderPath = Path.Combine(baseDirectory, folderName);
                 counter++;
             }
 
@@ -254,9 +596,15 @@ namespace TankManager.Core.Services
                 var dto = ToDto(product, productFolder);
                 var serializer = new DataContractJsonSerializer(typeof(ProductDto));
 
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                using (var memoryStream = new MemoryStream())
                 {
-                    serializer.WriteObject(stream, dto);
+                    serializer.WriteObject(memoryStream, dto);
+                    memoryStream.Position = 0;
+                    
+                    using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        memoryStream.CopyTo(fileStream);
+                    }
                 }
             }
             catch (Exception ex)
@@ -273,9 +621,13 @@ namespace TankManager.Core.Services
                     return null;
 
                 var serializer = new DataContractJsonSerializer(typeof(ProductDto));
-                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                
+                using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var memoryStream = new MemoryStream())
                 {
-                    var dto = (ProductDto)serializer.ReadObject(stream);
+                    fileStream.CopyTo(memoryStream);
+                    memoryStream.Position = 0;
+                    var dto = (ProductDto)serializer.ReadObject(memoryStream);
                     return FromDto(dto, productFolder);
                 }
             }
@@ -456,6 +808,16 @@ namespace TankManager.Core.Services
         public DateTime SavedDate { get; set; }
 
         public string DisplayName => $"{ProductName} ({Marking}) - {DetailsCount} дет.";
+    }
+
+    /// <summary>
+    /// Настройки хранения
+    /// </summary>
+    [System.Runtime.Serialization.DataContract]
+    public class StorageSettings
+    {
+        [System.Runtime.Serialization.DataMember]
+        public string ServerStorageFolder { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]

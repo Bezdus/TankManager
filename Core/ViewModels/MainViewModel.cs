@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.WindowsAPICodePack.Dialogs;
 using TankManager.Core.Models;
 using TankManager.Core.Services;
 
@@ -340,6 +341,59 @@ namespace TankManager.Core.ViewModels
 
         #endregion
 
+        #region Properties - Server Storage
+
+        /// <summary>
+        /// Путь к серверной папке для хранения изделий
+        /// </summary>
+        public string ServerStorageFolder
+        {
+            get => _storageService.ServerStorageFolder;
+            set
+            {
+                if (_storageService.ServerStorageFolder != value)
+                {
+                    _storageService.ServerStorageFolder = value;
+                    OnPropertyChanged(nameof(ServerStorageFolder));
+                    OnPropertyChanged(nameof(ServerStorageFolderDisplay));
+                    OnPropertyChanged(nameof(HasServerStorageFolder));
+                    OnPropertyChanged(nameof(IsServerAvailable));
+                    ((RelayCommand)ClearServerStorageFolderCommand)?.NotifyCanExecuteChanged();
+                    ((RelayCommand)SyncFromServerCommand)?.NotifyCanExecuteChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Отображаемый путь к серверной папке (сокращённый)
+        /// </summary>
+        public string ServerStorageFolderDisplay
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(ServerStorageFolder))
+                    return "Не указана";
+                    
+                // Сокращаем путь если слишком длинный
+                if (ServerStorageFolder.Length > 40)
+                    return "..." + ServerStorageFolder.Substring(ServerStorageFolder.Length - 37);
+                    
+                return ServerStorageFolder;
+            }
+        }
+
+        /// <summary>
+        /// Указана ли серверная папка
+        /// </summary>
+        public bool HasServerStorageFolder => _storageService.HasServerFolder;
+
+        /// <summary>
+        /// Доступна ли серверная папка
+        /// </summary>
+        public bool IsServerAvailable => _storageService.IsServerAvailable;
+
+        #endregion
+
         #region Commands
 
         public ICommand ShowInKompasCommand { get; private set; }
@@ -359,6 +413,9 @@ namespace TankManager.Core.ViewModels
         public ICommand LinkToKompasCommand { get; private set; }
         public ICommand SaveProductCommand { get; private set; }
         public ICommand RefreshFromKompasCommand { get; private set; }
+        public ICommand SelectServerStorageFolderCommand { get; private set; }
+        public ICommand ClearServerStorageFolderCommand { get; private set; }
+        public ICommand SyncFromServerCommand { get; private set; }
 
         #endregion
 
@@ -395,6 +452,9 @@ namespace TankManager.Core.ViewModels
             LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
             SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name));
             RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
+            SelectServerStorageFolderCommand = new RelayCommand(SelectServerStorageFolder);
+            ClearServerStorageFolderCommand = new RelayCommand(ClearServerStorageFolder, () => HasServerStorageFolder);
+            SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable);
         }
 
         #endregion
@@ -627,6 +687,26 @@ namespace TankManager.Core.ViewModels
 
         private void SetCurrentProduct(Product product, bool isLinked)
         {
+            // Очищаем превью у старого продукта перед переключением
+            if (_currentProduct != null && _currentProduct != product)
+            {
+                if (_currentProduct.Details != null)
+                {
+                    foreach (var detail in _currentProduct.Details)
+                    {
+                        detail.FilePreview = null;
+                    }
+                }
+                
+                if (_currentProduct.StandardParts != null)
+                {
+                    foreach (var part in _currentProduct.StandardParts)
+                    {
+                        part.FilePreview = null;
+                    }
+                }
+            }
+            
             _currentProduct = product;
             _isLinkedToKompas = isLinked;
 
@@ -639,6 +719,10 @@ namespace TankManager.Core.ViewModels
             NotifyCopyCommandsCanExecuteChanged();
             NotifySaveCommandCanExecuteChanged();
             NotifyRefreshCommandCanExecuteChanged();
+            
+            // Принудительная сборка мусора после смены продукта
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
 
         private async Task SaveProductAsync()
@@ -751,10 +835,39 @@ namespace TankManager.Core.ViewModels
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (result == MessageBoxResult.Yes && _storageService.Delete(SelectedSavedProduct.FileName))
+            if (result == MessageBoxResult.Yes)
             {
-                StatusMessage = $"Удалено: {SelectedSavedProduct.ProductName}";
-                RefreshSavedProducts();
+                // Если удаляемый продукт - текущий, очищаем его
+                if (CurrentProduct != null && 
+                    CurrentProduct.Name == SelectedSavedProduct.ProductName &&
+                    CurrentProduct.Marking == SelectedSavedProduct.Marking)
+                {
+                    // Очищаем превью у всех деталей
+                    if (Details != null)
+                    {
+                        foreach (var detail in Details)
+                        {
+                            detail.FilePreview = null;
+                        }
+                    }
+                    
+                    CurrentProduct = new Product();
+                    IsLinkedToKompas = false;
+                }
+                
+                // Удаляем из кэша
+                InvalidateProductCache(CurrentProduct?.FilePath);
+                
+                if (_storageService.Delete(SelectedSavedProduct.FileName))
+                {
+                    StatusMessage = $"Удалено: {SelectedSavedProduct.ProductName}";
+                    RefreshSavedProducts();
+                    
+                    // Принудительная сборка мусора для освобождения файлов
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                }
             }
         }
 
@@ -936,6 +1049,93 @@ namespace TankManager.Core.ViewModels
 
         #endregion
 
+        #region Server Storage & Sync
+
+        private void SelectServerStorageFolder()
+        {
+            using (var dialog = new CommonOpenFileDialog())
+            {
+                dialog.IsFolderPicker = true;
+                dialog.Title = "Выберите серверную папку для хранения изделий";
+                
+                if (!string.IsNullOrEmpty(ServerStorageFolder) && Directory.Exists(ServerStorageFolder))
+                {
+                    dialog.InitialDirectory = ServerStorageFolder;
+                }
+
+                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    ServerStorageFolder = dialog.FileName;
+                    StatusMessage = $"Серверная папка: {ServerStorageFolderDisplay}";
+                    
+                    // После выбора папки автоматически синхронизируем
+                    _ = SyncFromServerAsync();
+                }
+            }
+        }
+
+        private void ClearServerStorageFolder()
+        {
+            var result = MessageBox.Show(
+                "Очистить серверную папку для хранения изделий?\n\nСинхронизация будет отключена.",
+                "Подтверждение",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                ServerStorageFolder = null;
+                StatusMessage = "Серверная папка очищена";
+            }
+        }
+
+        private async Task SyncFromServerAsync()
+        {
+            if (!IsServerAvailable)
+            {
+                StatusMessage = "Серверная папка недоступна";
+                return;
+            }
+
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Синхронизация с сервером...";
+
+                var syncResult = await Task.Run(() => _storageService.SyncFromServer());
+
+                if (syncResult.Success)
+                {
+                    if (syncResult.NewProducts > 0 || syncResult.UpdatedProducts > 0)
+                    {
+                        StatusMessage = $"Синхронизация завершена: новых {syncResult.NewProducts}, обновлено {syncResult.UpdatedProducts}";
+                    }
+                    else
+                    {
+                        StatusMessage = "Синхронизация: данные актуальны";
+                    }
+                }
+                else
+                {
+                    StatusMessage = $"Синхронизация с ошибками: {string.Join(", ", syncResult.Errors.Take(2))}";
+                }
+
+                // Обновляем список продуктов
+                RefreshSavedProducts();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка синхронизации: {ex.Message}");
+                StatusMessage = $"Ошибка синхронизации: {ex.Message}";
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        #endregion
+
         #region Clipboard
 
         private void CopyToClipboard<T>(Action<IEnumerable<T>> copyAction, IEnumerable<T> items)
@@ -1049,9 +1249,33 @@ namespace TankManager.Core.ViewModels
 
         public void Dispose()
         {
+            // Очищаем превью у всех деталей перед закрытием
+            if (CurrentProduct?.Details != null)
+            {
+                foreach (var detail in CurrentProduct.Details)
+                {
+                    detail.FilePreview = null;
+                    detail.InvalidateDrawingPreviewCache();
+                }
+            }
+            
+            if (CurrentProduct?.StandardParts != null)
+            {
+                foreach (var part in CurrentProduct.StandardParts)
+                {
+                    part.FilePreview = null;
+                    part.InvalidateDrawingPreviewCache();
+                }
+            }
+            
             _linkedProductsCache.Clear();
             CurrentProduct?.Clear();
             _kompasService?.Dispose();
+            
+            // Принудительная сборка мусора для освобождения файлов
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
         }
 
         #endregion

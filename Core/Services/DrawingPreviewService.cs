@@ -88,6 +88,7 @@ namespace TankManager.Core.Services
         /// <summary>
         /// Загружает PNG-изображение для отображения в UI.
         /// Проверяет актуальность кэша перед загрузкой.
+        /// Загружает изображение в память, чтобы не блокировать файл.
         /// </summary>
         /// <param name="pngPath">Путь к PNG-файлу</param>
         /// <param name="sourceCdwPath">Путь к исходному файлу чертежа для проверки актуальности</param>
@@ -110,8 +111,17 @@ namespace TankManager.Core.Services
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.UriSource = new Uri(pngPath);
-                bitmap.EndInit();
+                
+                // Загружаем через поток в память, чтобы не блокировать файл
+                using (var fileStream = new FileStream(pngPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var memoryStream = new MemoryStream())
+                {
+                    fileStream.CopyTo(memoryStream);
+                    memoryStream.Position = 0;
+                    bitmap.StreamSource = memoryStream;
+                    bitmap.EndInit();
+                }
+                
                 bitmap.Freeze(); // Для потокобезопасности WPF
                 return bitmap;
             }
