@@ -18,11 +18,29 @@ namespace TankManager.Core.Services
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "products");
 
         private const string LastProductFileName = "_last_product.json";
+        private const string ProductJsonFileName = "product.json";
+        private const string ImagesSubfolder = "images";
         private const string FileExtension = ".json";
 
         public ProductStorageService()
         {
             Directory.CreateDirectory(ProductsDirectory);
+        }
+
+        /// <summary>
+        /// Возвращает путь к папке с изображениями для продукта
+        /// </summary>
+        public string GetProductImagesFolder(Product product)
+        {
+            if (product == null || string.IsNullOrEmpty(product.Name))
+                return null;
+
+            string productFolderName = GetProductFolderName(product);
+            string productFolder = Path.Combine(ProductsDirectory, productFolderName);
+            string imagesFolder = Path.Combine(productFolder, ImagesSubfolder);
+            
+            Directory.CreateDirectory(imagesFolder);
+            return imagesFolder;
         }
 
         /// <summary>
@@ -39,7 +57,8 @@ namespace TankManager.Core.Services
         /// </summary>
         public Product LoadLast()
         {
-            return LoadFromFile(Path.Combine(ProductsDirectory, LastProductFileName));
+            string filePath = Path.Combine(ProductsDirectory, LastProductFileName);
+            return LoadFromFile(filePath, null);
         }
 
         /// <summary>
@@ -49,51 +68,62 @@ namespace TankManager.Core.Services
         {
             if (product == null) return null;
 
-            // Проверяем, есть ли уже сохранённый файл с таким же продуктом
-            string existingFileName = FindExistingProduct(product);
+            // Проверяем, есть ли уже сохранённый продукт
+            string existingFolderPath = FindExistingProductFolder(product);
             
-            if (existingFileName != null)
+            if (existingFolderPath != null)
             {
-                // Перезаписываем существующий файл
-                string existingFilePath = Path.Combine(ProductsDirectory, existingFileName);
+                // Перезаписываем существующий продукт
+                string existingFilePath = Path.Combine(existingFolderPath, ProductJsonFileName);
                 SaveToFile(product, existingFilePath);
                 return existingFilePath;
             }
 
-            // Создаём новый файл
-            string fileName = GenerateFileName(product, customName);
-            string filePath = Path.Combine(ProductsDirectory, fileName);
+            // Создаём новую папку для продукта
+            string productFolderName = GenerateProductFolderName(product, customName);
+            string productFolderPath = Path.Combine(ProductsDirectory, productFolderName);
+            Directory.CreateDirectory(productFolderPath);
+            
+            // Создаём папку для изображений
+            string imagesFolder = Path.Combine(productFolderPath, ImagesSubfolder);
+            Directory.CreateDirectory(imagesFolder);
 
+            // Сохраняем JSON
+            string filePath = Path.Combine(productFolderPath, ProductJsonFileName);
             SaveToFile(product, filePath);
             return filePath;
         }
 
         /// <summary>
-        /// Найти существующий файл продукта по имени и обозначению
+        /// Найти существующую папку продукта по имени и обозначению
         /// </summary>
-        private string FindExistingProduct(Product product)
+        private string FindExistingProductFolder(Product product)
         {
             if (!Directory.Exists(ProductsDirectory))
                 return null;
 
-            var files = Directory.GetFiles(ProductsDirectory, "*" + FileExtension)
-                .Where(f => !Path.GetFileName(f).Equals(LastProductFileName, StringComparison.OrdinalIgnoreCase));
+            var folders = Directory.GetDirectories(ProductsDirectory)
+                .Where(f => !Path.GetFileName(f).StartsWith("_"));
 
-            foreach (var file in files)
+            foreach (var folder in folders)
             {
                 try
                 {
-                    var existingProduct = LoadFromFile(file);
+                    string jsonPath = Path.Combine(folder, ProductJsonFileName);
+                    if (!File.Exists(jsonPath))
+                        continue;
+
+                    var existingProduct = LoadFromFile(jsonPath, folder);
                     if (existingProduct != null &&
                         existingProduct.Name == product.Name &&
                         existingProduct.Marking == product.Marking)
                     {
-                        return Path.GetFileName(file);
+                        return folder;
                     }
                 }
                 catch
                 {
-                    // Пропускаем повреждённые файлы
+                    // Пропускаем повреждённые папки
                 }
             }
 
@@ -101,12 +131,13 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Загрузить продукт по имени файла
+        /// Загрузить продукт по имени папки
         /// </summary>
-        public Product Load(string fileName)
+        public Product Load(string folderName)
         {
-            string filePath = Path.Combine(ProductsDirectory, fileName);
-            return LoadFromFile(filePath);
+            string folderPath = Path.Combine(ProductsDirectory, folderName);
+            string filePath = Path.Combine(folderPath, ProductJsonFileName);
+            return LoadFromFile(filePath, folderPath);
         }
 
         /// <summary>
@@ -119,21 +150,25 @@ namespace TankManager.Core.Services
             if (!Directory.Exists(ProductsDirectory))
                 return result;
 
-            var files = Directory.GetFiles(ProductsDirectory, "*" + FileExtension)
-                .Where(f => !Path.GetFileName(f).Equals(LastProductFileName, StringComparison.OrdinalIgnoreCase));
+            var folders = Directory.GetDirectories(ProductsDirectory)
+                .Where(f => !Path.GetFileName(f).StartsWith("_"));
 
-            foreach (var file in files)
+            foreach (var folder in folders)
             {
                 try
                 {
-                    var fileInfo = new FileInfo(file);
-                    var product = LoadFromFile(file);
+                    string jsonPath = Path.Combine(folder, ProductJsonFileName);
+                    if (!File.Exists(jsonPath))
+                        continue;
+
+                    var fileInfo = new FileInfo(jsonPath);
+                    var product = LoadFromFile(jsonPath, folder);
 
                     if (product != null)
                     {
                         result.Add(new ProductFileInfo
                         {
-                            FileName = Path.GetFileName(file),
+                            FileName = Path.GetFileName(folder),
                             ProductName = product.Name,
                             Marking = product.Marking,
                             DetailsCount = product.Details.Count,
@@ -143,7 +178,7 @@ namespace TankManager.Core.Services
                 }
                 catch
                 {
-                    // Пропускаем повреждённые файлы
+                    // Пропускаем повреждённые папки
                 }
             }
 
@@ -153,14 +188,14 @@ namespace TankManager.Core.Services
         /// <summary>
         /// Удалить продукт из базы
         /// </summary>
-        public bool Delete(string fileName)
+        public bool Delete(string folderName)
         {
             try
             {
-                string filePath = Path.Combine(ProductsDirectory, fileName);
-                if (File.Exists(filePath))
+                string folderPath = Path.Combine(ProductsDirectory, folderName);
+                if (Directory.Exists(folderPath))
                 {
-                    File.Delete(filePath);
+                    Directory.Delete(folderPath, true);
                     return true;
                 }
             }
@@ -174,39 +209,49 @@ namespace TankManager.Core.Services
         /// <summary>
         /// Проверить существование продукта
         /// </summary>
-        public bool Exists(string fileName)
+        public bool Exists(string folderName)
         {
-            return File.Exists(Path.Combine(ProductsDirectory, fileName));
+            string folderPath = Path.Combine(ProductsDirectory, folderName);
+            string jsonPath = Path.Combine(folderPath, ProductJsonFileName);
+            return File.Exists(jsonPath);
         }
 
         #region Private Methods
 
-        private string GenerateFileName(Product product, string customName)
+        private string GetProductFolderName(Product product)
+        {
+            string baseName = $"{product.Name}_{product.Marking}";
+            return string.Join("_", baseName.Split(Path.GetInvalidFileNameChars()));
+        }
+
+        private string GenerateProductFolderName(Product product, string customName)
         {
             string baseName = customName ?? $"{product.Name}_{product.Marking}";
             // Убираем недопустимые символы
             baseName = string.Join("_", baseName.Split(Path.GetInvalidFileNameChars()));
 
-            string fileName = baseName + FileExtension;
-            string filePath = Path.Combine(ProductsDirectory, fileName);
+            string folderPath = Path.Combine(ProductsDirectory, baseName);
 
-            // Если файл существует, добавляем номер
+            // Если папка существует, добавляем номер
             int counter = 1;
-            while (File.Exists(filePath))
+            while (Directory.Exists(folderPath))
             {
-                fileName = $"{baseName}_{counter}{FileExtension}";
-                filePath = Path.Combine(ProductsDirectory, fileName);
+                string folderName = $"{baseName}_{counter}";
+                folderPath = Path.Combine(ProductsDirectory, folderName);
                 counter++;
             }
 
-            return fileName;
+            return Path.GetFileName(folderPath);
         }
 
         private void SaveToFile(Product product, string filePath)
         {
             try
             {
-                var dto = ToDto(product);
+                // Получаем папку продукта для сохранения относительных путей
+                string productFolder = Path.GetDirectoryName(filePath);
+                
+                var dto = ToDto(product, productFolder);
                 var serializer = new DataContractJsonSerializer(typeof(ProductDto));
 
                 using (var stream = new FileStream(filePath, FileMode.Create))
@@ -220,7 +265,7 @@ namespace TankManager.Core.Services
             }
         }
 
-        private Product LoadFromFile(string filePath)
+        private Product LoadFromFile(string filePath, string productFolder)
         {
             try
             {
@@ -231,7 +276,7 @@ namespace TankManager.Core.Services
                 using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                 {
                     var dto = (ProductDto)serializer.ReadObject(stream);
-                    return FromDto(dto);
+                    return FromDto(dto, productFolder);
                 }
             }
             catch (Exception ex)
@@ -241,7 +286,7 @@ namespace TankManager.Core.Services
             }
         }
 
-        private static ProductDto ToDto(Product product)
+        private static ProductDto ToDto(Product product, string productFolder)
         {
             return new ProductDto
             {
@@ -249,15 +294,39 @@ namespace TankManager.Core.Services
                 Marking = product.Marking,
                 Mass = product.Mass,
                 FilePath = product.FilePath,
-                Details = product.Details.Select(d => ToPartDto(d)).ToList(),
-                StandardParts = product.StandardParts.Select(d => ToPartDto(d)).ToList(),
+                Details = product.Details.Select(d => ToPartDto(d, productFolder)).ToList(),
+                StandardParts = product.StandardParts.Select(d => ToPartDto(d, productFolder)).ToList(),
                 SheetMaterials = product.SheetMaterials.Select(m => ToMaterialDto(m)).ToList(),
-                TubularProducts = product.TubularProducts.Select(m => ToMaterialDto(m)).ToList()
+                TubularProducts = product.TubularProducts.Select(m => ToMaterialDto(m)).ToList(),
+                OtherMaterials = product.OtherMaterials.Select(m => ToMaterialDto(m)).ToList()
             };
         }
 
-        private static PartModelDto ToPartDto(PartModel part)
+        private static PartModelDto ToPartDto(PartModel part, string productFolder)
         {
+            string relativeCdfPath = null;
+            
+            // Преобразуем абсолютный путь в относительный для сохранения в папке продукта
+            if (!string.IsNullOrEmpty(part.CdfFilePath) && !string.IsNullOrEmpty(productFolder))
+            {
+                try
+                {
+                    // Если путь уже находится внутри папки продукта, делаем его относительным
+                    if (part.CdfFilePath.StartsWith(productFolder, StringComparison.OrdinalIgnoreCase))
+                    {
+                        relativeCdfPath = part.CdfFilePath.Substring(productFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
+                    else
+                    {
+                        relativeCdfPath = part.CdfFilePath;
+                    }
+                }
+                catch
+                {
+                    relativeCdfPath = part.CdfFilePath;
+                }
+            }
+            
             return new PartModelDto
             {
                 Name = part.Name,
@@ -269,7 +338,9 @@ namespace TankManager.Core.Services
                 PartId = part.PartId,
                 IsBodyBased = part.IsBodyBased,
                 InstanceIndex = part.InstanceIndex,
-                ProductType = (int)part.ProductType
+                ProductType = (int)part.ProductType,
+                CdfFilePath = relativeCdfPath,
+                SourceCdwPath = part.SourceCdwPath
             };
         }
 
@@ -278,11 +349,12 @@ namespace TankManager.Core.Services
             return new MaterialInfoDto
             {
                 Name = material.Name,
-                TotalMass = material.TotalMass
+                TotalMass = material.TotalMass,
+                TotalLength = material.TotalLength
             };
         }
 
-        private static Product FromDto(ProductDto dto)
+        private static Product FromDto(ProductDto dto, string productFolder)
         {
             var product = new Product();
             product.Name = dto.Name;
@@ -292,12 +364,12 @@ namespace TankManager.Core.Services
 
             foreach (var partDto in dto.Details ?? Enumerable.Empty<PartModelDto>())
             {
-                product.Details.Add(FromPartDto(partDto));
+                product.Details.Add(FromPartDto(partDto, productFolder));
             }
 
             foreach (var partDto in dto.StandardParts ?? Enumerable.Empty<PartModelDto>())
             {
-                product.StandardParts.Add(FromPartDto(partDto));
+                product.StandardParts.Add(FromPartDto(partDto, productFolder));
             }
 
             foreach (var materialDto in dto.SheetMaterials ?? Enumerable.Empty<MaterialInfoDto>())
@@ -310,11 +382,39 @@ namespace TankManager.Core.Services
                 product.TubularProducts.Add(FromMaterialDto(materialDto));
             }
 
+            foreach (var materialDto in dto.OtherMaterials ?? Enumerable.Empty<MaterialInfoDto>())
+            {
+                product.OtherMaterials.Add(FromMaterialDto(materialDto));
+            }
+
             return product;
         }
 
-        private static PartModel FromPartDto(PartModelDto dto)
+        private static PartModel FromPartDto(PartModelDto dto, string productFolder)
         {
+            string absoluteCdfPath = null;
+            
+            // Преобразуем относительный путь в абсолютный
+            if (!string.IsNullOrEmpty(dto.CdfFilePath) && !string.IsNullOrEmpty(productFolder))
+            {
+                try
+                {
+                    // Если путь относительный, делаем его абсолютным
+                    if (!Path.IsPathRooted(dto.CdfFilePath))
+                    {
+                        absoluteCdfPath = Path.Combine(productFolder, dto.CdfFilePath);
+                    }
+                    else
+                    {
+                        absoluteCdfPath = dto.CdfFilePath;
+                    }
+                }
+                catch
+                {
+                    absoluteCdfPath = dto.CdfFilePath;
+                }
+            }
+            
             return new PartModelFromStorage
             {
                 Name = dto.Name,
@@ -323,7 +423,9 @@ namespace TankManager.Core.Services
                 Material = dto.Material,
                 Mass = dto.Mass,
                 FilePath = dto.FilePath,
-                ProductType = (ProductType)(dto.ProductType)
+                ProductType = (ProductType)(dto.ProductType),
+                CdfFilePath = absoluteCdfPath,
+                SourceCdwPath = dto.SourceCdwPath
             };
         }
 
@@ -332,7 +434,8 @@ namespace TankManager.Core.Services
             return new MaterialInfo
             {
                 Name = dto.Name,
-                TotalMass = dto.TotalMass
+                TotalMass = dto.TotalMass,
+                TotalLength = dto.TotalLength
             };
         }
 
@@ -381,6 +484,9 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public List<MaterialInfoDto> TubularProducts { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public List<MaterialInfoDto> OtherMaterials { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
@@ -415,6 +521,12 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public int ProductType { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public string CdfFilePath { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public string SourceCdwPath { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
@@ -425,6 +537,9 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public double TotalMass { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double TotalLength { get; set; }
     }
 
     #endregion

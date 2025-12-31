@@ -277,7 +277,6 @@ namespace TankManager.Core.Models
                 Material = FormatMaterial(
                     context.GetBodyPropertyValue(body, KompasConstants.MaterialPropertyName));
 
-
                 Mass = ParseMass(
                     context.GetBodyPropertyValue(body, KompasConstants.MassPropertyName));
                 
@@ -303,10 +302,14 @@ namespace TankManager.Core.Models
         /// <summary>
         /// Загружает превью чертежа для детали
         /// </summary>
-        public void LoadDrawingPreview(IPart7 part, KompasContext context)
+        /// <param name="targetDirectory">Целевая папка для сохранения превью</param>
+        public void LoadDrawingPreview(IPart7 part, KompasContext context, string targetDirectory)
         {
+            if (string.IsNullOrEmpty(targetDirectory))
+                return;
+
             string sourceCdwPath;
-            string pngPath = _previewService.GetOrCreatePreview(part, context, out sourceCdwPath);
+            string pngPath = _previewService.GetOrCreatePreview(part, context, out sourceCdwPath, targetDirectory);
             
             // Сначала устанавливаем путь к исходному файлу
             _cdwFilePath = sourceCdwPath;

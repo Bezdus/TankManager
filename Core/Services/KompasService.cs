@@ -137,7 +137,7 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Отображает деталь в KOMPAS (выделяет и центрирует камеру)
+        /// Отображает деталь в KOMPАС (выделяет и центрирует камеру)
         /// </summary>
         /// <param name="detail">Деталь для отображения</param>
         /// <param name="product">Продукт, содержащий деталь</param>
@@ -236,9 +236,13 @@ namespace TankManager.Core.Services
         /// </summary>
         /// <param name="detail">Деталь для загрузки превью</param>
         /// <param name="product">Продукт, содержащий деталь</param>
-        public void LoadDrawingPreview(PartModel detail, Product product)
+        /// <param name="targetDirectory">Целевая папка для сохранения превью</param>
+        public void LoadDrawingPreview(PartModel detail, Product product, string targetDirectory)
         {
             if (detail == null || product?.Context == null || !product.Context.IsDocumentLoaded)
+                return;
+
+            if (string.IsNullOrEmpty(targetDirectory))
                 return;
 
             // Пропускаем Body-based детали (у них нет своего чертежа)
@@ -250,7 +254,7 @@ namespace TankManager.Core.Services
                 var targetPart = FindTargetPart(detail, product.Context);
                 if (targetPart != null)
                 {
-                    detail.LoadDrawingPreview(targetPart, product.Context);
+                    detail.LoadDrawingPreview(targetPart, product.Context, targetDirectory);
                     if (!string.IsNullOrEmpty(detail.CdfFilePath))
                     {
                         _logger.LogInfo($"Drawing preview loaded for: {detail.Name}");

@@ -393,7 +393,7 @@ namespace TankManager.Core.ViewModels
             CopyAllDataToClipboardCommand = new RelayCommand(CopyAllDataToClipboard, () => StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
             CheckForUpdatesCommand = new RelayCommand(() => UpdateService.CheckForUpdates(showNoUpdateMessage: true));
             LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
-            SaveProductCommand = new RelayCommand(SaveProduct, () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name));
+            SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name));
             RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
         }
 
@@ -641,13 +641,104 @@ namespace TankManager.Core.ViewModels
             NotifyRefreshCommandCanExecuteChanged();
         }
 
-        private void SaveProduct()
+        private async Task SaveProductAsync()
         {
             if (CurrentProduct == null || string.IsNullOrEmpty(CurrentProduct.Name)) return;
 
-            var filePath = _storageService.Save(CurrentProduct);
-            StatusMessage = $"Сохранено: {Path.GetFileName(filePath)}";
-            RefreshSavedProducts();
+            try
+            {
+                // Если есть связь с КОМПАС - предлагаем загрузить превью чертежей
+                if (IsLinkedToKompas && CurrentProduct?.Context != null)
+                {
+                    var detailsWithoutPreview = Details?
+                        .Where(d => string.IsNullOrEmpty(d.CdfFilePath) && !d.IsBodyBased && !string.IsNullOrEmpty(d.FilePath))
+                        .GroupBy(d => d.FilePath)
+                        .Count() ?? 0;
+
+                    if (detailsWithoutPreview > 0)
+                    {
+                        var result = MessageBox.Show(
+                            $"Загрузить превью чертежей для {detailsWithoutPreview} деталей?\n\nЭто может занять некоторое время.",
+                            "Сохранение изделия",
+                            MessageBoxButton.YesNoCancel,
+                            MessageBoxImage.Question);
+
+                        if (result == MessageBoxResult.Cancel)
+                            return;
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            IsLoading = true;
+                            await LoadAllDrawingPreviewsAsync();
+                        }
+                    }
+                }
+
+                var filePath = _storageService.Save(CurrentProduct);
+                StatusMessage = $"Сохранено: {Path.GetFileName(filePath)}";
+                RefreshSavedProducts();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка сохранения: {ex.Message}");
+                StatusMessage = $"Ошибка сохранения: {ex.Message}";
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Загружает превью чертежей для всех деталей, у которых их ещё нет
+        /// </summary>
+        private async Task LoadAllDrawingPreviewsAsync()
+        {
+            if (Details == null || !IsLinkedToKompas || CurrentProduct?.Context == null)
+                return;
+
+            // Получаем папку для изображений продукта
+            string imagesFolder = _storageService.GetProductImagesFolder(CurrentProduct);
+
+            // Группируем по уникальным деталям (по FilePath), чтобы не загружать одно и то же несколько раз
+            var uniqueDetailsWithoutPreview = Details
+                .Where(d => string.IsNullOrEmpty(d.CdfFilePath) && !d.IsBodyBased && !string.IsNullOrEmpty(d.FilePath))
+                .GroupBy(d => d.FilePath)
+                .Select(g => g.First())
+                .ToList();
+
+            if (uniqueDetailsWithoutPreview.Count == 0)
+                return;
+
+            int loaded = 0;
+            int total = uniqueDetailsWithoutPreview.Count;
+
+            foreach (var detail in uniqueDetailsWithoutPreview)
+            {
+                try
+                {
+                    StatusMessage = $"Загрузка чертежей: {loaded + 1}/{total} - {detail.Name}";
+                    
+                    await Task.Run(() => _kompasService.LoadDrawingPreview(detail, CurrentProduct, imagesFolder));
+                    
+                    // Копируем путь к превью для всех одинаковых деталей
+                    if (!string.IsNullOrEmpty(detail.CdfFilePath))
+                    {
+                        foreach (var samePart in Details.Where(d => d.FilePath == detail.FilePath && d != detail))
+                        {
+                            samePart.CdfFilePath = detail.CdfFilePath;
+                            samePart.SourceCdwPath = detail.SourceCdwPath;
+                        }
+                    }
+                    
+                    loaded++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Ошибка загрузки превью для {detail.Name}: {ex.Message}");
+                    loaded++;
+                }
+            }
         }
 
         private void DeleteSelectedProduct()
@@ -710,19 +801,25 @@ namespace TankManager.Core.ViewModels
         private async Task LoadDrawingPreviewForSelectedPartAsync()
         {
             var part = CurrentlySelectedPart;
-            if (part == null || !IsLinkedToKompas || CurrentProduct?.Context == null)
+            if (part == null)
                 return;
 
-            try
+            // Если есть связь с КОМПАС И у детали ещё нет превью - загружаем
+            if (IsLinkedToKompas && CurrentProduct?.Context != null && string.IsNullOrEmpty(part.CdfFilePath))
             {
-                // Всегда вызываем LoadDrawingPreview - он сам проверит актуальность кэша
-                // и перегенерирует PNG при необходимости
-                await Task.Run(() => _kompasService.LoadDrawingPreview(part, CurrentProduct));
+                try
+                {
+                    string imagesFolder = _storageService.GetProductImagesFolder(CurrentProduct);
+                    await Task.Run(() => _kompasService.LoadDrawingPreview(part, CurrentProduct, imagesFolder));
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Ошибка загрузки превью чертежа: {ex.Message}");
+                }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Ошибка загрузки превью чертежа: {ex.Message}");
-            }
+            
+            // Всегда уведомляем UI для отображения превью (из кеша или только что загруженного)
+            part.OnPropertyChanged(nameof(part.DrawingPreview));
         }
 
         #endregion

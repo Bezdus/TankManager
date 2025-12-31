@@ -15,28 +15,19 @@ namespace TankManager.Core.Services
     /// </summary>
     public class DrawingPreviewService
     {
-        private readonly string _cacheDirectory;
-
-        public DrawingPreviewService()
-        {
-            // Папка кэша рядом с исполняемым файлом
-            string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            _cacheDirectory = Path.Combine(appDirectory, "DrawingCache");
-            Directory.CreateDirectory(_cacheDirectory);
-        }
-
         /// <summary>
         /// Получает или создаёт PNG-превью чертежа детали
         /// </summary>
         /// <param name="part">Деталь</param>
         /// <param name="context">Контекст KOMPAS</param>
         /// <param name="sourceCdwPath">Выходной параметр: путь к исходному файлу чертежа</param>
+        /// <param name="targetDirectory">Целевая папка для сохранения превью</param>
         /// <returns>Путь к PNG-файлу превью</returns>
-        public string GetOrCreatePreview(IPart7 part, KompasContext context, out string sourceCdwPath)
+        public string GetOrCreatePreview(IPart7 part, KompasContext context, out string sourceCdwPath, string targetDirectory)
         {
             sourceCdwPath = null;
 
-            if (part == null || context == null)
+            if (part == null || context == null || string.IsNullOrEmpty(targetDirectory))
                 return null;
 
             IKompasDocument3D kompasDocument3D = null;
@@ -51,10 +42,20 @@ namespace TankManager.Core.Services
 
                 sourceCdwPath = cdwPath;
 
+                // Создаём целевую папку если её нет
+                Directory.CreateDirectory(targetDirectory);
+
                 // Проверяем кэш
-                string pngPath = GetCachedPngPath(cdwPath);
+                string pngPath = GetCachedPngPath(cdwPath, targetDirectory);
                 if (IsCacheValid(cdwPath, pngPath))
                     return pngPath;
+
+                // Удаляем существующий файл, чтобы КОМПАС не показывал диалог подтверждения
+                if (File.Exists(pngPath))
+                {
+                    try { File.Delete(pngPath); }
+                    catch { /* Игнорируем ошибку удаления */ }
+                }
 
                 // Генерируем PNG
                 cdwDocument = context.Application.Documents.Open(cdwPath, false, false);
@@ -79,9 +80,8 @@ namespace TankManager.Core.Services
             }
             finally
             {
-
-                    CloseAndReleaseDocument(cdwDocument);
-                    CloseAndReleaseDocument(kompasDocument3D);
+                CloseAndReleaseDocument(cdwDocument);
+                CloseAndReleaseDocument(kompasDocument3D);
             }
         }
 
@@ -95,40 +95,31 @@ namespace TankManager.Core.Services
         public BitmapImage LoadPreviewImage(string pngPath, string sourceCdwPath = null)
         {
             if (string.IsNullOrEmpty(pngPath) || !File.Exists(pngPath))
+            {
                 return null;
+            }
 
             // Если указан исходный файл, проверяем актуальность кэша
             if (!string.IsNullOrEmpty(sourceCdwPath) && !IsCacheValid(sourceCdwPath, pngPath))
-                return null;
-
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.UriSource = new Uri(pngPath);
-            bitmap.EndInit();
-            bitmap.Freeze(); // Для потокобезопасности WPF
-            return bitmap;
-        }
-
-        /// <summary>
-        /// Очищает папку кэша
-        /// </summary>
-        public void ClearCache()
-        {
-            if (Directory.Exists(_cacheDirectory))
             {
-                foreach (var file in Directory.GetFiles(_cacheDirectory, "*.png"))
-                {
-                    try { File.Delete(file); }
-                    catch { /* Игнорируем ошибки удаления */ }
-                }
+                return null;
+            }
+
+            try
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.UriSource = new Uri(pngPath);
+                bitmap.EndInit();
+                bitmap.Freeze(); // Для потокобезопасности WPF
+                return bitmap;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
-
-        /// <summary>
-        /// Возвращает путь к папке кэша
-        /// </summary>
-        public string CacheDirectory => _cacheDirectory;
 
         private string GetAttachedDrawingPath(IPart7 part, ref IKompasDocument3D kompasDocument3D)
         {
@@ -155,13 +146,13 @@ namespace TankManager.Core.Services
                     .Equals(".cdw", StringComparison.OrdinalIgnoreCase));
         }
 
-        private string GetCachedPngPath(string cdwPath)
+        private string GetCachedPngPath(string cdwPath, string cacheDirectory)
         {
             string hash = ComputeHash(cdwPath);
             string fileName = Path.GetFileNameWithoutExtension(cdwPath);
             // Убираем недопустимые символы из имени файла
             string safeFileName = string.Join("_", fileName.Split(Path.GetInvalidFileNameChars()));
-            return Path.Combine(_cacheDirectory, $"{safeFileName}_{hash}.png");
+            return Path.Combine(cacheDirectory, $"{safeFileName}_{hash}.png");
         }
 
         private static bool IsCacheValid(string sourcePath, string cachedPath)
