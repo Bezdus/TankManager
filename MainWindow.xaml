@@ -727,14 +727,54 @@
                 <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Свойства выбранной детали -->
                 <GroupBox Grid.Column="2" Header="Свойства детали">
                     <Grid>
-                        <TextBlock Text="Выберите деталь из списка" 
-                                   HorizontalAlignment="Center" 
-                                   VerticalAlignment="Center"
-                                   Foreground="{StaticResource TextSecondary}"
-                                   FontStyle="Italic"
-                                   FontSize="11"
-                                   Margin="15"
-                                   Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}"/>
+                        <!-- Превью изделия когда ничего не выбрано -->
+                        <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Text="Выберите деталь из списка" 
+                                       HorizontalAlignment="Center" 
+                                       Foreground="{StaticResource TextSecondary}"
+                                       FontStyle="Italic"
+                                       FontSize="11"
+                                       Margin="15,15,15,10"
+                                       Visibility="{Binding DataContext.CurrentProduct.FilePreview, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}"/>
+
+                            <!-- Превью файла изделия -->
+                            <Border Grid.Row="1"
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3" 
+                                    Padding="8" 
+                                    Margin="15"
+                                    VerticalAlignment="Top"
+                                    Visibility="{Binding DataContext.CurrentProduct.FilePreview, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" 
+                                               Text="Превью изделия" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,8"/>
+
+                                    <Image Grid.Row="1"
+                                           Source="{Binding DataContext.CurrentProduct.FilePreview, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                           MaxHeight="400"
+                                           Stretch="Uniform"
+                                           StretchDirection="DownOnly"
+                                           HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
 
                         <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseNullToVisibilityConverter}}"
                               DataContext="{Binding CurrentlySelectedPart}">

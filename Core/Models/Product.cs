@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows.Media.Imaging;
 using KompasAPI7;
 using TankManager.Core.Services;
 
@@ -10,8 +11,11 @@ namespace TankManager.Core.Models
     /// </summary>
     public class Product : PartModel
     {
+        private BitmapSource _filePreview;
+        private bool _previewLoaded;
+
         /// <summary>
-        /// Контекст KOMPAS, связанный с этим продуктом
+        /// Контекст KOMPАС, связанный с этим продуктом
         /// </summary>
         public KompasContext Context { get; private set; }
 
@@ -65,6 +69,46 @@ namespace TankManager.Core.Models
         /// </summary>
         public bool IsLinkedToKompas => Context?.IsDocumentLoaded == true && Context.TopPart != null;
 
+        /// <summary>
+        /// Превью файла изделия с ленивой загрузкой
+        /// </summary>
+        public new BitmapSource FilePreview
+        {
+            get
+            {
+                if (!_previewLoaded)
+                {
+                    _previewLoaded = true;
+                    _filePreview = TryLoadPreview(FilePath);
+                }
+                return _filePreview;
+            }
+            set
+            {
+                if (_filePreview != value)
+                {
+                    _filePreview = value;
+                    _previewLoaded = true;
+                    OnPropertyChanged(nameof(FilePreview));
+                }
+            }
+        }
+
+        private static BitmapSource TryLoadPreview(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
+                return null;
+
+            try
+            {
+                return ThumbnailService.GetFileThumbnail(filePath);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public void Clear()
         {
             // Очищаем превью у всех деталей перед очисткой коллекций
@@ -93,7 +137,8 @@ namespace TankManager.Core.Models
             Context = null;
             
             // Освобождаем собственные ресурсы
-            FilePreview = null;
+            _filePreview = null;
+            _previewLoaded = false;
             InvalidateDrawingPreviewCache();
         }
     }
