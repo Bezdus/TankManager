@@ -122,8 +122,8 @@ namespace TankManager.Core.Services
         #region Synchronization
 
         /// <summary>
-        /// Синхронизирует данные с сервера в локальную папку.
-        /// Копирует новые и обновлённые изделия с сервера.
+        /// Синхронизирует данные между локальной папкой и сервером (двусторонняя синхронизация).
+        /// Копирует новые и обновлённые изделия в обе стороны.
         /// </summary>
         public SyncResult SyncFromServer()
         {
@@ -138,6 +138,7 @@ namespace TankManager.Core.Services
 
             try
             {
+                // Фаза 1: Синхронизация С СЕРВЕРА В ЛОКАЛЬНУЮ ПАПКУ
                 var serverFolders = Directory.GetDirectories(_serverStorageFolder)
                     .Where(f => !Path.GetFileName(f).StartsWith("_"))
                     .ToList();
@@ -190,13 +191,63 @@ namespace TankManager.Core.Services
                     catch (Exception ex)
                     {
                         result.FailedProducts++;
-                        result.Errors.Add($"Ошибка синхронизации {Path.GetFileName(serverFolder)}: {ex.Message}");
+                        result.Errors.Add($"Ошибка синхронизации с сервера {Path.GetFileName(serverFolder)}: {ex.Message}");
+                    }
+                }
+
+                // Фаза 2: Синхронизация ИЗ ЛОКАЛЬНОЙ ПАПКИ НА СЕРВЕР
+                var localFolders = Directory.GetDirectories(ProductsDirectory)
+                    .Where(f => !Path.GetFileName(f).StartsWith("_"))
+                    .ToList();
+
+                foreach (var localFolder in localFolders)
+                {
+                    try
+                    {
+                        string folderName = Path.GetFileName(localFolder);
+                        string serverFolder = Path.Combine(_serverStorageFolder, folderName);
+                        string localJsonPath = Path.Combine(localFolder, ProductJsonFileName);
+
+                        // Пропускаем папки без product.json (это папки только с превью)
+                        if (!File.Exists(localJsonPath))
+                            continue;
+
+                        var localFileInfo = new FileInfo(localJsonPath);
+                        string serverJsonPath = Path.Combine(serverFolder, ProductJsonFileName);
+
+                        bool needsCopy = false;
+
+                        if (!Directory.Exists(serverFolder) || !File.Exists(serverJsonPath))
+                        {
+                            // Новое локальное изделие - загружаем на сервер
+                            needsCopy = true;
+                        }
+                        else
+                        {
+                            // Проверяем дату модификации
+                            var serverFileInfo = new FileInfo(serverJsonPath);
+                            if (localFileInfo.LastWriteTimeUtc > serverFileInfo.LastWriteTimeUtc)
+                            {
+                                // Локальная версия новее - загружаем на сервер
+                                needsCopy = true;
+                            }
+                        }
+
+                        if (needsCopy)
+                        {
+                            CopyProductFolder(localFolder, serverFolder);
+                            // Не увеличиваем счётчики, так как уже посчитали в первой фазе
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        result.Errors.Add($"Ошибка загрузки на сервер {Path.GetFileName(localFolder)}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                result.Errors.Add($"Ошибка доступа к серверной папке: {ex.Message}");
+                result.Errors.Add($"Ошибка доступа к папкам: {ex.Message}");
             }
 
             return result;

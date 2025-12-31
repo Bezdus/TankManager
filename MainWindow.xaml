@@ -1174,7 +1174,8 @@
                         <Button Command="{Binding SyncFromServerCommand}"
                                 Style="{StaticResource PanelButtonStyle}"
                                 Margin="0,8,0,0"
-                                Visibility="{Binding HasServerStorageFolder, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                Visibility="{Binding HasServerStorageFolder, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                ToolTip="Двусторонняя синхронизация: обновляет изделия в обе стороны (локально ↔ сервер)">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🔄" Margin="0,0,8,0" FontSize="14"/>
                                 <TextBlock FontSize="12">

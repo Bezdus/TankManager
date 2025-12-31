@@ -1100,7 +1100,7 @@ namespace TankManager.Core.ViewModels
             try
             {
                 IsLoading = true;
-                StatusMessage = "Синхронизация с сервером...";
+                StatusMessage = "Двусторонняя синхронизация...";
 
                 var syncResult = await Task.Run(() => _storageService.SyncFromServer());
 
