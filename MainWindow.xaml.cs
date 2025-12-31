@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using TankManager.Core.Models;
+using TankManager.Core.Services;
 using TankManager.Core.ViewModels;
 
 namespace TankManager
@@ -228,6 +229,59 @@ namespace TankManager
             };
             
             previewWindow.ShowDialog();
+        }
+
+        private void DeleteProduct_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true; // Предотвращаем всплытие события к ListBoxItem
+            
+            var button = sender as Button;
+            if (button?.DataContext != null)
+            {
+                _viewModel.DeleteProductCommand?.Execute(button.DataContext);
+            }
+        }
+
+        private void DeleteProduct_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            
+            var button = sender as Button;
+            if (button == null)
+                return;
+
+            var listBoxItem = FindParent<ListBoxItem>(button);
+            var productInfo = (listBoxItem?.DataContext ?? button.DataContext) as ProductFileInfo;
+            
+            if (productInfo != null)
+            {
+                _viewModel.SelectedSavedProduct = productInfo;
+                _viewModel.DeleteProductCommand?.Execute(null);
+            }
+        }
+
+        private void DeleteButton_MouseEnter(object sender, MouseEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null)
+            {
+                button.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 224, 224)); // #FFFFE0E0
+                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 107, 107)); // #FFFF6B6B
+            }
+        }
+
+        private void DeleteButton_MouseLeave(object sender, MouseEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null)
+            {
+                button.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 255, 255)); // #FFFFFFFF (PrimaryBackground)
+                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(224, 224, 224)); // #FFE0E0E0 (BorderColor)
+            }
         }
     }
 

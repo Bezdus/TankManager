@@ -196,6 +196,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Helpers\" />
     <Folder Include="Resources\" />
   </ItemGroup>
   <ItemGroup>

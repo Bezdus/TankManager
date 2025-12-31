@@ -785,18 +785,6 @@
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#FF707070"/>
-                                            </Trigger>
-                                            <Trigger Property="IsPressed" Value="True">
-                                                <Setter Property="Background" Value="#FF404040"/>
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter Property="Background" Value="#FFB0B0B0"/>
-                                                <Setter Property="Cursor" Value="Arrow"/>
-                                            </Trigger>
-                                        </Style.Triggers>
                                     </Style>
                                 </Button.Style>
                             </Button>
@@ -1121,14 +1109,6 @@
 
                     <!-- Кнопка удаления -->
                     <StackPanel Grid.Row="1" Margin="8,8,8,0">
-                        <Button Command="{Binding DeleteProductCommand}"
-                                Style="{StaticResource PanelButtonStyle}"
-                                Margin="0,0,0,4">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🗑️" Margin="0,0,8,0" FontSize="14"/>
-                                <TextBlock Text="Удалить выбранное" FontSize="12"/>
-                            </StackPanel>
-                        </Button>
                         <Separator Margin="0,4" Background="{StaticResource BorderColor}"/>
                         
                         <!-- Настройка серверной папки -->
@@ -1244,23 +1224,24 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border Background="{TemplateBinding Background}" 
+                                            <Border x:Name="Bd"
+                                                    Background="{TemplateBinding Background}" 
                                                     Padding="{TemplateBinding Padding}"
                                                     BorderBrush="{StaticResource BorderColor}"
                                                     BorderThickness="0,0,0,1">
                                                 <ContentPresenter/>
                                             </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBackground}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectedBackground}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Setter.Value>
                                 </Setter>
-                                <Style.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
-                                    </Trigger>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource SelectedBackground}"/>
-                                    </Trigger>
-                                </Style.Triggers>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -1271,59 +1252,91 @@
                                                       Command="{Binding DataContext.SwitchToProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="{Binding}"/>
                                     </Grid.InputBindings>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock Grid.Row="0" 
-                                               Text="{Binding ProductName}" 
-                                               FontWeight="SemiBold"
-                                               FontSize="12"
-                                               TextWrapping="Wrap">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                                        <Setter Property="Foreground" Value="White"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <TextBlock Grid.Row="1" 
-                                               Text="{Binding Marking}" 
-                                               FontSize="10"
-                                               Margin="0,2,0,0">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                                        <Setter Property="Foreground" Value="#CCFFFFFF"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <StackPanel Grid.Row="2" 
-                                                Orientation="Horizontal" 
-                                                Margin="0,6,0,0">
-                                        <Border Background="{StaticResource HoverBackground}" 
-                                                CornerRadius="3" 
-                                                Padding="6,2"
-                                                Margin="0,0,8,0">
-                                            <TextBlock Text="{Binding DetailsCount, StringFormat='{}{0} дет.'}" 
-                                                       FontSize="10" 
-                                                       Foreground="{StaticResource TextSecondary}"/>
-                                        </Border>
-                                        <TextBlock Text="{Binding SavedDate, StringFormat='{}{0:dd.MM.yyyy HH:mm}'}" 
-                                                   FontSize="9" 
-                                                   Foreground="{StaticResource TextSecondary}"
-                                                   VerticalAlignment="Center"/>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding ProductName}" 
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                            <Setter Property="Foreground" Value="White"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Marking}" 
+                                                                   FontSize="10"
+                                                                   Margin="0,2,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                            <Setter Property="Foreground" Value="#CCFFFFFF"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <StackPanel Orientation="Horizontal" 
+                                                    Margin="0,6,0,0">
+                                            <Border Background="{StaticResource HoverBackground}" 
+                                                    CornerRadius="3" 
+                                                    Padding="6,2"
+                                                    Margin="0,0,8,0">
+                                                <TextBlock Text="{Binding DetailsCount, StringFormat='{}{0} дет.'}" 
+                                                           FontSize="10" 
+                                                           Foreground="{StaticResource TextSecondary}"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding SavedDate, StringFormat='{}{0:dd.MM.yyyy HH:mm}'}" 
+                                                       FontSize="9" 
+                                                       Foreground="{StaticResource TextSecondary}"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
+
+                                    <Button Grid.Column="1"
+                                            PreviewMouseDown="DeleteProduct_PreviewMouseDown"
+                                            MouseEnter="DeleteButton_MouseEnter"
+                                            MouseLeave="DeleteButton_MouseLeave"
+                                            Panel.ZIndex="1"
+                                            DataContext="{Binding}"
+                                            ToolTip="Удалить изделие"
+                                            VerticalAlignment="Center"
+                                            Margin="8,0,0,0"
+                                            Padding="8,4"
+                                            Background="{StaticResource PrimaryBackground}"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource BorderColor}"
+                                            Cursor="Hand">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" 
+                                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                                    CornerRadius="3"
+                                                                    Padding="{TemplateBinding Padding}">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
+                                        <TextBlock Text="🗑️" FontSize="14" IsHitTestVisible="False"/>
+                                    </Button>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
