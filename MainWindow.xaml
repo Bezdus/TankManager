@@ -713,7 +713,8 @@
                                  ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Background="Transparent"
-                                 BorderThickness="0">
+                                 BorderThickness="0"
+                                 PreviewMouseDown="DetailsListBox_PreviewMouseDown">
                             <ListBox.GroupStyle>
                                 <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                             </ListBox.GroupStyle>
@@ -1075,7 +1076,8 @@
                                  ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Background="Transparent"
-                                 BorderThickness="0">
+                                 BorderThickness="0"
+                                 PreviewMouseDown="StandardPartsListBox_PreviewMouseDown">
                             <ListBox.GroupStyle>
                                 <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                             </ListBox.GroupStyle>

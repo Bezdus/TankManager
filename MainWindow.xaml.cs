@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using TankManager.Core.Models;
@@ -130,6 +131,64 @@ namespace TankManager
                 () => _viewModel.SelectedTubularProduct = null);
         }
 
+        private void DetailsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            HandlePartListBoxClick(sender, e, 
+                () => _viewModel.SelectedDetail, 
+                () => _viewModel.SelectedDetail = null);
+        }
+
+        private void StandardPartsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            HandlePartListBoxClick(sender, e, 
+                () => _viewModel.SelectedStandardPart, 
+                () => _viewModel.SelectedStandardPart = null);
+        }
+
+        private void HandlePartListBoxClick(object sender, MouseButtonEventArgs e, 
+            Func<PartModel> getSelected, Action clearSelection)
+        {
+            var listBox = sender as ListBox;
+            if (listBox == null)
+                return;
+
+            var clickedElement = e.OriginalSource as DependencyObject;
+            
+            // Если это не Visual (например, Run), пытаемся получить родительский Visual
+            if (clickedElement != null && !(clickedElement is Visual || clickedElement is System.Windows.Media.Media3D.Visual3D))
+            {
+                // Для элементов типа Run, получаем Parent через логическое дерево
+                if (clickedElement is FrameworkContentElement fce)
+                {
+                    clickedElement = fce.Parent as DependencyObject;
+                }
+            }
+            
+            var listBoxItem = FindParent<ListBoxItem>(clickedElement);
+
+            if (listBoxItem != null)
+            {
+                if (listBoxItem.Content is PartModel clickedPart)
+                {
+                    var selected = getSelected();
+                    // Сброс выбора при клике по уже выбранной детали
+                    if (selected != null && 
+                        clickedPart.Name == selected.Name && 
+                        clickedPart.Marking == selected.Marking &&
+                        clickedPart.Material == selected.Material)
+                    {
+                        clearSelection();
+                        e.Handled = true;
+                    }
+                }
+            }
+            else
+            {
+                // Сброс выбора при клике в пустую область
+                clearSelection();
+            }
+        }
+
         private void HandleMaterialListBoxClick(object sender, MouseButtonEventArgs e, 
             Func<MaterialInfo> getSelected, Action clearSelection)
         {
@@ -138,6 +197,17 @@ namespace TankManager
                 return;
 
             var clickedElement = e.OriginalSource as DependencyObject;
+            
+            // Если это не Visual (например, Run), пытаемся получить родительский Visual
+            if (clickedElement != null && !(clickedElement is Visual || clickedElement is System.Windows.Media.Media3D.Visual3D))
+            {
+                // Для элементов типа Run, получаем Parent через логическое дерево
+                if (clickedElement is FrameworkContentElement fce)
+                {
+                    clickedElement = fce.Parent as DependencyObject;
+                }
+            }
+            
             var listBoxItem = FindParent<ListBoxItem>(clickedElement);
 
             if (listBoxItem != null)
@@ -162,12 +232,25 @@ namespace TankManager
 
         private T FindParent<T>(DependencyObject child) where T : DependencyObject
         {
+            // Защита от null
+            if (child == null)
+                return null;
+                
             while (child != null)
             {
                 if (child is T parent)
                     return parent;
                 
-                child = System.Windows.Media.VisualTreeHelper.GetParent(child);
+                // Проверяем, является ли объект Visual перед попыткой получить родителя
+                if (child is Visual || child is System.Windows.Media.Media3D.Visual3D)
+                {
+                    child = System.Windows.Media.VisualTreeHelper.GetParent(child);
+                }
+                else
+                {
+                    // Если не Visual, прерываем поиск
+                    break;
+                }
             }
             return null;
         }

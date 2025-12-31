@@ -287,11 +287,19 @@ namespace TankManager.Core.ViewModels
             get => _selectedDetail;
             set
             {
-                if (SetProperty(ref _selectedDetail, value, nameof(SelectedDetail)) && value != null)
+                if (SetProperty(ref _selectedDetail, value, nameof(SelectedDetail)))
                 {
-                    SelectedStandardPart = null;
-                    CurrentlySelectedPart = value;
-                    _ = LoadDrawingPreviewForSelectedPartAsync();
+                    if (value != null)
+                    {
+                        SelectedStandardPart = null;
+                        CurrentlySelectedPart = value;
+                        _ = LoadDrawingPreviewForSelectedPartAsync();
+                    }
+                    else
+                    {
+                        // При сбросе выбора очищаем CurrentlySelectedPart
+                        CurrentlySelectedPart = null;
+                    }
                 }
             }
         }
@@ -301,11 +309,19 @@ namespace TankManager.Core.ViewModels
             get => _selectedStandardPart;
             set
             {
-                if (SetProperty(ref _selectedStandardPart, value, nameof(SelectedStandardPart)) && value != null)
+                if (SetProperty(ref _selectedStandardPart, value, nameof(SelectedStandardPart)))
                 {
-                    SelectedDetail = null;
-                    CurrentlySelectedPart = value;
-                    _ = LoadDrawingPreviewForSelectedPartAsync();
+                    if (value != null)
+                    {
+                        SelectedDetail = null;
+                        CurrentlySelectedPart = value;
+                        _ = LoadDrawingPreviewForSelectedPartAsync();
+                    }
+                    else
+                    {
+                        // При сбросе выбора очищаем CurrentlySelectedPart
+                        CurrentlySelectedPart = null;
+                    }
                 }
             }
         }
@@ -1198,7 +1214,9 @@ namespace TankManager.Core.ViewModels
             }
 
             copyAction(items);
-            StatusMessage = $"Скопировано элементов: {items.Count()}";
+            int count = items.Count();
+            StatusMessage = $"Скопировано элементов: {count}";
+            ShowSnackbar($"Скопировано {count} элементов в буфер обмена");
         }
 
         private void CopyAllDataToClipboard()
@@ -1207,6 +1225,7 @@ namespace TankManager.Core.ViewModels
             
             int count = (StandardParts?.Count ?? 0) + (SheetMaterials?.Count ?? 0) + (TubularProducts?.Count ?? 0) + (OtherMaterials?.Count ?? 0);
             StatusMessage = $"Скопировано все данные: {count} элементов";
+            ShowSnackbar($"Все данные скопированы в Excel ({count} элементов)");
         }
 
         #endregion
