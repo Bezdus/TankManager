@@ -46,6 +46,9 @@ namespace TankManager.Core.ViewModels
         private string _statusMessage;
         private double _totalMassMultipleParts;
         private int _uniquePartsCount;
+        private bool _isSnackbarVisible;
+        private string _snackbarMessage;
+        private System.Threading.Timer _snackbarTimer;
 
         #endregion
 
@@ -339,6 +342,18 @@ namespace TankManager.Core.ViewModels
             set => SetProperty(ref _uniquePartsCount, value, nameof(UniquePartsCount));
         }
 
+        public bool IsSnackbarVisible
+        {
+            get => _isSnackbarVisible;
+            set => SetProperty(ref _isSnackbarVisible, value, nameof(IsSnackbarVisible));
+        }
+
+        public string SnackbarMessage
+        {
+            get => _snackbarMessage;
+            set => SetProperty(ref _snackbarMessage, value, nameof(SnackbarMessage));
+        }
+
         #endregion
 
         #region Properties - Server Storage
@@ -491,6 +506,7 @@ namespace TankManager.Core.ViewModels
                 if (!File.Exists(filePath))
                 {
                     StatusMessage = $"Файл не найден: {Path.GetFileName(filePath)}";
+                    MessageBox.Show($"Файл не найден:\n{filePath}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
@@ -501,10 +517,40 @@ namespace TankManager.Core.ViewModels
                     SetCurrentProduct(linkedProduct, isLinked: true);
                     StatusMessage = $"Связано с КОМПАС: {CurrentProduct.Name}";
                 }
+                else
+                {
+                    MessageBox.Show(
+                        "Не удалось установить связь с КОМПАС.\n\n" +
+                        "Возможные причины:\n" +
+                        "• КОМПАС-3D не запущен\n" +
+                        "• Документ не удалось открыть\n\n" +
+                        "Пожалуйста, запустите КОМПАС-3D и попробуйте снова.",
+                        "Связь с КОМПАС",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    StatusMessage = "Не удалось связаться с КОМПАС. Убедитесь, что КОМПАС запущен.";
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Ошибка связывания с КОМПАС: {ex.Message}");
+                
+                string errorMessage = "Не удалось установить связь с КОМПАС.\n\n";
+                
+                if (ex.Message.Contains("Не удалось подключиться к KOMPAS-3D") || 
+                    ex is InvalidOperationException)
+                {
+                    errorMessage += "Возможные причины:\n" +
+                                  "• КОМПАС-3D не запущен\n" +
+                                  "• Нет прав доступа к приложению\n\n" +
+                                  "Пожалуйста, запустите КОМПАС-3D и попробуйте снова.";
+                }
+                else
+                {
+                    errorMessage += $"Ошибка: {ex.Message}";
+                }
+                
+                MessageBox.Show(errorMessage, "Связь с КОМПАС", MessageBoxButton.OK, MessageBoxImage.Warning);
                 StatusMessage = $"Ошибка связи с КОМПАС: {ex.Message}";
                 IsLinkedToKompas = false;
                 NotifySaveCommandCanExecuteChanged();
@@ -761,13 +807,16 @@ namespace TankManager.Core.ViewModels
                 }
 
                 var filePath = _storageService.Save(CurrentProduct);
-                StatusMessage = $"Сохранено: {Path.GetFileName(filePath)}";
+                var fileName = Path.GetFileName(filePath);
+                StatusMessage = $"Сохранено: {fileName}";
+                ShowSnackbar($"Изделие \"{CurrentProduct.Name}\" успешно сохранено");
                 RefreshSavedProducts();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Ошибка сохранения: {ex.Message}");
                 StatusMessage = $"Ошибка сохранения: {ex.Message}";
+                MessageBox.Show($"Не удалось сохранить изделие:\n{ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -812,7 +861,7 @@ namespace TankManager.Core.ViewModels
                     {
                         foreach (var samePart in Details.Where(d => d.FilePath == detail.FilePath && d != detail))
                         {
-                            samePart.CdfFilePath = detail.CdfFilePath;
+                        samePart.CdfFilePath = detail.CdfFilePath;
                             samePart.SourceCdwPath = detail.SourceCdwPath;
                         }
                     }
@@ -1164,6 +1213,24 @@ namespace TankManager.Core.ViewModels
 
         #region Helper Methods
 
+        private void ShowSnackbar(string message, int durationMs = 3000)
+        {
+            // Останавливаем предыдущий таймер, если есть
+            _snackbarTimer?.Dispose();
+
+            SnackbarMessage = message;
+            IsSnackbarVisible = true;
+
+            // Автоматически скрываем через заданное время
+            _snackbarTimer = new System.Threading.Timer(_ =>
+            {
+                Application.Current?.Dispatcher.Invoke(() =>
+                {
+                    IsSnackbarVisible = false;
+                });
+            }, null, durationMs, System.Threading.Timeout.Infinite);
+        }
+
         private void NotifyProductChanged()
         {
             OnPropertyChanged(nameof(CurrentProduct));
@@ -1251,6 +1318,9 @@ namespace TankManager.Core.ViewModels
 
         public void Dispose()
         {
+            // Останавливаем таймер SnackBar
+            _snackbarTimer?.Dispose();
+            
             // Очищаем превью у всех деталей перед закрытием
             if (CurrentProduct?.Details != null)
             {

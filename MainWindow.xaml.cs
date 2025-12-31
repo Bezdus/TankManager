@@ -26,6 +26,26 @@ namespace TankManager
             this.DataContext = _viewModel;
             
             InitializeComponent();
+            
+            // Подписываемся на изменение видимости SnackBar для запуска анимации
+            _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsSnackbarVisible))
+            {
+                if (_viewModel.IsSnackbarVisible)
+                {
+                    var showStoryboard = (System.Windows.Media.Animation.Storyboard)FindResource("ShowSnackbarStoryboard");
+                    showStoryboard?.Begin();
+                }
+                else
+                {
+                    var hideStoryboard = (System.Windows.Media.Animation.Storyboard)FindResource("HideSnackbarStoryboard");
+                    hideStoryboard?.Begin();
+                }
+            }
         }
 
         private void LoadDocumentButton_Click(object sender, RoutedEventArgs e)

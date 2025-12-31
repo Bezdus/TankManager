@@ -29,6 +29,33 @@
             </ObjectDataProvider.MethodParameters>
         </ObjectDataProvider>
 
+        <!-- Storyboard для анимации SnackBar -->
+        <Storyboard x:Key="ShowSnackbarStoryboard">
+            <DoubleAnimation Storyboard.TargetName="SnackbarNotification"
+                           Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                           From="100" To="0" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="SnackbarNotification"
+                           Storyboard.TargetProperty="Opacity"
+                           From="0" To="1" Duration="0:0:0.3"/>
+        </Storyboard>
+
+        <Storyboard x:Key="HideSnackbarStoryboard">
+            <DoubleAnimation Storyboard.TargetName="SnackbarNotification"
+                           Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                           To="100" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="SnackbarNotification"
+                           Storyboard.TargetProperty="Opacity"
+                           To="0" Duration="0:0:0.2"/>
+        </Storyboard>
+
         <!-- Цветовая палитра -->
         <SolidColorBrush x:Key="PrimaryBackground" Color="#FFFFFFFF"/>
         <SolidColorBrush x:Key="SecondaryBackground" Color="#FFF5F5F5"/>
@@ -1387,6 +1414,38 @@
         <!-- Статус-бар -->
         <Border Grid.Row="3" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="8,4">
             <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+        </Border>
+
+        <!-- SnackBar уведомление -->
+        <Border x:Name="SnackbarNotification"
+                Grid.Row="0" Grid.RowSpan="4"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,20"
+                Background="#FF4CAF50"
+                CornerRadius="6"
+                Padding="20,12"
+                Visibility="{Binding IsSnackbarVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                RenderTransformOrigin="0.5,1">
+            <Border.RenderTransform>
+                <TranslateTransform Y="100"/>
+            </Border.RenderTransform>
+            <Border.Effect>
+                <DropShadowEffect ShadowDepth="3" Opacity="0.4" BlurRadius="10"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="✓" 
+                          FontSize="18" 
+                          FontWeight="Bold"
+                          Foreground="White"
+                          Margin="0,0,12,0"
+                          VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding SnackbarMessage}" 
+                          FontSize="13" 
+                          FontWeight="SemiBold"
+                          Foreground="White"
+                          VerticalAlignment="Center"/>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>
