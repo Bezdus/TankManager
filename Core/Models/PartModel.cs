@@ -32,6 +32,7 @@ namespace TankManager.Core.Models
         private string _cdwFilePath; // Путь к исходному файлу чертежа
         private BitmapSource _drawingPreview;
         private bool _drawingPreviewLoaded;
+        private string _filePreviewPngPath; // Путь к сохранённому превью 3D-файла
 
         private static readonly DrawingPreviewService _previewService = new DrawingPreviewService();
 
@@ -163,6 +164,24 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
+        /// Путь к сохранённому PNG-превью 3D-файла (для работы без исходных файлов КОМПАС)
+        /// </summary>
+        public string FilePreviewPngPath
+        {
+            get { return _filePreviewPngPath; }
+            set
+            {
+                if (_filePreviewPngPath != value)
+                {
+                    _filePreviewPngPath = value;
+                    _previewLoaded = false; // Сбрасываем флаг загрузки при изменении пути
+                    OnPropertyChanged(nameof(FilePreviewPngPath));
+                    OnPropertyChanged(nameof(FilePreview));
+                }
+            }
+        }
+
+        /// <summary>
         /// Превью чертежа для отображения в UI
         /// </summary>
         public BitmapSource DrawingPreview
@@ -208,7 +227,7 @@ namespace TankManager.Core.Models
                 if (!_previewLoaded)
                 {
                     _previewLoaded = true;
-                    _filePreview = TryLoadPreview(FilePath);
+                    _filePreview = TryLoadPreview(FilePath, _filePreviewPngPath);
                 }
                 return _filePreview;
             }
@@ -299,6 +318,7 @@ namespace TankManager.Core.Models
             }
         }
 
+
         /// <summary>
         /// Загружает превью чертежа для детали
         /// </summary>
@@ -324,6 +344,39 @@ namespace TankManager.Core.Models
             // Уведомляем UI об изменениях
             OnPropertyChanged(nameof(CdfFilePath));
             OnPropertyChanged(nameof(DrawingPreview));
+        }
+
+        /// <summary>
+        /// Сохраняет текущее превью 3D-файла в PNG для работы без исходных файлов КОМПАС
+        /// </summary>
+        /// <param name="targetDirectory">Целевая папка для сохранения (обычно images)</param>
+        /// <returns>Путь к сохранённому файлу или null если не удалось сохранить</returns>
+        public string SaveFilePreview(string targetDirectory)
+        {
+            // Если превью уже сохранено и файл существует - возвращаем путь
+            if (!string.IsNullOrEmpty(_filePreviewPngPath) && File.Exists(_filePreviewPngPath))
+                return _filePreviewPngPath;
+
+            // Загружаем превью если ещё не загружено
+            var preview = FilePreview;
+            if (preview == null || string.IsNullOrEmpty(targetDirectory))
+                return null;
+
+            try
+            {
+                string fileName = ThumbnailService.GeneratePreviewFileName(FilePath, "file");
+                string filePath = Path.Combine(targetDirectory, fileName);
+
+                if (ThumbnailService.SavePreviewToFile(preview, filePath))
+                {
+                    _filePreviewPngPath = filePath;
+                    OnPropertyChanged(nameof(FilePreviewPngPath));
+                    return filePath;
+                }
+            }
+            catch { }
+
+            return null;
         }
 
         /// <summary>
@@ -412,19 +465,31 @@ namespace TankManager.Core.Models
                 CultureInfo.InvariantCulture, out double mass) ? mass : 0;
         }
 
-        private static BitmapSource TryLoadPreview(string filePath)
+        private static BitmapSource TryLoadPreview(string filePath, string savedPreviewPath = null)
         {
-            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
-                return null;
+            // Сначала пробуем загрузить из исходного файла КОМПАС
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            {
+                try
+                {
+                    var preview = ThumbnailService.GetFileThumbnail(filePath);
+                    if (preview != null)
+                        return preview;
+                }
+                catch { }
+            }
 
-            try
+            // Fallback: загружаем из сохранённого PNG если исходный файл недоступен
+            if (!string.IsNullOrEmpty(savedPreviewPath) && File.Exists(savedPreviewPath))
             {
-                return ThumbnailService.GetFileThumbnail(filePath);
+                try
+                {
+                    return ThumbnailService.LoadPreviewFromFile(savedPreviewPath);
+                }
+                catch { }
             }
-            catch
-            {
-                return null;
-            }
+
+            return null;
         }
 
         private static string FormatMaterial(string material)

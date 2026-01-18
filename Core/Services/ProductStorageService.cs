@@ -708,6 +708,7 @@ namespace TankManager.Core.Services
         private static PartModelDto ToPartDto(PartModel part, string productFolder)
         {
             string relativeCdfPath = null;
+            string relativeFilePreviewPath = null;
             
             // Преобразуем абсолютный путь в относительный для сохранения в папке продукта
             if (!string.IsNullOrEmpty(part.CdfFilePath) && !string.IsNullOrEmpty(productFolder))
@@ -729,6 +730,26 @@ namespace TankManager.Core.Services
                     relativeCdfPath = part.CdfFilePath;
                 }
             }
+
+            // Преобразуем путь к превью 3D-файла
+            if (!string.IsNullOrEmpty(part.FilePreviewPngPath) && !string.IsNullOrEmpty(productFolder))
+            {
+                try
+                {
+                    if (part.FilePreviewPngPath.StartsWith(productFolder, StringComparison.OrdinalIgnoreCase))
+                    {
+                        relativeFilePreviewPath = part.FilePreviewPngPath.Substring(productFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
+                    else
+                    {
+                        relativeFilePreviewPath = part.FilePreviewPngPath;
+                    }
+                }
+                catch
+                {
+                    relativeFilePreviewPath = part.FilePreviewPngPath;
+                }
+            }
             
             return new PartModelDto
             {
@@ -743,7 +764,8 @@ namespace TankManager.Core.Services
                 InstanceIndex = part.InstanceIndex,
                 ProductType = (int)part.ProductType,
                 CdfFilePath = relativeCdfPath,
-                SourceCdwPath = part.SourceCdwPath
+                SourceCdwPath = part.SourceCdwPath,
+                FilePreviewPngPath = relativeFilePreviewPath
             };
         }
 
@@ -796,6 +818,7 @@ namespace TankManager.Core.Services
         private static PartModel FromPartDto(PartModelDto dto, string productFolder)
         {
             string absoluteCdfPath = null;
+            string absoluteFilePreviewPath = null;
             
             // Преобразуем относительный путь в абсолютный
             if (!string.IsNullOrEmpty(dto.CdfFilePath) && !string.IsNullOrEmpty(productFolder))
@@ -817,6 +840,26 @@ namespace TankManager.Core.Services
                     absoluteCdfPath = dto.CdfFilePath;
                 }
             }
+
+            // Преобразуем путь к превью 3D-файла
+            if (!string.IsNullOrEmpty(dto.FilePreviewPngPath) && !string.IsNullOrEmpty(productFolder))
+            {
+                try
+                {
+                    if (!Path.IsPathRooted(dto.FilePreviewPngPath))
+                    {
+                        absoluteFilePreviewPath = Path.Combine(productFolder, dto.FilePreviewPngPath);
+                    }
+                    else
+                    {
+                        absoluteFilePreviewPath = dto.FilePreviewPngPath;
+                    }
+                }
+                catch
+                {
+                    absoluteFilePreviewPath = dto.FilePreviewPngPath;
+                }
+            }
             
             return new PartModelFromStorage
             {
@@ -828,7 +871,8 @@ namespace TankManager.Core.Services
                 FilePath = dto.FilePath,
                 ProductType = (ProductType)(dto.ProductType),
                 CdfFilePath = absoluteCdfPath,
-                SourceCdwPath = dto.SourceCdwPath
+                SourceCdwPath = dto.SourceCdwPath,
+                FilePreviewPngPath = absoluteFilePreviewPath
             };
         }
 
@@ -940,6 +984,9 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public string SourceCdwPath { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public string FilePreviewPngPath { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
