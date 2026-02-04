@@ -795,6 +795,11 @@ namespace TankManager.Core.ViewModels
 
             try
             {
+                IsLoading = true;
+                
+                // Получаем папку для изображений продукта
+                string imagesFolder = _storageService.GetProductImagesFolder(CurrentProduct);
+
                 // Если есть связь с КОМПАС - предлагаем загрузить превью чертежей
                 if (IsLinkedToKompas && CurrentProduct?.Context != null)
                 {
@@ -816,11 +821,13 @@ namespace TankManager.Core.ViewModels
 
                         if (result == MessageBoxResult.Yes)
                         {
-                            IsLoading = true;
                             await LoadAllDrawingPreviewsAsync();
                         }
                     }
                 }
+
+                // Сохраняем превью 3D-файлов для работы без исходных файлов КОМПАС
+                await SaveAllFilePreviewsAsync(imagesFolder);
 
                 var filePath = _storageService.Save(CurrentProduct);
                 var fileName = Path.GetFileName(filePath);
@@ -837,6 +844,60 @@ namespace TankManager.Core.ViewModels
             finally
             {
                 IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Сохраняет превью 3D-файлов для всех уникальных деталей
+        /// </summary>
+        private async Task SaveAllFilePreviewsAsync(string imagesFolder)
+        {
+            if (string.IsNullOrEmpty(imagesFolder))
+                return;
+
+            // Собираем все детали из Details и StandardParts
+            var allParts = (Details ?? Enumerable.Empty<PartModel>())
+                .Concat(StandardParts ?? Enumerable.Empty<PartModel>())
+                .Where(p => !string.IsNullOrEmpty(p.FilePath) && string.IsNullOrEmpty(p.FilePreviewPngPath))
+                .GroupBy(p => p.FilePath)
+                .Select(g => g.First())
+                .ToList();
+
+            if (allParts.Count == 0)
+                return;
+
+            int saved = 0;
+            int total = allParts.Count;
+
+            foreach (var part in allParts)
+            {
+                try
+                {
+                    StatusMessage = $"Сохранение превью: {saved + 1}/{total}";
+                    
+                    // Сохраняем превью
+                    var savedPath = await Task.Run(() => part.SaveFilePreview(imagesFolder));
+                    
+                    // Копируем путь к превью для всех одинаковых деталей
+                    if (!string.IsNullOrEmpty(savedPath))
+                    {
+                        var sameParts = (Details ?? Enumerable.Empty<PartModel>())
+                            .Concat(StandardParts ?? Enumerable.Empty<PartModel>())
+                            .Where(p => p.FilePath == part.FilePath && p != part);
+                        
+                        foreach (var samePart in sameParts)
+                        {
+                            samePart.FilePreviewPngPath = savedPath;
+                        }
+                    }
+                    
+                    saved++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Ошибка сохранения превью для {part.Name}: {ex.Message}");
+                    saved++;
+                }
             }
         }
 

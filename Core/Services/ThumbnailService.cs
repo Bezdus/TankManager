@@ -117,5 +117,82 @@ namespace TankManager.Core.Services
                 DeleteObject(hBitmap);
             }
         }
+
+        /// <summary>
+        /// Сохраняет BitmapSource в PNG файл
+        /// </summary>
+        /// <param name="bitmapSource">Изображение для сохранения</param>
+        /// <param name="filePath">Путь к файлу PNG</param>
+        /// <returns>true если сохранение успешно</returns>
+        public static bool SavePreviewToFile(BitmapSource bitmapSource, string filePath)
+        {
+            if (bitmapSource == null || string.IsNullOrEmpty(filePath))
+                return false;
+
+            try
+            {
+                // Создаём директорию если не существует
+                string directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                    Directory.CreateDirectory(directory);
+
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+
+                using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                {
+                    encoder.Save(stream);
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Загружает превью из PNG файла
+        /// </summary>
+        /// <param name="filePath">Путь к файлу PNG</param>
+        /// <returns>BitmapSource или null если не удалось загрузить</returns>
+        public static BitmapSource LoadPreviewFromFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return null;
+
+            try
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad; // Загружаем сразу, не держим файл открытым
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return bitmap;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Генерирует уникальное имя файла для превью на основе пути к исходному файлу
+        /// </summary>
+        /// <param name="sourceFilePath">Путь к исходному файлу</param>
+        /// <param name="prefix">Префикс для имени файла</param>
+        /// <returns>Имя файла PNG</returns>
+        public static string GeneratePreviewFileName(string sourceFilePath, string prefix = "preview")
+        {
+            if (string.IsNullOrEmpty(sourceFilePath))
+                return $"{prefix}_{Guid.NewGuid():N}.png";
+
+            string fileName = Path.GetFileNameWithoutExtension(sourceFilePath);
+            // Убираем недопустимые символы
+            fileName = string.Join("_", fileName.Split(Path.GetInvalidFileNameChars()));
+            return $"{prefix}_{fileName}.png";
+        }
     }
 }
