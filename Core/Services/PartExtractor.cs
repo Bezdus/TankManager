@@ -170,7 +170,7 @@ namespace TankManager.Core.Services
             else
             {
                 var detailType = _context.GetDetailType(subPart);
-                if (detailType == KompasConstants.OtherPartsType)
+                if (detailType == KompasConstants.OtherPartsType || detailType == KompasConstants.StandardPartsType)
                 {
                     AddPartToList(subPart, details);
                 }
