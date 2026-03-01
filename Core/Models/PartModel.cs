@@ -519,19 +519,10 @@ namespace TankManager.Core.Models
             string result = material;
 
             // 1. Заменяем $d на пробел
-            result = Regex.Replace(result, @"\$d", " ");
+            result = result.Replace("$d", " ");
 
-            // 2. Убираем ГОСТы и ТУ с номерами
-            result = Regex.Replace(result, @"\s*(ГОСТ|ТУ)\s*[\d\-;]+", " ", RegexOptions.IgnoreCase);
-
-            // 3. Убираем лишние $ и ;
-            result = result.Replace("$", "").Replace(";", "");
-
-            // 4. Разделяем размерные параметры (например, "d60" → "60")
-            result = Regex.Replace(result, @"\b[dD](\d+)", "$1");
-
-            // 5. Убираем лишние пробелы
-            //result = Regex.Replace(result, @"\s+", " ").Trim();
+            // 2. Убираем оставшиеся $
+            result = result.Replace("$", "");
 
             return result;
         }
