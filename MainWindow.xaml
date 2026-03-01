@@ -7,7 +7,7 @@
         xmlns:models="clr-namespace:TankManager.Core.Models"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
-        Title="Tank Manager v1.1.1" Height="900" Width="1800"
+        Title="Tank Manager v1.1.2" Height="900" Width="1800"
         AllowDrop="True"
         Drop="FileDropZone_Drop"
         DragEnter="FileDropZone_DragEnter"
