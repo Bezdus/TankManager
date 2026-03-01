@@ -52,20 +52,21 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Kompas6API5">
-      <HintPath>..\KompasLibs\Kompas6API5.dll</HintPath>
+    <Reference Include="Kompas6API5, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\Common\Kompas6API5.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="Kompas6Constants">
-      <HintPath>..\KompasLibs\Kompas6Constants.dll</HintPath>
+      <HintPath>..\Common\Kompas6Constants.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="Kompas6Constants3D">
-      <HintPath>..\KompasLibs\Kompas6Constants3D.dll</HintPath>
+      <HintPath>..\Common\Kompas6Constants3D.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="KompasAPI7">
-      <HintPath>..\KompasLibs\KompasAPI7.dll</HintPath>
+      <HintPath>..\Common\KompasAPI7.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="System" />
@@ -93,6 +94,7 @@
     </ApplicationDefinition>
     <Compile Include="Core\Services\DrawingPreviewService.cs" />
     <Compile Include="Core\Services\FileLockDiagnostics.cs" />
+    <Compile Include="Core\Services\ImageSyncService.cs" />
     <Compile Include="Views\MaterialsPanel.xaml.cs" />
     <Compile Include="Views\PartPropertiesPanel.xaml.cs" />
     <Compile Include="Views\PartsListPanel.xaml.cs" />

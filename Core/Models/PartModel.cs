@@ -353,19 +353,38 @@ namespace TankManager.Core.Models
         /// <returns>Путь к сохранённому файлу или null если не удалось сохранить</returns>
         public string SaveFilePreview(string targetDirectory)
         {
-            // Если превью уже сохранено и файл существует - возвращаем путь
+            // Если превью уже сохранено в памяти, файл существует и актуален — возвращаем путь
             if (!string.IsNullOrEmpty(_filePreviewPngPath) && File.Exists(_filePreviewPngPath))
-                return _filePreviewPngPath;
+            {
+                if (string.IsNullOrEmpty(FilePath) || !File.Exists(FilePath) ||
+                    File.GetLastWriteTimeUtc(_filePreviewPngPath) >= File.GetLastWriteTimeUtc(FilePath))
+                    return _filePreviewPngPath;
+            }
 
-            // Загружаем превью если ещё не загружено
-            var preview = FilePreview;
-            if (preview == null || string.IsNullOrEmpty(targetDirectory))
+            if (string.IsNullOrEmpty(targetDirectory))
                 return null;
 
             try
             {
                 string fileName = ThumbnailService.GeneratePreviewFileName(FilePath, "file");
                 string filePath = Path.Combine(targetDirectory, fileName);
+
+                // Если файл уже существует на диске и актуален — просто запоминаем путь, не перегенерируем
+                if (File.Exists(filePath))
+                {
+                    if (string.IsNullOrEmpty(FilePath) || !File.Exists(FilePath) ||
+                        File.GetLastWriteTimeUtc(filePath) >= File.GetLastWriteTimeUtc(FilePath))
+                    {
+                        _filePreviewPngPath = filePath;
+                        OnPropertyChanged(nameof(FilePreviewPngPath));
+                        return filePath;
+                    }
+                }
+
+                // Только если файла нет на диске — загружаем превью (дорогая операция)
+                var preview = FilePreview;
+                if (preview == null)
+                    return null;
 
                 if (ThumbnailService.SavePreviewToFile(preview, filePath))
                 {

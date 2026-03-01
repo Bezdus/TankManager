@@ -37,6 +37,7 @@ namespace TankManager.Core.Services
         private const string ImagesSubfolder = "images";
         private const string FileExtension = ".json";
 
+        private readonly ImageSyncService _imageSyncService = new ImageSyncService();
         private string _serverStorageFolder;
 
         /// <summary>
@@ -244,6 +245,9 @@ namespace TankManager.Core.Services
                         result.Errors.Add($"Ошибка загрузки на сервер {Path.GetFileName(localFolder)}: {ex.Message}");
                     }
                 }
+
+                // Фаза 3: Синхронизация изображений на уровне отдельных файлов
+                SyncAllProductImages();
             }
             catch (Exception ex)
             {
@@ -277,6 +281,74 @@ namespace TankManager.Core.Services
         }
 
         #endregion
+
+        /// <summary>
+        /// Синхронизирует изображения для всех продуктов между локальной папкой и сервером
+        /// </summary>
+        private void SyncAllProductImages()
+        {
+            if (!IsServerAvailable)
+                return;
+
+            try
+            {
+                var localFolders = Directory.GetDirectories(ProductsDirectory)
+                    .Where(f => !Path.GetFileName(f).StartsWith("_"))
+                    .ToList();
+
+                foreach (var localFolder in localFolders)
+                {
+                    try
+                    {
+                        string folderName = Path.GetFileName(localFolder);
+                        string serverFolder = Path.Combine(_serverStorageFolder, folderName);
+
+                        if (!Directory.Exists(serverFolder))
+                            continue;
+
+                        string localImages = Path.Combine(localFolder, ImagesSubfolder);
+                        string serverImages = Path.Combine(serverFolder, ImagesSubfolder);
+
+                        _imageSyncService.SyncImageDirectories(localImages, serverImages);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Ошибка синхронизации изображений {Path.GetFileName(localFolder)}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка синхронизации изображений: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Синхронизирует изображения конкретного продукта между локальной папкой и сервером
+        /// </summary>
+        public void SyncProductImagesWithServer(Product product)
+        {
+            if (!IsServerAvailable || product == null || string.IsNullOrEmpty(product.Name))
+                return;
+
+            try
+            {
+                string localFolder = FindExistingProductFolder(product, ProductsDirectory);
+                string serverFolder = FindExistingProductFolder(product, _serverStorageFolder);
+
+                if (localFolder == null || serverFolder == null)
+                    return;
+
+                string localImages = Path.Combine(localFolder, ImagesSubfolder);
+                string serverImages = Path.Combine(serverFolder, ImagesSubfolder);
+
+                _imageSyncService.SyncImageDirectories(localImages, serverImages);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка синхронизации изображений продукта: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Возвращает путь к папке с изображениями для продукта
@@ -398,14 +470,18 @@ namespace TankManager.Core.Services
             foreach (var file in Directory.GetFiles(sourceImagesFolder))
             {
                 string destFile = Path.Combine(destImagesFolder, Path.GetFileName(file));
-                if (!File.Exists(destFile))
+                try
                 {
-                    try
+                    if (!File.Exists(destFile))
                     {
                         File.Copy(file, destFile, false);
                     }
-                    catch { /* Игнорируем ошибки копирования */ }
+                    else if (File.GetLastWriteTimeUtc(file) > File.GetLastWriteTimeUtc(destFile))
+                    {
+                        File.Copy(file, destFile, true);
+                    }
                 }
+                catch { /* Игнорируем ошибки копирования */ }
             }
         }
 
@@ -607,6 +683,26 @@ namespace TankManager.Core.Services
             string folderPath = Path.Combine(ProductsDirectory, folderName);
             string jsonPath = Path.Combine(folderPath, ProductJsonFileName);
             return File.Exists(jsonPath);
+        }
+
+        /// <summary>
+        /// Пытается загрузить ранее сохранённый продукт по имени и обозначению.
+        /// Используется для восстановления путей к изображениям при повторном связывании с КОМПАС.
+        /// </summary>
+        public Product TryLoadSavedProduct(Product product)
+        {
+            if (product == null || string.IsNullOrEmpty(product.Name))
+                return null;
+
+            try
+            {
+                string folderName = GetProductFolderName(product);
+                return Load(folderName);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         #region Private Methods

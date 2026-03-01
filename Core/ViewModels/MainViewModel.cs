@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
@@ -49,6 +50,7 @@ namespace TankManager.Core.ViewModels
         private bool _isSnackbarVisible;
         private string _snackbarMessage;
         private System.Threading.Timer _snackbarTimer;
+        private CancellationTokenSource _backgroundPreviewCts;
 
         #endregion
 
@@ -530,6 +532,7 @@ namespace TankManager.Core.ViewModels
                 if (linkedProduct != null)
                 {
                     _linkedProductsCache[filePath] = linkedProduct;
+                    RestoreImagePathsFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
                     StatusMessage = $"Связано с КОМПАС: {CurrentProduct.Name}";
                 }
@@ -597,10 +600,7 @@ namespace TankManager.Core.ViewModels
                 if (refreshedProduct != null)
                 {
                     _linkedProductsCache[filePath] = refreshedProduct;
-                    
-                    // Инвалидируем кэш превью чертежей для всех деталей
-                    InvalidateDrawingPreviewsCache(refreshedProduct);
-                    
+                    RestoreImagePathsFromSaved(refreshedProduct);
                     SetCurrentProduct(refreshedProduct, isLinked: true);
                     StatusMessage = $"Данные обновлены: {CurrentProduct.Name}, деталей: {Details?.Count ?? 0}";
                 }
@@ -630,6 +630,68 @@ namespace TankManager.Core.ViewModels
             }
         }
 
+        /// <summary>
+        /// Восстанавливает пути к изображениям из ранее сохранённого продукта.
+        /// Позволяет избежать повторных COM-вызовов при связывании/обновлении из КОМПАС,
+        /// когда PNG-файлы уже существуют на диске и актуальны.
+        /// </summary>
+        private void RestoreImagePathsFromSaved(Product kompasProduct)
+        {
+            if (kompasProduct?.Details == null)
+                return;
+
+            try
+            {
+                var savedProduct = _storageService.TryLoadSavedProduct(kompasProduct);
+                if (savedProduct?.Details == null)
+                    return;
+
+                // Строим словарь сохранённых деталей по FilePath для быстрого поиска
+                var savedByFilePath = new Dictionary<string, PartModel>();
+                foreach (var saved in savedProduct.Details)
+                {
+                    if (!string.IsNullOrEmpty(saved.FilePath) && !savedByFilePath.ContainsKey(saved.FilePath))
+                        savedByFilePath[saved.FilePath] = saved;
+                }
+
+                foreach (var detail in kompasProduct.Details)
+                {
+                    if (string.IsNullOrEmpty(detail.FilePath))
+                        continue;
+
+                    PartModel savedDetail;
+                    if (!savedByFilePath.TryGetValue(detail.FilePath, out savedDetail))
+                        continue;
+
+                    // Восстанавливаем путь к PNG чертежа, если файл существует и актуален
+                    if (!string.IsNullOrEmpty(savedDetail.CdfFilePath) && File.Exists(savedDetail.CdfFilePath))
+                    {
+                        // Проверяем актуальность: если есть исходный CDW, PNG должен быть не старше
+                        if (string.IsNullOrEmpty(savedDetail.SourceCdwPath) || !File.Exists(savedDetail.SourceCdwPath) ||
+                            File.GetLastWriteTimeUtc(savedDetail.CdfFilePath) >= File.GetLastWriteTimeUtc(savedDetail.SourceCdwPath))
+                        {
+                            detail.CdfFilePath = savedDetail.CdfFilePath;
+                            detail.SourceCdwPath = savedDetail.SourceCdwPath;
+                        }
+                    }
+
+                    // Восстанавливаем путь к превью 3D-файла, если существует и актуален
+                    if (!string.IsNullOrEmpty(savedDetail.FilePreviewPngPath) && File.Exists(savedDetail.FilePreviewPngPath))
+                    {
+                        if (string.IsNullOrEmpty(detail.FilePath) || !File.Exists(detail.FilePath) ||
+                            File.GetLastWriteTimeUtc(savedDetail.FilePreviewPngPath) >= File.GetLastWriteTimeUtc(detail.FilePath))
+                        {
+                            detail.FilePreviewPngPath = savedDetail.FilePreviewPngPath;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка восстановления путей изображений: {ex.Message}");
+            }
+        }
+
         private async Task TryLinkToKompasAsync(string filePath)
         {
             if (string.IsNullOrEmpty(filePath)) return;
@@ -649,6 +711,7 @@ namespace TankManager.Core.ViewModels
                 if (linkedProduct != null)
                 {
                     _linkedProductsCache[filePath] = linkedProduct;
+                    RestoreImagePathsFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
                 }
             }
@@ -675,11 +738,14 @@ namespace TankManager.Core.ViewModels
 
                 var product = await Task.Run(() => _kompasService.LoadDocument(filePath));
                 _linkedProductsCache[filePath] = product;
+                RestoreImagePathsFromSaved(product);
                 CurrentProduct = product;
                 IsLinkedToKompas = true;
 
                 UpdateCalculations();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
+
+                _ = GenerateDrawingPreviewsInBackgroundAsync();
             }
             catch (Exception ex)
             {
@@ -690,6 +756,7 @@ namespace TankManager.Core.ViewModels
                 IsLoading = false;
                 NotifyCopyCommandsCanExecuteChanged();
                 NotifyRefreshCommandCanExecuteChanged();
+                NotifySaveCommandCanExecuteChanged();
             }
         }
 
@@ -705,11 +772,14 @@ namespace TankManager.Core.ViewModels
                 if (!string.IsNullOrEmpty(product.FilePath))
                     _linkedProductsCache[product.FilePath] = product;
 
+                RestoreImagePathsFromSaved(product);
                 CurrentProduct = product;
                 IsLinkedToKompas = true;
 
                 UpdateCalculations();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
+
+                _ = GenerateDrawingPreviewsInBackgroundAsync();
             }
             catch (Exception ex)
             {
@@ -720,6 +790,7 @@ namespace TankManager.Core.ViewModels
                 IsLoading = false;
                 NotifyCopyCommandsCanExecuteChanged();
                 NotifyRefreshCommandCanExecuteChanged();
+                NotifySaveCommandCanExecuteChanged();
             }
         }
 
@@ -750,6 +821,9 @@ namespace TankManager.Core.ViewModels
 
         private void SetCurrentProduct(Product product, bool isLinked)
         {
+            // Отменяем предыдущую фоновую генерацию превью
+            _backgroundPreviewCts?.Cancel();
+
             // Очищаем превью у старого продукта перед переключением
             if (_currentProduct != null && _currentProduct != product)
             {
@@ -783,7 +857,16 @@ namespace TankManager.Core.ViewModels
             NotifySaveCommandCanExecuteChanged();
             NotifyRefreshCommandCanExecuteChanged();
             NotifyLinkCommandCanExecuteChanged();
-            
+
+            // Фоновая синхронизация изображений с сервером
+            _ = SyncProductImagesInBackgroundAsync(product);
+
+            // Фоновая генерация превью чертежей для нового изделия с КОМПАС
+            if (isLinked)
+            {
+                _ = GenerateDrawingPreviewsInBackgroundAsync();
+            }
+
             // Принудительная сборка мусора после смены продукта
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -796,35 +879,9 @@ namespace TankManager.Core.ViewModels
             try
             {
                 IsLoading = true;
-                
+
                 // Получаем папку для изображений продукта
                 string imagesFolder = _storageService.GetProductImagesFolder(CurrentProduct);
-
-                // Если есть связь с КОМПАС - предлагаем загрузить превью чертежей
-                if (IsLinkedToKompas && CurrentProduct?.Context != null)
-                {
-                    var detailsWithoutPreview = Details?
-                        .Where(d => string.IsNullOrEmpty(d.CdfFilePath) && !d.IsBodyBased && !string.IsNullOrEmpty(d.FilePath))
-                        .GroupBy(d => d.FilePath)
-                        .Count() ?? 0;
-
-                    if (detailsWithoutPreview > 0)
-                    {
-                        var result = MessageBox.Show(
-                            $"Загрузить превью чертежей для {detailsWithoutPreview} деталей?\n\nЭто может занять некоторое время.",
-                            "Сохранение изделия",
-                            MessageBoxButton.YesNoCancel,
-                            MessageBoxImage.Question);
-
-                        if (result == MessageBoxResult.Cancel)
-                            return;
-
-                        if (result == MessageBoxResult.Yes)
-                        {
-                            await LoadAllDrawingPreviewsAsync();
-                        }
-                    }
-                }
 
                 // Сохраняем превью 3D-файлов для работы без исходных файлов КОМПАС
                 await SaveAllFilePreviewsAsync(imagesFolder);
@@ -898,6 +955,73 @@ namespace TankManager.Core.ViewModels
                     Debug.WriteLine($"Ошибка сохранения превью для {part.Name}: {ex.Message}");
                     saved++;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Фоновая генерация превью чертежей для всех деталей без превью.
+        /// Запускается автоматически после загрузки нового изделия из КОМПАС.
+        /// </summary>
+        private async Task GenerateDrawingPreviewsInBackgroundAsync()
+        {
+            if (Details == null || !IsLinkedToKompas || CurrentProduct?.Context == null)
+                return;
+
+            _backgroundPreviewCts?.Cancel();
+            _backgroundPreviewCts = new CancellationTokenSource();
+            var token = _backgroundPreviewCts.Token;
+            var product = CurrentProduct;
+
+            string imagesFolder = _storageService.GetProductImagesFolder(product);
+
+            var detailsToProcess = Details
+                .Where(d => string.IsNullOrEmpty(d.CdfFilePath) && !d.IsBodyBased && !string.IsNullOrEmpty(d.FilePath))
+                .GroupBy(d => d.FilePath)
+                .Select(g => g.First())
+                .ToList();
+
+            if (detailsToProcess.Count == 0)
+                return;
+
+            int processed = 0;
+            int total = detailsToProcess.Count;
+
+            foreach (var detail in detailsToProcess)
+            {
+                if (token.IsCancellationRequested || CurrentProduct != product)
+                    return;
+
+                try
+                {
+                    StatusMessage = $"Генерация превью чертежей: {processed + 1}/{total}";
+
+                    await Task.Run(() => _kompasService.LoadDrawingPreview(detail, product, imagesFolder), token);
+
+                    if (!string.IsNullOrEmpty(detail.CdfFilePath))
+                    {
+                        foreach (var samePart in Details.Where(d => d.FilePath == detail.FilePath && d != detail))
+                        {
+                            samePart.CdfFilePath = detail.CdfFilePath;
+                            samePart.SourceCdwPath = detail.SourceCdwPath;
+                        }
+                    }
+
+                    processed++;
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Фоновая генерация превью {detail.Name}: {ex.Message}");
+                    processed++;
+                }
+            }
+
+            if (CurrentProduct == product && !token.IsCancellationRequested)
+            {
+                StatusMessage = $"Превью чертежей готовы: {processed}/{total}";
             }
         }
 
@@ -1045,9 +1169,17 @@ namespace TankManager.Core.ViewModels
             if (part == null)
                 return;
 
-            // Если есть связь с КОМПАС И у детали ещё нет превью - загружаем
-            if (IsLinkedToKompas && CurrentProduct?.Context != null && string.IsNullOrEmpty(part.CdfFilePath))
+            bool needsPreview = string.IsNullOrEmpty(part.CdfFilePath);
+            bool isStale = !needsPreview && ImageSyncService.IsDrawingPreviewStale(part.CdfFilePath, part.SourceCdwPath);
+
+            // Если есть связь с КОМПАС И у детали нет превью или оно устарело - загружаем/перегенерируем
+            if (IsLinkedToKompas && CurrentProduct?.Context != null && (needsPreview || isStale))
             {
+                if (isStale)
+                {
+                    part.InvalidateDrawingPreviewCache();
+                }
+
                 try
                 {
                     string imagesFolder = _storageService.GetProductImagesFolder(CurrentProduct);
@@ -1058,7 +1190,7 @@ namespace TankManager.Core.ViewModels
                     Debug.WriteLine($"Ошибка загрузки превью чертежа: {ex.Message}");
                 }
             }
-            
+
             // Всегда уведомляем UI для отображения превью (из кеша или только что загруженного)
             part.OnPropertyChanged(nameof(part.DrawingPreview));
         }
@@ -1262,6 +1394,24 @@ namespace TankManager.Core.ViewModels
             }
         }
 
+        /// <summary>
+        /// Фоновая синхронизация изображений продукта с сервером
+        /// </summary>
+        private async Task SyncProductImagesInBackgroundAsync(Product product)
+        {
+            if (product == null || string.IsNullOrEmpty(product.Name) || !_storageService.IsServerAvailable)
+                return;
+
+            try
+            {
+                await Task.Run(() => _storageService.SyncProductImagesWithServer(product));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка фоновой синхронизации изображений: {ex.Message}");
+            }
+        }
+
         #endregion
 
         #region Clipboard
@@ -1398,6 +1548,10 @@ namespace TankManager.Core.ViewModels
 
         public void Dispose()
         {
+            // Отменяем фоновую генерацию превью
+            _backgroundPreviewCts?.Cancel();
+            _backgroundPreviewCts?.Dispose();
+
             // Останавливаем таймер SnackBar
             _snackbarTimer?.Dispose();
             

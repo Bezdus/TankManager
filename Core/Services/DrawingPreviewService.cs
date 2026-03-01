@@ -66,9 +66,14 @@ namespace TankManager.Core.Services
                 if (cdwDocument1 == null)
                     return null;
 
-                var rasterParams = (IRasterConvertParameters)cdwDocument1
-                    .GetInterface(KompasAPIObjectTypeEnum.ksObjectRasterConvertParameters);
+                var rasterParams = (IRasterConvertParameters)cdwDocument1.GetInterface(KompasAPIObjectTypeEnum.ksObjectRasterConvertParameters);
                 rasterParams.ColorType = ksObjectColorTypeEnum.ksColorObject;
+                rasterParams.Resolution = 72;
+                rasterParams.ColorBPP = ksColorBPPEnum.ksColorBPP_24;
+                rasterParams.RasterFormat = ksRasterFormatEnum.ksRasterFormatPNG;
+                rasterParams.Scale = 1;
+                rasterParams.MultiPageOutput = ksMultiPageOutputEnum.ksMultiPageOn2;
+                rasterParams.Uncompressed = false;
 
                 cdwDocument1.SaveAsToRasterFormat(pngPath, (RasterConvertParameters)rasterParams);
 
