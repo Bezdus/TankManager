@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using System.Windows;
 using AutoUpdaterDotNET;
 
@@ -11,8 +10,7 @@ namespace TankManager.Core.Services
     public class UpdateService
     {
         private const string UPDATE_URL = "https://raw.githubusercontent.com/Bezdus/TankManager/master/update.xml";
-        private static bool _eventHandlersInitialized = false;
-        
+
         /// <summary>
         /// Проверяет наличие обновлений
         /// </summary>
@@ -21,22 +19,14 @@ namespace TankManager.Core.Services
         {
             try
             {
-                // Инициализируем обработчики только один раз
-                if (!_eventHandlersInitialized)
-                {
-                    AutoUpdater.CheckForUpdateEvent += AutoUpdaterOnCheckForUpdateEvent;
-                    AutoUpdater.ApplicationExitEvent += AutoUpdater_ApplicationExitEvent;
-                    _eventHandlersInitialized = true;
-                }
-                
-                // Конфигурация AutoUpdater
                 AutoUpdater.ShowSkipButton = false;
                 AutoUpdater.ShowRemindLaterButton = false;
                 AutoUpdater.Mandatory = false;
                 AutoUpdater.RunUpdateAsAdmin = false;
                 AutoUpdater.ReportErrors = showNoUpdateMessage;
-                
-                // Запуск проверки обновлений
+                AutoUpdater.ApplicationExitEvent -= OnApplicationExit;
+                AutoUpdater.ApplicationExitEvent += OnApplicationExit;
+
                 AutoUpdater.Start(UPDATE_URL);
             }
             catch (Exception ex)
@@ -52,64 +42,7 @@ namespace TankManager.Core.Services
             }
         }
 
-        /// <summary>
-        /// Асинхронная проверка обновлений
-        /// </summary>
-        public static async Task CheckForUpdatesAsync(bool showNoUpdateMessage = false)
-        {
-            await Task.Run(() => CheckForUpdates(showNoUpdateMessage));
-        }
-
-        private static void AutoUpdaterOnCheckForUpdateEvent(UpdateInfoEventArgs args)
-        {
-            if (args.Error == null)
-            {
-                if (args.IsUpdateAvailable)
-                {
-                    AutoUpdater.ShowUpdateForm(args);
-                }
-                else
-                {
-                    // Обновлений нет - показываем сообщение только при ручной проверке
-                    if (AutoUpdater.ReportErrors)
-                    {
-                        MessageBox.Show(
-                            $"У вас установлена последняя версия приложения.\n\nТекущая версия: {args.CurrentVersion}",
-                            "Обновления не требуются",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                    }
-                }
-            }
-            else
-            {
-                if (args.Error is System.Net.WebException)
-                {
-                    // Проблема с сетью - тихо игнорируем при автоматической проверке
-                    if (AutoUpdater.ReportErrors)
-                    {
-                        MessageBox.Show(
-                            "Не удалось проверить обновления.\nПроверьте подключение к интернету или повторите попытку позже.",
-                            "Ошибка подключения",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                    }
-                }
-                else
-                {
-                    if (AutoUpdater.ReportErrors)
-                    {
-                        MessageBox.Show(
-                            $"Ошибка при проверке обновлений:\n{args.Error.Message}",
-                            "Ошибка",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
-                    }
-                }
-            }
-        }
-
-        private static void AutoUpdater_ApplicationExitEvent()
+        private static void OnApplicationExit()
         {
             System.Windows.Application.Current?.Shutdown();
         }
