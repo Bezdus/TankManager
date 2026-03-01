@@ -66,7 +66,7 @@ namespace TankManager.Core.Services
             {
                 if (args.IsUpdateAvailable)
                 {
-                    // Обновление доступно - AutoUpdater покажет диалог автоматически
+                    AutoUpdater.ShowUpdateForm(args);
                 }
                 else
                 {
