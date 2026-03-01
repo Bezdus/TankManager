@@ -30,7 +30,6 @@ namespace TankManager.Core.Services
                 }
                 
                 // Конфигурация AutoUpdater
-                AutoUpdater.InstallationPath = AppDomain.CurrentDomain.BaseDirectory;
                 AutoUpdater.ShowSkipButton = false;
                 AutoUpdater.ShowRemindLaterButton = false;
                 AutoUpdater.Mandatory = false;
