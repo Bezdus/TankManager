@@ -486,7 +486,7 @@ namespace TankManager.Core.Models
 
         private static BitmapSource TryLoadPreview(string filePath, string savedPreviewPath = null)
         {
-            // Сначала пробуем загрузить из исходного файла КОМПАС
+            // Если исходный файл КОМПАС доступен — загружаем из него
             if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
                 try
@@ -499,7 +499,7 @@ namespace TankManager.Core.Models
             }
 
             // Fallback: загружаем из сохранённого PNG если исходный файл недоступен
-            if (!string.IsNullOrEmpty(savedPreviewPath) && File.Exists(savedPreviewPath))
+            if (!string.IsNullOrEmpty(savedPreviewPath))
             {
                 try
                 {
