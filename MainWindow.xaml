@@ -472,6 +472,17 @@
 
                     <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
 
+                    <Button Command="{Binding ExportToExcelCommand}"
+                            Style="{StaticResource PanelButtonStyle}"
+                            ToolTip="Сохранить ведомость материалов в Excel файл">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📑" Margin="0,0,5,0"/>
+                            <TextBlock Text="Ведомость в Excel"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+
                     <!-- Кнопка связи с КОМПАС / индикатор статуса -->
                     <Button Command="{Binding LinkToKompasCommand}"
                             Style="{StaticResource PanelButtonStyle}"

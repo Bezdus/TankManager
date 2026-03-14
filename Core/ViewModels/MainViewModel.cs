@@ -449,6 +449,7 @@ namespace TankManager.Core.ViewModels
         public ICommand SelectServerStorageFolderCommand { get; private set; }
         public ICommand ClearServerStorageFolderCommand { get; private set; }
         public ICommand SyncFromServerCommand { get; private set; }
+        public ICommand ExportToExcelCommand { get; private set; }
 
         #endregion
 
@@ -488,6 +489,7 @@ namespace TankManager.Core.ViewModels
             SelectServerStorageFolderCommand = new RelayCommand(SelectServerStorageFolder);
             ClearServerStorageFolderCommand = new RelayCommand(ClearServerStorageFolder, () => HasServerStorageFolder);
             SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable);
+            ExportToExcelCommand = new RelayCommand(ExportToExcel, () => Details?.Any() == true || StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
         }
 
         #endregion
@@ -1433,10 +1435,35 @@ namespace TankManager.Core.ViewModels
         private void CopyAllDataToClipboard()
         {
             _excelService.CopyAllDataToClipboard(StandardParts, SheetMaterials, TubularProducts, OtherMaterials);
-            
+
             int count = (StandardParts?.Count ?? 0) + (SheetMaterials?.Count ?? 0) + (TubularProducts?.Count ?? 0) + (OtherMaterials?.Count ?? 0);
             StatusMessage = $"Скопировано все данные: {count} элементов";
             ShowSnackbar($"Все данные скопированы в Excel ({count} элементов)");
+        }
+
+        private void ExportToExcel()
+        {
+            try
+            {
+                var filePath = _excelService.ExportToExcelFile(
+                    CurrentProduct?.Name,
+                    Details,
+                    StandardParts,
+                    SheetMaterials,
+                    TubularProducts,
+                    OtherMaterials);
+
+                if (filePath != null)
+                {
+                    StatusMessage = $"Файл сохранён: {filePath}";
+                    ShowSnackbar("Ведомость материалов сохранена в Excel");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при экспорте в Excel: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         #endregion
@@ -1480,6 +1507,7 @@ namespace TankManager.Core.ViewModels
             ((RelayCommand)CopyStandartPartsToClipboardCommand)?.NotifyCanExecuteChanged();
             ((RelayCommand)CopyOtherMaterialsToClipboardCommand)?.NotifyCanExecuteChanged();
             ((RelayCommand)CopyAllDataToClipboardCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)ExportToExcelCommand)?.NotifyCanExecuteChanged();
         }
 
         private void NotifyLinkCommandCanExecuteChanged()
