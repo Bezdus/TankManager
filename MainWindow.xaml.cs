@@ -25,7 +25,11 @@ namespace TankManager
         {
             _viewModel = new MainViewModel();
             this.DataContext = _viewModel;
-            
+
+            // Устанавливаем размер окна - 60% экрана
+            this.Width = SystemParameters.PrimaryScreenWidth * 0.6;
+            this.Height = SystemParameters.PrimaryScreenHeight * 0.6;
+
             InitializeComponent();
             
             // Подписываемся на изменение видимости SnackBar для запуска анимации
