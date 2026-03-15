@@ -349,21 +349,39 @@ namespace TankManager
             }
         }
 
-        private void DeleteProduct_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        private void DeleteProductLocal_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             e.Handled = true;
-            
+
             var button = sender as Button;
             if (button == null)
                 return;
 
             var listBoxItem = FindParent<ListBoxItem>(button);
             var productInfo = (listBoxItem?.DataContext ?? button.DataContext) as ProductFileInfo;
-            
+
             if (productInfo != null)
             {
                 _viewModel.SelectedSavedProduct = productInfo;
-                _viewModel.DeleteProductCommand?.Execute(null);
+                _viewModel.DeleteProductLocalCommand?.Execute(null);
+            }
+        }
+
+        private void DeleteProductEverywhere_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+
+            var button = sender as Button;
+            if (button == null)
+                return;
+
+            var listBoxItem = FindParent<ListBoxItem>(button);
+            var productInfo = (listBoxItem?.DataContext ?? button.DataContext) as ProductFileInfo;
+
+            if (productInfo != null)
+            {
+                _viewModel.SelectedSavedProduct = productInfo;
+                _viewModel.DeleteProductEverywhereCommand?.Execute(null);
             }
         }
 
@@ -388,6 +406,30 @@ namespace TankManager
                     System.Windows.Media.Color.FromRgb(255, 255, 255)); // #FFFFFFFF (PrimaryBackground)
                 button.BorderBrush = new System.Windows.Media.SolidColorBrush(
                     System.Windows.Media.Color.FromRgb(224, 224, 224)); // #FFE0E0E0 (BorderColor)
+            }
+        }
+
+        private void DeleteButtonEverywhere_MouseEnter(object sender, MouseEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null)
+            {
+                button.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 200, 200)); // более насыщенный красный
+                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(220, 60, 60));
+            }
+        }
+
+        private void DeleteButtonEverywhere_MouseLeave(object sender, MouseEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null)
+            {
+                button.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 255, 255));
+                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(224, 224, 224));
             }
         }
     }

@@ -115,7 +115,11 @@ namespace TankManager.Core.ViewModels
             set
             {
                 if (SetProperty(ref _selectedSavedProduct, value, nameof(SelectedSavedProduct)))
+                {
                     ((RelayCommand)DeleteProductCommand)?.NotifyCanExecuteChanged();
+                    ((RelayCommand)DeleteProductLocalCommand)?.NotifyCanExecuteChanged();
+                    ((RelayCommand)DeleteProductEverywhereCommand)?.NotifyCanExecuteChanged();
+                }
             }
         }
 
@@ -434,6 +438,8 @@ namespace TankManager.Core.ViewModels
         public ICommand ClearSearchCommand { get; private set; }
         public ICommand LoadProductCommand { get; private set; }
         public ICommand DeleteProductCommand { get; private set; }
+        public ICommand DeleteProductLocalCommand { get; private set; }
+        public ICommand DeleteProductEverywhereCommand { get; private set; }
         public ICommand ToggleProductsPanelCommand { get; private set; }
         public ICommand SwitchToProductCommand { get; private set; }
         public ICommand CopyAllToClipboardCommand { get; private set; }
@@ -474,6 +480,8 @@ namespace TankManager.Core.ViewModels
             ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
             LoadProductCommand = new RelayCommand<string>(fileName => _ = LoadProductAsync(fileName));
             DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
+            DeleteProductLocalCommand = new RelayCommand(DeleteSelectedProductLocal, () => SelectedSavedProduct != null);
+            DeleteProductEverywhereCommand = new RelayCommand(DeleteSelectedProductEverywhere, () => SelectedSavedProduct != null);
             ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
             SwitchToProductCommand = new RelayCommand<ProductFileInfo>(info => _ = SwitchToProductAsync(info));
             CopyAllToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyPartsToClipboard, Details), () => Details?.Any() == true);
@@ -1081,47 +1089,77 @@ namespace TankManager.Core.ViewModels
 
         private void DeleteSelectedProduct()
         {
+            DeleteSelectedProductEverywhere();
+        }
+
+        private void DeleteSelectedProductLocal()
+        {
             if (SelectedSavedProduct == null) return;
 
             var result = MessageBox.Show(
-                $"Удалить \"{SelectedSavedProduct.ProductName}\"?",
+                $"Удалить \"{SelectedSavedProduct.ProductName}\" локально?\n\nИзделие останется на сервере.",
                 "Подтверждение удаления",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
             if (result == MessageBoxResult.Yes)
             {
-                // Если удаляемый продукт - текущий, очищаем его
-                if (CurrentProduct != null && 
-                    CurrentProduct.Name == SelectedSavedProduct.ProductName &&
-                    CurrentProduct.Marking == SelectedSavedProduct.Marking)
-                {
-                    // Очищаем превью у всех деталей
-                    if (Details != null)
-                    {
-                        foreach (var detail in Details)
-                        {
-                            detail.FilePreview = null;
-                        }
-                    }
-                    
-                    CurrentProduct = new Product();
-                    IsLinkedToKompas = false;
-                }
-                
-                // Удаляем из кэша
+                ClearCurrentProductIfMatches(SelectedSavedProduct);
                 InvalidateProductCache(CurrentProduct?.FilePath);
-                
-                if (_storageService.Delete(SelectedSavedProduct.FileName))
+
+                if (_storageService.DeleteLocal(SelectedSavedProduct.FileName))
                 {
-                    StatusMessage = $"Удалено: {SelectedSavedProduct.ProductName}";
+                    StatusMessage = $"Удалено локально: {SelectedSavedProduct.ProductName}";
                     RefreshSavedProducts();
-                    
-                    // Принудительная сборка мусора для освобождения файлов
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
                     GC.Collect();
                 }
+            }
+        }
+
+        private void DeleteSelectedProductEverywhere()
+        {
+            if (SelectedSavedProduct == null) return;
+
+            var result = MessageBox.Show(
+                $"Удалить \"{SelectedSavedProduct.ProductName}\" локально и с сервера?\n\nЭто действие нельзя отменить.",
+                "Подтверждение удаления",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                ClearCurrentProductIfMatches(SelectedSavedProduct);
+                InvalidateProductCache(CurrentProduct?.FilePath);
+
+                if (_storageService.Delete(SelectedSavedProduct.FileName))
+                {
+                    StatusMessage = $"Удалено отовсюду: {SelectedSavedProduct.ProductName}";
+                    RefreshSavedProducts();
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                }
+            }
+        }
+
+        private void ClearCurrentProductIfMatches(ProductFileInfo productInfo)
+        {
+            if (CurrentProduct != null &&
+                CurrentProduct.Name == productInfo.ProductName &&
+                CurrentProduct.Marking == productInfo.Marking)
+            {
+                if (Details != null)
+                {
+                    foreach (var detail in Details)
+                    {
+                        detail.FilePreview = null;
+                    }
+                }
+
+                CurrentProduct = new Product();
+                IsLinkedToKompas = false;
             }
         }
 

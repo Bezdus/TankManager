@@ -622,32 +622,38 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Удалить продукт из базы (из локальной папки и с сервера)
+        /// Удалить продукт только из локальной папки
         /// </summary>
-        public bool Delete(string folderName)
+        public bool DeleteLocal(string folderName)
         {
-            bool deletedAny = false;
-
             // Принудительная сборка мусора перед удалением
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
 
-            // Удаляем из локальной папки
             try
             {
                 string folderPath = Path.Combine(ProductsDirectory, folderName);
                 if (Directory.Exists(folderPath))
                 {
-                    // Пытаемся удалить файлы по одному, чтобы определить заблокированные
                     DeleteDirectoryRecursive(folderPath);
-                    deletedAny = true;
+                    return true;
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Ошибка удаления из локальной папки: {ex.Message}");
             }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Удалить продукт из базы (из локальной папки и с сервера)
+        /// </summary>
+        public bool Delete(string folderName)
+        {
+            bool deletedAny = DeleteLocal(folderName);
 
             // Удаляем с сервера если доступен
             if (IsServerAvailable)

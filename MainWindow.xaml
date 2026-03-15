@@ -1396,39 +1396,74 @@
                                         </StackPanel>
                                     </StackPanel>
 
-                                    <Button Grid.Column="1"
-                                            PreviewMouseDown="DeleteProduct_PreviewMouseDown"
-                                            MouseEnter="DeleteButton_MouseEnter"
-                                            MouseLeave="DeleteButton_MouseLeave"
-                                            Panel.ZIndex="1"
-                                            DataContext="{Binding}"
-                                            ToolTip="Удалить изделие"
-                                            VerticalAlignment="Center"
-                                            Margin="8,0,0,0"
-                                            Padding="8,4"
-                                            Background="{StaticResource PrimaryBackground}"
-                                            BorderThickness="1"
-                                            BorderBrush="{StaticResource BorderColor}"
-                                            Cursor="Hand">
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}" 
-                                                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                                                    CornerRadius="3"
-                                                                    Padding="{TemplateBinding Padding}">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </Button.Style>
-                                        <TextBlock Text="🗑️" FontSize="14" IsHitTestVisible="False"/>
-                                    </Button>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                VerticalAlignment="Center"
+                                                Margin="8,0,0,0">
+                                        <!-- Кнопка удаления локально -->
+                                        <Button PreviewMouseDown="DeleteProductLocal_PreviewMouseDown"
+                                                MouseEnter="DeleteButton_MouseEnter"
+                                                MouseLeave="DeleteButton_MouseLeave"
+                                                Panel.ZIndex="1"
+                                                DataContext="{Binding}"
+                                                ToolTip="Удалить локально"
+                                                Padding="8,4"
+                                                Margin="0,0,2,0"
+                                                Background="{StaticResource PrimaryBackground}"
+                                                BorderThickness="1"
+                                                BorderBrush="{StaticResource BorderColor}"
+                                                Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" 
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                        CornerRadius="3"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </Button.Style>
+                                            <TextBlock Text="🗑️" FontSize="14" IsHitTestVisible="False"/>
+                                        </Button>
+                                        <!-- Кнопка удаления локально и с сервера -->
+                                        <Button PreviewMouseDown="DeleteProductEverywhere_PreviewMouseDown"
+                                                MouseEnter="DeleteButtonEverywhere_MouseEnter"
+                                                MouseLeave="DeleteButtonEverywhere_MouseLeave"
+                                                Panel.ZIndex="1"
+                                                DataContext="{Binding}"
+                                                ToolTip="Удалить локально и с сервера"
+                                                Padding="8,4"
+                                                Background="{StaticResource PrimaryBackground}"
+                                                BorderThickness="1"
+                                                BorderBrush="{StaticResource BorderColor}"
+                                                Cursor="Hand"
+                                                Visibility="{Binding DataContext.HasServerStorageFolder, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" 
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                        CornerRadius="3"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </Button.Style>
+                                            <TextBlock Text="🗑️☁️" FontSize="14" IsHitTestVisible="False"/>
+                                        </Button>
+                                    </StackPanel>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
