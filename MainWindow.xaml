@@ -1505,6 +1505,65 @@
             <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
         </Border>
 
+        <!-- Popup превью чертежа -->
+        <Grid x:Name="DrawingPopupOverlay"
+              Grid.Row="0" Grid.RowSpan="4"
+              Visibility="Collapsed"
+              Panel.ZIndex="100">
+            <!-- Затемнение фона -->
+            <Border Background="#CC000000"
+                    MouseLeftButtonDown="DrawingPopupOverlay_MouseLeftButtonDown"/>
+            <!-- Контент превью -->
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
+                  MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window}}"
+                  MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                  Margin="40">
+                <Border Background="White"
+                        CornerRadius="6"
+                        Padding="12"
+                        MouseLeftButtonDown="DrawingPopupContent_MouseLeftButtonDown">
+                    <Border.Effect>
+                        <DropShadowEffect ShadowDepth="4" Opacity="0.4" BlurRadius="15"/>
+                    </Border.Effect>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Заголовок с кнопкой закрытия -->
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <TextBlock x:Name="DrawingPopupTitle"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       VerticalAlignment="Center"/>
+                            <Button Content="✕"
+                                    HorizontalAlignment="Right"
+                                    FontSize="16"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Padding="6,2"
+                                    Foreground="{StaticResource TextSecondary}"
+                                    Click="DrawingPopupClose_Click"/>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto"
+                                      Background="#FFF0F0F0">
+                            <Image x:Name="DrawingPopupImage"
+                                   Stretch="None"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Margin="20"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
         <!-- SnackBar уведомление -->
         <Border x:Name="SnackbarNotification"
                 Grid.Row="0" Grid.RowSpan="4"

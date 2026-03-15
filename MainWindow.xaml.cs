@@ -273,6 +273,16 @@ namespace TankManager
             _viewModel?.Dispose();
         }
 
+        protected override void OnPreviewKeyDown(KeyEventArgs e)
+        {
+            base.OnPreviewKeyDown(e);
+            if (e.Key == Key.Escape && DrawingPopupOverlay.Visibility == Visibility.Visible)
+            {
+                CloseDrawingPopup();
+                e.Handled = true;
+            }
+        }
+
         private void OverlayBackground_MouseDown(object sender, MouseButtonEventArgs e)
         {
             _viewModel.IsProductsPanelOpen = false;
@@ -284,58 +294,30 @@ namespace TankManager
             if (part?.DrawingPreview == null)
                 return;
 
-            var previewWindow = new Window
-            {
-                Title = $"Чертёж: {part.Name} {part.Marking}",
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                Width = SystemParameters.WorkArea.Width * 0.9,
-                Height = SystemParameters.WorkArea.Height * 0.9,
-                Background = System.Windows.Media.Brushes.White,
-                WindowState = WindowState.Maximized
-            };
+            DrawingPopupTitle.Text = $"Чертёж: {part.Name} {part.Marking}";
+            DrawingPopupImage.Source = part.DrawingPreview;
+            DrawingPopupOverlay.Visibility = Visibility.Visible;
+        }
 
-            var scrollViewer = new ScrollViewer
-            {
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Background = System.Windows.Media.Brushes.LightGray
-            };
+        private void CloseDrawingPopup()
+        {
+            DrawingPopupOverlay.Visibility = Visibility.Collapsed;
+            DrawingPopupImage.Source = null;
+        }
 
-            var image = new Image
-            {
-                Source = part.DrawingPreview,
-                Stretch = System.Windows.Media.Stretch.None,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(20)
-            };
+        private void DrawingPopupOverlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            CloseDrawingPopup();
+        }
 
-            // Закрытие по Escape
-            previewWindow.KeyDown += (s, args) =>
-            {
-                if (args.Key == Key.Escape)
-                    previewWindow.Close();
-            };
+        private void DrawingPopupContent_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
 
-            // Двойной клик для закрытия
-            image.MouseLeftButtonDown += (s, args) =>
-            {
-                if (args.ClickCount == 2)
-                    previewWindow.Close();
-            };
-
-            scrollViewer.Content = image;
-            previewWindow.Content = scrollViewer;
-            
-            // Очистка ресурсов при закрытии окна
-            previewWindow.Closed += (s, args) =>
-            {
-                image.Source = null;
-                scrollViewer.Content = null;
-                previewWindow.Content = null;
-            };
-            
-            previewWindow.ShowDialog();
+        private void DrawingPopupClose_Click(object sender, RoutedEventArgs e)
+        {
+            CloseDrawingPopup();
         }
 
         private void DeleteProduct_Click(object sender, RoutedEventArgs e)
