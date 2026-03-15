@@ -126,7 +126,8 @@ namespace TankManager.Core.Services
         /// Синхронизирует данные между локальной папкой и сервером (двусторонняя синхронизация).
         /// Копирует новые и обновлённые изделия в обе стороны.
         /// </summary>
-        public SyncResult SyncFromServer()
+        /// <param name="skipImages">Если true, изображения не копируются при синхронизации</param>
+        public SyncResult SyncFromServer(bool skipImages = false)
         {
             var result = new SyncResult();
 
@@ -181,8 +182,8 @@ namespace TankManager.Core.Services
 
                         if (needsCopy)
                         {
-                            CopyProductFolder(serverFolder, localFolder);
-                            
+                            CopyProductFolder(serverFolder, localFolder, skipImages);
+
                             if (isNew)
                                 result.NewProducts++;
                             else
@@ -236,7 +237,7 @@ namespace TankManager.Core.Services
 
                         if (needsCopy)
                         {
-                            CopyProductFolder(localFolder, serverFolder);
+                            CopyProductFolder(localFolder, serverFolder, skipImages);
                             // Не увеличиваем счётчики, так как уже посчитали в первой фазе
                         }
                     }
@@ -247,7 +248,8 @@ namespace TankManager.Core.Services
                 }
 
                 // Фаза 3: Синхронизация изображений на уровне отдельных файлов
-                SyncAllProductImages();
+                if (!skipImages)
+                    SyncAllProductImages();
             }
             catch (Exception ex)
             {
@@ -260,7 +262,8 @@ namespace TankManager.Core.Services
         /// <summary>
         /// Копирует папку продукта с сервера в локальную директорию
         /// </summary>
-        private void CopyProductFolder(string sourceFolder, string destFolder)
+        /// <param name="skipImages">Если true, подпапка images не копируется</param>
+        private void CopyProductFolder(string sourceFolder, string destFolder, bool skipImages = false)
         {
             // Создаём целевую папку
             Directory.CreateDirectory(destFolder);
@@ -272,11 +275,14 @@ namespace TankManager.Core.Services
                 File.Copy(file, destFile, true);
             }
 
-            // Копируем подпапки (например, images)
+            // Копируем подпапки (пропускаем images если skipImages)
             foreach (var dir in Directory.GetDirectories(sourceFolder))
             {
+                if (skipImages && string.Equals(Path.GetFileName(dir), ImagesSubfolder, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 string destSubDir = Path.Combine(destFolder, Path.GetFileName(dir));
-                CopyProductFolder(dir, destSubDir);
+                CopyProductFolder(dir, destSubDir, skipImages);
             }
         }
 
