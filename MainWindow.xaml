@@ -57,6 +57,33 @@
                            To="0" Duration="0:0:0.2"/>
         </Storyboard>
 
+        <!-- Storyboard для анимации панели продуктов -->
+        <Storyboard x:Key="ShowProductsPanelStoryboard">
+            <DoubleAnimation Storyboard.TargetName="ProductsPanel"
+                           Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                           From="-300" To="0" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="ProductsPanelOverlay"
+                           Storyboard.TargetProperty="Opacity"
+                           From="0" To="1" Duration="0:0:0.3"/>
+        </Storyboard>
+
+        <Storyboard x:Key="HideProductsPanelStoryboard">
+            <DoubleAnimation Storyboard.TargetName="ProductsPanel"
+                           Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                           To="-300" Duration="0:0:0.25">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="ProductsPanelOverlay"
+                           Storyboard.TargetProperty="Opacity"
+                           To="0" Duration="0:0:0.25"/>
+        </Storyboard>
+
         <!-- Цветовая палитра -->
         <SolidColorBrush x:Key="PrimaryBackground" Color="#FFFFFFFF"/>
         <SolidColorBrush x:Key="SecondaryBackground" Color="#FFF5F5F5"/>
@@ -1149,17 +1176,24 @@
             </Grid>
 
             <!-- Затемнение фона при открытой панели -->
-            <Border Background="#40000000"
-                    Visibility="{Binding IsProductsPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
+            <Border x:Name="ProductsPanelOverlay"
+                    Background="#40000000"
+                    Visibility="Collapsed"
+                    Opacity="0"
                     MouseDown="OverlayBackground_MouseDown"/>
 
             <!-- Выдвижная панель продуктов (overlay) -->
-            <Border Background="{StaticResource PrimaryBackground}"
+            <Border x:Name="ProductsPanel"
+                    Background="{StaticResource PrimaryBackground}"
                     BorderBrush="{StaticResource BorderColor}"
                     BorderThickness="0,0,1,0"
                     HorizontalAlignment="Left"
                     Width="300"
-                    Visibility="{Binding IsProductsPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    Visibility="Collapsed"
+                    RenderTransformOrigin="0,0.5">
+                <Border.RenderTransform>
+                    <TranslateTransform X="-300"/>
+                </Border.RenderTransform>
                 <Border.Effect>
                     <DropShadowEffect ShadowDepth="3" Direction="0" Opacity="0.2" BlurRadius="10"/>
                 </Border.Effect>

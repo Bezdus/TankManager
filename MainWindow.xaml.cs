@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using TankManager.Core.Models;
@@ -42,13 +43,37 @@ namespace TankManager
             {
                 if (_viewModel.IsSnackbarVisible)
                 {
-                    var showStoryboard = (System.Windows.Media.Animation.Storyboard)FindResource("ShowSnackbarStoryboard");
+                    var showStoryboard = (Storyboard)FindResource("ShowSnackbarStoryboard");
                     showStoryboard?.Begin();
                 }
                 else
                 {
-                    var hideStoryboard = (System.Windows.Media.Animation.Storyboard)FindResource("HideSnackbarStoryboard");
+                    var hideStoryboard = (Storyboard)FindResource("HideSnackbarStoryboard");
                     hideStoryboard?.Begin();
+                }
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsProductsPanelOpen))
+            {
+                if (_viewModel.IsProductsPanelOpen)
+                {
+                    ProductsPanelOverlay.Visibility = Visibility.Visible;
+                    ProductsPanel.Visibility = Visibility.Visible;
+                    var showStoryboard = (Storyboard)FindResource("ShowProductsPanelStoryboard");
+                    showStoryboard?.Begin();
+                }
+                else
+                {
+                    var hideStoryboard = (Storyboard)FindResource("HideProductsPanelStoryboard");
+                    if (hideStoryboard != null)
+                    {
+                        var storyboardCopy = hideStoryboard.Clone();
+                        storyboardCopy.Completed += (s, args) =>
+                        {
+                            ProductsPanelOverlay.Visibility = Visibility.Collapsed;
+                            ProductsPanel.Visibility = Visibility.Collapsed;
+                        };
+                        storyboardCopy.Begin(this);
+                    }
                 }
             }
         }
