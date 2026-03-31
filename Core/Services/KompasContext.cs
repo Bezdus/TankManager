@@ -128,11 +128,13 @@ namespace TankManager.Core.Services
                 string lengthStr = GetBodyPropertyValue(body, "Длина профиля");
                 if (double.TryParse(lengthStr, out double length))
                     return length;
+
+                // Возвращаем максимальный габарит
+                var partGabarit = KompasCameraController.GetPartGabarit(body);
+                return partGabarit.MaxSize;
             }
 
-            // Возвращаем максимальный габарит
-            var partGabarit = KompasCameraController.GetPartGabarit(part);
-            return partGabarit.MaxSize;
+            return 0.0;
         }
 
         /// <summary>

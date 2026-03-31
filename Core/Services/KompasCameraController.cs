@@ -77,6 +77,16 @@ namespace TankManager.Core.Services
             return gabarit;
         }
 
+        public static Gabarit GetPartGabarit(IBody7 body)
+        {
+            var gabarit = new Gabarit();
+
+            body.GetGabarit(
+                out gabarit.X1, out gabarit.Y1, out gabarit.Z1,
+                out gabarit.X2, out gabarit.Y2, out gabarit.Z2);
+            return gabarit;
+        }
+
         private (double x, double y, double z) CalculateLocalCenter(Gabarit g)
         {
             return ((g.X1 + g.X2) / 2.0, (g.Y1 + g.Y2) / 2.0, (g.Z1 + g.Z2) / 2.0);
