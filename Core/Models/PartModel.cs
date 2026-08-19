@@ -34,6 +34,7 @@ namespace TankManager.Core.Models
         private BitmapSource _drawingPreview;
         private bool _drawingPreviewLoaded;
         private string _filePreviewPngPath; // Путь к сохранённому превью 3D-файла
+        private string _dxfFilePath; // Путь к DXF-файлу для лазерной резки
 
         private static readonly DrawingPreviewService _previewService = new DrawingPreviewService();
 
@@ -171,6 +172,22 @@ namespace TankManager.Core.Models
                 {
                     _cdwFilePath = value;
                     OnPropertyChanged(nameof(SourceCdwPath));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Путь к DXF-файлу для лазерной резки
+        /// </summary>
+        public string DxfFilePath
+        {
+            get { return _dxfFilePath; }
+            set
+            {
+                if (_dxfFilePath != value)
+                {
+                    _dxfFilePath = value;
+                    OnPropertyChanged(nameof(DxfFilePath));
                 }
             }
         }

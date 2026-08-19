@@ -872,7 +872,8 @@ namespace TankManager.Core.Services
                 ProductType = (int)part.ProductType,
                 CdfFilePath = relativeCdfPath,
                 SourceCdwPath = part.SourceCdwPath,
-                FilePreviewPngPath = relativeFilePreviewPath
+                FilePreviewPngPath = relativeFilePreviewPath,
+                DxfFilePath = part.DxfFilePath
             };
         }
 
@@ -1018,7 +1019,8 @@ namespace TankManager.Core.Services
                 ProductType = (ProductType)(dto.ProductType),
                 CdfFilePath = absoluteCdfPath,
                 SourceCdwPath = dto.SourceCdwPath,
-                FilePreviewPngPath = absoluteFilePreviewPath
+                FilePreviewPngPath = absoluteFilePreviewPath,
+                DxfFilePath = dto.DxfFilePath
             };
         }
 
@@ -1159,6 +1161,9 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public string FilePreviewPngPath { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public string DxfFilePath { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]

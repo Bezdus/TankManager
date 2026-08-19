@@ -50,6 +50,7 @@ namespace TankManager.Core.Services
                 if (context.IsDocumentLoaded)
                 {
                     var product = CreateProductFromTopPart(context);
+                    AttachLaserCutting(product);
                     _logger.LogInfo($"Successfully loaded product '{product.Name}' with {product.Details.Count} parts");
                     return product;
                 }
@@ -85,6 +86,7 @@ namespace TankManager.Core.Services
                 if (context.IsDocumentLoaded)
                 {
                     var product = CreateProductFromTopPart(context);
+                    AttachLaserCutting(product);
                     _logger.LogInfo($"Successfully loaded product '{product.Name}' with {product.Details.Count} parts from active document");
                     return product;
                 }
@@ -264,6 +266,58 @@ namespace TankManager.Core.Services
             catch (Exception ex)
             {
                 _logger.LogWarning($"Failed to load drawing preview for {detail.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Привязывает DXF-файлы к листовым деталям и считает операцию лазерной резки
+        /// </summary>
+        /// <param name="product">Продукт, чьи листовые детали обрабатываются</param>
+        public void AttachLaserCutting(Product product)
+        {
+            if (product == null || string.IsNullOrEmpty(product.FilePath))
+                return;
+
+            var dxfFolders = DxfResolver.GetCandidateFolders(product.FilePath);
+            if (dxfFolders.Count == 0)
+                return;
+
+            bool kompasAvailable = product.Context != null && product.Context.IsInitialized;
+            var laserService = new LaserCuttingService(_logger);
+            var cache = new Dictionary<string, LaserCuttingOperation>();
+
+            foreach (var detail in product.Details)
+            {
+                if (detail.ProductType != ProductType.SheetMaterial)
+                    continue;
+
+                if (string.IsNullOrEmpty(detail.Marking))
+                    continue;
+
+                string dxfPath = DxfResolver.FindDxfForMarking(detail.Marking, dxfFolders);
+                if (string.IsNullOrEmpty(dxfPath))
+                    continue;
+
+                detail.DxfFilePath = dxfPath;
+
+                if (!kompasAvailable)
+                    continue;
+
+                LaserCuttingOperation operation;
+                if (!cache.TryGetValue(dxfPath, out operation))
+                {
+                    operation = laserService.Compute(dxfPath, product.Context.Application);
+                    cache[dxfPath] = operation;
+                }
+
+                if (operation != null)
+                {
+                    detail.Operations.Add(new LaserCuttingOperation
+                    {
+                        CutLength = operation.CutLength,
+                        EngravingLength = operation.EngravingLength
+                    });
+                }
             }
         }
 

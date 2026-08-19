@@ -93,6 +93,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Core\Services\DrawingPreviewService.cs" />
+    <Compile Include="Core\Services\DxfResolver.cs" />
     <Compile Include="Core\Services\FileLockDiagnostics.cs" />
     <Compile Include="Core\Services\ImageSyncService.cs" />
     <Compile Include="Views\MaterialsPanel.xaml.cs" />
@@ -125,7 +126,9 @@
     <Compile Include="Core\Services\ILogger.cs" />
     <Compile Include="Core\Services\KompasCameraController.cs" />
     <Compile Include="Core\Services\KompasContext.cs" />
+    <Compile Include="Core\Services\KompasPathResolver.cs" />
     <Compile Include="Core\Services\KompasService.cs" />
+    <Compile Include="Core\Services\LaserCuttingService.cs" />
     <Compile Include="Core\Services\MaterialAggregator.cs" />
     <Compile Include="Core\Services\PartExtractor.cs" />
     <Compile Include="Core\Services\PartFinder.cs" />

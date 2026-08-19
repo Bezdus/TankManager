@@ -9,5 +9,6 @@ namespace TankManager.Core.Services
         Product LoadActiveDocument();
         void ShowDetailInKompas(PartModel detail, Product product);
         void LoadDrawingPreview(PartModel detail, Product product, string targetDirectory);
+        void AttachLaserCutting(Product product);
     }
 }
