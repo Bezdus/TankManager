@@ -110,6 +110,7 @@
     <Compile Include="Converters\MaterialSortTypeConverter.cs" />
     <Compile Include="Converters\NullToVisibilityConverter.cs" />
     <Compile Include="Core\Constants\KompasConstants.cs" />
+    <Compile Include="Core\Models\ManufacturingOperations.cs" />
     <Compile Include="Core\Models\MaterialInfo.cs" />
     <Compile Include="Core\Models\MaterialSortType.cs" />
     <Compile Include="Core\Models\PartModel.cs" />

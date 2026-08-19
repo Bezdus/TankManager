@@ -1,6 +1,7 @@
 ﻿using Kompas6API5;
 using KompasAPI7;
 using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -35,6 +36,17 @@ namespace TankManager.Core.Models
         private string _filePreviewPngPath; // Путь к сохранённому превью 3D-файла
 
         private static readonly DrawingPreviewService _previewService = new DrawingPreviewService();
+
+        /// <summary>
+        /// Операции изготовления детали
+        /// </summary>
+        public ObservableCollection<ManufacturingOperationBase> Operations { get; }
+            = new ObservableCollection<ManufacturingOperationBase>();
+
+        /// <summary>
+        /// Есть ли операции изготовления
+        /// </summary>
+        public bool HasOperations => Operations.Count > 0;
 
         // Уникальные идентификаторы для поиска в KOMPAS
         public string PartId { get; private set; }
@@ -252,6 +264,7 @@ namespace TankManager.Core.Models
             _material = string.Empty;
             _filePath = string.Empty;
             _productType = ProductType.Part;
+            Operations.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasOperations));
         }
 
         public PartModel(IPart7 part, KompasContext context, int instanceIndex = 0)
@@ -275,6 +288,7 @@ namespace TankManager.Core.Models
             else
                 Length = -1;
 
+            Operations.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasOperations));
 
         }
 
@@ -310,6 +324,8 @@ namespace TankManager.Core.Models
                     Length = GetLength(body, context);
                 else
                     Length = -1;
+
+                Operations.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasOperations));
 
             }
             finally

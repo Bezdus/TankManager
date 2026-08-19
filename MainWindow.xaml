@@ -20,6 +20,7 @@
         <local:InverseNullToVisibilityConverter x:Key="InverseNullToVisibilityConverter"/>
         <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
+        <local:DoubleNonZeroToVisibilityConverter x:Key="DoubleNonZeroToVisibilityConverter"/>
         <local:GroupItemPropertyConverter x:Key="GroupItemPropertyConverter"/>
         <local:MaterialSortTypeConverter x:Key="MaterialSortTypeConverter"/>
 
@@ -430,6 +431,233 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- DataTemplates для операций изготовления -->
+        <DataTemplate DataType="{x:Type models:BendingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Гибка"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}">
+                            <Run Text="Угол: "/><Run Text="{Binding BendAngle, StringFormat='{}{0:F1}°'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding BendLength, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Длина: "/><Run Text="{Binding BendLength, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type models:FlangingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Отбортовка"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Radius, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Радиус: "/><Run Text="{Binding Radius, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"
+                                   Visibility="{Binding Radius, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Diameter, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Ø: "/><Run Text="{Binding Diameter, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type models:RollingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Вальцовка"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Length, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Длина: "/><Run Text="{Binding Length, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"
+                                   Visibility="{Binding Length, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding RollDiameter, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Ø: "/><Run Text="{Binding RollDiameter, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"
+                                   Visibility="{Binding RollDiameter, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Radius, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Радиус: "/><Run Text="{Binding Radius, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type models:LaserCuttingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Резка на лазере"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}">
+                            <Run Text="Рез: "/><Run Text="{Binding CutLength, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding EngravingLength, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Гравировка: "/><Run Text="{Binding EngravingLength, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -821,6 +1049,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
@@ -880,8 +1109,41 @@
                                 </Grid>
                             </Border>
 
+                            <!-- Операции изготовления -->
+                            <Border Grid.Row="2"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="8"
+                                    Margin="3"
+                                    Visibility="{Binding HasOperations, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Text="Операции изготовления"
+                                               FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               Margin="0,0,0,4"/>
+
+                                    <ItemsControl Grid.Row="1"
+                                                  ItemsSource="{Binding Operations}"
+                                                  Background="Transparent"
+                                                  BorderThickness="0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                </Grid>
+                            </Border>
+
                             <!-- Кнопка показать в КОМПАС -->
-                            <Button Grid.Row="2"
+                            <Button Grid.Row="3"
                                     Content="Показать в КОМПАС" 
                                     Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Margin="3,3,3,6"
@@ -908,7 +1170,7 @@
                             </Button>
 
                             <!-- Превью чертежа (занимает оставшееся пространство) -->
-                            <Border Grid.Row="3"
+                            <Border Grid.Row="4"
                                     BorderBrush="{StaticResource BorderColor}" 
                                     BorderThickness="1" 
                                     CornerRadius="3"
