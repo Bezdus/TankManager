@@ -10,7 +10,7 @@ using TankManager.Core.Models;
 namespace TankManager.Core.Services
 {
     /// <summary>
-    /// Результат синхронизации
+    /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     /// </summary>
     public class SyncResult
     {
@@ -22,7 +22,7 @@ namespace TankManager.Core.Services
     }
 
     /// <summary>
-    /// Сервис для сохранения и загрузки Product в локальную базу с синхронизацией с сервером
+    /// пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Product пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     /// </summary>
     public class ProductStorageService
     {
@@ -41,7 +41,7 @@ namespace TankManager.Core.Services
         private string _serverStorageFolder;
 
         /// <summary>
-        /// Серверная (сетевая) папка для хранения изделий
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅ) пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public string ServerStorageFolder
         {
@@ -54,12 +54,12 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Проверяет, установлена ли серверная папка
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public bool HasServerFolder => !string.IsNullOrEmpty(_serverStorageFolder);
 
         /// <summary>
-        /// Проверяет, доступна ли серверная папка
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public bool IsServerAvailable => HasServerFolder && Directory.Exists(_serverStorageFolder);
 
@@ -90,7 +90,7 @@ namespace TankManager.Core.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка загрузки настроек хранения: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
             }
         }
 
@@ -114,7 +114,7 @@ namespace TankManager.Core.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка сохранения настроек хранения: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
             }
         }
 
@@ -123,10 +123,10 @@ namespace TankManager.Core.Services
         #region Synchronization
 
         /// <summary>
-        /// Синхронизирует данные между локальной папкой и сервером (двусторонняя синхронизация).
-        /// Копирует новые и обновлённые изделия в обе стороны.
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ).
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
         /// </summary>
-        /// <param name="skipImages">Если true, изображения не копируются при синхронизации</param>
+        /// <param name="skipImages">пїЅпїЅпїЅпїЅ true, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</param>
         public SyncResult SyncFromServer(bool skipImages = false)
         {
             var result = new SyncResult();
@@ -134,13 +134,13 @@ namespace TankManager.Core.Services
             if (!IsServerAvailable)
             {
                 if (HasServerFolder)
-                    result.Errors.Add("Серверная папка недоступна");
+                    result.Errors.Add("пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
                 return result;
             }
 
             try
             {
-                // Фаза 1: Синхронизация С СЕРВЕРА В ЛОКАЛЬНУЮ ПАПКУ
+                // пїЅпїЅпїЅпїЅ 1: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 var serverFolders = Directory.GetDirectories(_serverStorageFolder)
                     .Where(f => !Path.GetFileName(f).StartsWith("_"))
                     .ToList();
@@ -164,17 +164,17 @@ namespace TankManager.Core.Services
 
                         if (!Directory.Exists(localFolder) || !File.Exists(localJsonPath))
                         {
-                            // Новое изделие - нужно скопировать
+                            // пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                             needsCopy = true;
                             isNew = true;
                         }
                         else
                         {
-                            // Проверяем дату модификации
+                            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                             var localFileInfo = new FileInfo(localJsonPath);
                             if (serverFileInfo.LastWriteTimeUtc > localFileInfo.LastWriteTimeUtc)
                             {
-                                // Серверная версия новее - нужно обновить
+                                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                                 needsCopy = true;
                                 isNew = false;
                             }
@@ -193,11 +193,11 @@ namespace TankManager.Core.Services
                     catch (Exception ex)
                     {
                         result.FailedProducts++;
-                        result.Errors.Add($"Ошибка синхронизации с сервера {Path.GetFileName(serverFolder)}: {ex.Message}");
+                        result.Errors.Add($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ {Path.GetFileName(serverFolder)}: {ex.Message}");
                     }
                 }
 
-                // Фаза 2: Синхронизация ИЗ ЛОКАЛЬНОИ ПАПКИ НА СЕРВЕР
+                // пїЅпїЅпїЅпїЅ 2: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
                 var localFolders = Directory.GetDirectories(ProductsDirectory)
                     .Where(f => !Path.GetFileName(f).StartsWith("_"))
                     .ToList();
@@ -210,7 +210,7 @@ namespace TankManager.Core.Services
                         string serverFolder = Path.Combine(_serverStorageFolder, folderName);
                         string localJsonPath = Path.Combine(localFolder, ProductJsonFileName);
 
-                        // Пропускаем папки без product.json (это папки только с превью)
+                        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ product.json (пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ)
                         if (!File.Exists(localJsonPath))
                             continue;
 
@@ -221,16 +221,16 @@ namespace TankManager.Core.Services
 
                         if (!Directory.Exists(serverFolder) || !File.Exists(serverJsonPath))
                         {
-                            // Новое локальное изделие - загружаем на сервер
+                            // пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
                             needsCopy = true;
                         }
                         else
                         {
-                            // Проверяем дату модификации
+                            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                             var serverFileInfo = new FileInfo(serverJsonPath);
                             if (localFileInfo.LastWriteTimeUtc > serverFileInfo.LastWriteTimeUtc)
                             {
-                                // Локальная версия новее - загружаем на сервер
+                                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
                                 needsCopy = true;
                             }
                         }
@@ -238,44 +238,44 @@ namespace TankManager.Core.Services
                         if (needsCopy)
                         {
                             CopyProductFolder(localFolder, serverFolder, skipImages);
-                            // Не увеличиваем счётчики, так как уже посчитали в первой фазе
+                            // пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
                         }
                     }
                     catch (Exception ex)
                     {
-                        result.Errors.Add($"Ошибка загрузки на сервер {Path.GetFileName(localFolder)}: {ex.Message}");
+                        result.Errors.Add($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ {Path.GetFileName(localFolder)}: {ex.Message}");
                     }
                 }
 
-                // Фаза 3: Синхронизация изображений на уровне отдельных файлов
+                // пїЅпїЅпїЅпїЅ 3: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
                 if (!skipImages)
                     SyncAllProductImages();
             }
             catch (Exception ex)
             {
-                result.Errors.Add($"Ошибка доступа к папкам: {ex.Message}");
+                result.Errors.Add($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
             }
 
             return result;
         }
 
         /// <summary>
-        /// Копирует папку продукта с сервера в локальную директорию
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
-        /// <param name="skipImages">Если true, подпапка images не копируется</param>
+        /// <param name="skipImages">пїЅпїЅпїЅпїЅ true, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ images пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</param>
         private void CopyProductFolder(string sourceFolder, string destFolder, bool skipImages = false)
         {
-            // Создаём целевую папку
+            // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
             Directory.CreateDirectory(destFolder);
 
-            // Копируем все файлы
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
             foreach (var file in Directory.GetFiles(sourceFolder))
             {
                 string destFile = Path.Combine(destFolder, Path.GetFileName(file));
                 File.Copy(file, destFile, true);
             }
 
-            // Копируем подпапки (пропускаем images если skipImages)
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ images пїЅпїЅпїЅпїЅ skipImages)
             foreach (var dir in Directory.GetDirectories(sourceFolder))
             {
                 if (skipImages && string.Equals(Path.GetFileName(dir), ImagesSubfolder, StringComparison.OrdinalIgnoreCase))
@@ -289,7 +289,7 @@ namespace TankManager.Core.Services
         #endregion
 
         /// <summary>
-        /// Синхронизирует изображения для всех продуктов между локальной папкой и сервером
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         private void SyncAllProductImages()
         {
@@ -319,18 +319,18 @@ namespace TankManager.Core.Services
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Ошибка синхронизации изображений {Path.GetFileName(localFolder)}: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ {Path.GetFileName(localFolder)}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка синхронизации изображений: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Синхронизирует изображения конкретного продукта между локальной папкой и сервером
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public void SyncProductImagesWithServer(Product product)
         {
@@ -352,12 +352,12 @@ namespace TankManager.Core.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка синхронизации изображений продукта: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Возвращает путь к папке с изображениями для продукта
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public string GetProductImagesFolder(Product product)
         {
@@ -373,13 +373,13 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Сохранить как последний открытый продукт (автосохранение)
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
         /// </summary>
         public void SaveAsLast(Product product)
         {
             if (product == null || string.IsNullOrEmpty(product.Name)) return;
             
-            // Используем папку продукта для корректного сохранения относительных путей
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
             string productFolderName = GetProductFolderName(product);
             string productFolder = Path.Combine(ProductsDirectory, productFolderName);
             
@@ -387,7 +387,7 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Загрузить последний открытый продукт
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public Product LoadLast()
         {
@@ -395,18 +395,18 @@ namespace TankManager.Core.Services
             if (!File.Exists(filePath))
                 return null;
 
-            // Сначала загружаем без папки, чтобы узнать имя продукта
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             var product = LoadFromFile(filePath, null);
             if (product == null)
                 return null;
 
-            // Находим папку продукта для корректного разрешения путей к изображениям
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             string productFolderName = GetProductFolderName(product);
             string productFolder = Path.Combine(ProductsDirectory, productFolderName);
             
             if (Directory.Exists(productFolder))
             {
-                // Перезагружаем с правильной папкой для разрешения путей
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 return LoadFromFile(filePath, productFolder);
             }
             
@@ -414,16 +414,16 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Сохранить продукт в локальную папку и на сервер (если доступен)
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
         /// </summary>
         public string Save(Product product, string customName = null)
         {
             if (product == null) return null;
 
-            // Сохраняем в локальную папку
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
             string localFilePath = SaveToDirectory(product, ProductsDirectory, customName);
 
-            // Если сервер доступен - сохраняем и туда
+            // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ
             if (IsServerAvailable)
             {
                 try
@@ -432,7 +432,7 @@ namespace TankManager.Core.Services
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Ошибка сохранения на сервер: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
                 }
             }
 
@@ -440,50 +440,50 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Сохранить продукт в указанную директорию
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         private string SaveToDirectory(Product product, string baseDirectory, string customName)
         {
-            // Проверяем, есть ли уже сохранённый продукт
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             string existingFolderPath = FindExistingProductFolder(product, baseDirectory);
             
             if (existingFolderPath != null)
             {
-                // Перезаписываем существующий продукт
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                 string existingFilePath = Path.Combine(existingFolderPath, ProductJsonFileName);
                 SaveToFile(product, existingFilePath);
                 
-                // Копируем изображения если они есть в локальной папке
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 CopyImagesIfNeeded(product, existingFolderPath);
                 
                 return existingFilePath;
             }
 
-            // Создаём новую папку для продукта
+            // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             string productFolderName = GenerateProductFolderName(product, baseDirectory, customName);
             string productFolderPath = Path.Combine(baseDirectory, productFolderName);
             Directory.CreateDirectory(productFolderPath);
             
-            // Создаём папку для изображений
+            // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             string imagesFolder = Path.Combine(productFolderPath, ImagesSubfolder);
             Directory.CreateDirectory(imagesFolder);
 
-            // Сохраняем JSON
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ JSON
             string filePath = Path.Combine(productFolderPath, ProductJsonFileName);
             SaveToFile(product, filePath);
             
-            // Копируем изображения если они есть в локальной папке
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
             CopyImagesIfNeeded(product, productFolderPath);
             
             return filePath;
         }
 
         /// <summary>
-        /// Копирует изображения из локальной папки продукта в целевую папку
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         private void CopyImagesIfNeeded(Product product, string destProductFolder)
         {
-            // Находим локальную папку продукта
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             string localFolder = FindExistingProductFolder(product, ProductsDirectory);
             if (localFolder == null || localFolder == destProductFolder)
                 return;
@@ -510,12 +510,12 @@ namespace TankManager.Core.Services
                         File.Copy(file, destFile, true);
                     }
                 }
-                catch { /* Игнорируем ошибки копирования */ }
+                catch { /* пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ */ }
             }
         }
 
         /// <summary>
-        /// Найти существующую папку продукта по имени и обозначению в указанной директории
+        /// пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         private string FindExistingProductFolder(Product product, string baseDirectory)
         {
@@ -525,7 +525,7 @@ namespace TankManager.Core.Services
             var folders = Directory.GetDirectories(baseDirectory)
                 .Where(f => !Path.GetFileName(f).StartsWith("_"));
 
-            // Сначала ищем папку с product.json (полностью сохранённый продукт)
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ product.json (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
             foreach (var folder in folders)
             {
                 try
@@ -544,11 +544,11 @@ namespace TankManager.Core.Services
                 }
                 catch
                 {
-                    // Пропускаем повреждённые папки
+                    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 }
             }
 
-            // Если не нашли сохранённый продукт, ищем папку по имени (для превью)
+            // пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ)
             string expectedFolderName = GetProductFolderName(product);
             string expectedFolder = Path.Combine(baseDirectory, expectedFolderName);
             
@@ -561,7 +561,7 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Загрузить продукт по имени папки (только из локальной папки)
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ)
         /// </summary>
         public Product Load(string folderName)
         {
@@ -577,7 +577,7 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Получить список всех сохранённых продуктов (только из локальной папки)
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ)
         /// </summary>
         public List<ProductFileInfo> GetSavedProducts()
         {
@@ -614,7 +614,7 @@ namespace TankManager.Core.Services
                 }
                 catch
                 {
-                    // Пропускаем повреждённые папки
+                    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 }
             }
 
@@ -622,11 +622,11 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Удалить продукт только из локальной папки
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public bool DeleteLocal(string folderName)
         {
-            // Принудительная сборка мусора перед удалением
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
@@ -642,20 +642,20 @@ namespace TankManager.Core.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка удаления из локальной папки: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
             }
 
             return false;
         }
 
         /// <summary>
-        /// Удалить продукт из базы (из локальной папки и с сервера)
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ (пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
         /// </summary>
         public bool Delete(string folderName)
         {
             bool deletedAny = DeleteLocal(folderName);
 
-            // Удаляем с сервера если доступен
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             if (IsServerAvailable)
             {
                 try
@@ -669,7 +669,7 @@ namespace TankManager.Core.Services
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Ошибка удаления с сервера: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
                 }
             }
 
@@ -677,21 +677,21 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Рекурсивное удаление директории с повторными попытками
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         private void DeleteDirectoryRecursive(string path)
         {
             if (!Directory.Exists(path))
                 return;
 
-            System.Diagnostics.Debug.WriteLine($"??? Попытка удаления: {path}");
+            System.Diagnostics.Debug.WriteLine($"??? пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {path}");
 
-            // Используем диагностическую утилиту для детального анализа
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             if (!FileLockDiagnostics.ForceDeleteDirectory(path, maxAttempts: 5, delayMs: 200))
             {
-                System.Diagnostics.Debug.WriteLine($"?? Не удалось удалить папку после всех попыток");
+                System.Diagnostics.Debug.WriteLine($"?? пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
                 
-                // Пробуем ещё раз с более длительной задержкой
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                 System.Threading.Thread.Sleep(1000);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
@@ -700,18 +700,18 @@ namespace TankManager.Core.Services
                 try
                 {
                     Directory.Delete(path, true);
-                    System.Diagnostics.Debug.WriteLine($"? Папка удалена после дополнительной задержки");
+                    System.Diagnostics.Debug.WriteLine($"? пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
                 }
                 catch (IOException ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"? Окончательная ошибка удаления: {ex.Message}");
-                    throw; // Пробрасываем исключение выше
+                    System.Diagnostics.Debug.WriteLine($"? пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {ex.Message}");
+                    throw; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
                 }
             }
         }
 
         /// <summary>
-        /// Проверить существование продукта
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         /// </summary>
         public bool Exists(string folderName)
         {
@@ -721,8 +721,8 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Пытается загрузить ранее сохранённый продукт по имени и обозначению.
-        /// Используется для восстановления путей к изображениям при повторном связывании с КОМПАС.
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ.
         /// </summary>
         public Product TryLoadSavedProduct(Product product)
         {
@@ -751,12 +751,12 @@ namespace TankManager.Core.Services
         private string GenerateProductFolderName(Product product, string baseDirectory, string customName)
         {
             string baseName = customName ?? $"{product.Name}_{product.Marking}";
-            // Убираем недопустимые символы
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             baseName = string.Join("_", baseName.Split(Path.GetInvalidFileNameChars()));
 
             string folderPath = Path.Combine(baseDirectory, baseName);
 
-            // Если папка существует, добавляем номер
+            // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
             int counter = 1;
             while (Directory.Exists(folderPath))
             {
@@ -777,7 +777,7 @@ namespace TankManager.Core.Services
         {
             try
             {
-                // Получаем папку продукта для сохранения относительных путей
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 string productFolder = productFolderOverride ?? Path.GetDirectoryName(filePath);
                 
                 var dto = ToDto(product, productFolder);
@@ -796,7 +796,7 @@ namespace TankManager.Core.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка сохранения Product: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Product: {ex.Message}");
             }
         }
 
@@ -820,7 +820,7 @@ namespace TankManager.Core.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка загрузки Product: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Product: {ex.Message}");
                 return null;
             }
         }
@@ -846,13 +846,13 @@ namespace TankManager.Core.Services
             string relativeCdfPath = null;
             string relativeFilePreviewPath = null;
             
-            // Преобразуем абсолютный путь в относительный для сохранения
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             if (!string.IsNullOrEmpty(part.CdfFilePath) && !string.IsNullOrEmpty(productFolder))
             {
                 relativeCdfPath = MakeRelativePath(part.CdfFilePath, productFolder);
             }
 
-            // Преобразуем путь к превью 3D-файла
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ 3D-пїЅпїЅпїЅпїЅпїЅ
             if (!string.IsNullOrEmpty(part.FilePreviewPngPath) && !string.IsNullOrEmpty(productFolder))
             {
                 relativeFilePreviewPath = MakeRelativePath(part.FilePreviewPngPath, productFolder);
@@ -873,7 +873,11 @@ namespace TankManager.Core.Services
                 CdfFilePath = relativeCdfPath,
                 SourceCdwPath = part.SourceCdwPath,
                 FilePreviewPngPath = relativeFilePreviewPath,
-                DxfFilePath = part.DxfFilePath
+                DxfFilePath = part.DxfFilePath,
+                MetalCost = part.MetalCost,
+                OperationsCost = part.OperationsCost,
+                TotalCost = part.TotalCost,
+                Operations = part.Operations.Select(ToOperationDto).ToList()
             };
         }
 
@@ -887,6 +891,39 @@ namespace TankManager.Core.Services
             };
         }
 
+        private static OperationDto ToOperationDto(ManufacturingOperationBase op)
+        {
+            var dto = new OperationDto
+            {
+                Type = (int)op.Type,
+                Cost = op.Cost
+            };
+
+            if (op is LaserCuttingOperation laser)
+            {
+                dto.CutLength = laser.CutLength;
+                dto.EngravingLength = laser.EngravingLength;
+            }
+            else if (op is BendingOperation bend)
+            {
+                dto.BendAngle = bend.BendAngle;
+                dto.BendLength = bend.BendLength;
+            }
+            else if (op is RollingOperation roll)
+            {
+                dto.RollDiameter = roll.RollDiameter;
+                dto.Radius = roll.Radius;
+                dto.Length = roll.Length;
+            }
+            else if (op is FlangingOperation flange)
+            {
+                dto.Diameter = flange.Diameter;
+                dto.Radius = flange.Radius;
+            }
+
+            return dto;
+        }
+
         private static MaterialInfo FromMaterialDto(MaterialInfoDto dto)
         {
             return new MaterialInfo
@@ -897,11 +934,55 @@ namespace TankManager.Core.Services
             };
         }
 
+        private static ManufacturingOperationBase FromOperationDto(OperationDto dto)
+        {
+            ManufacturingOperationBase result = null;
+            var type = (ManufacturingOperationType)dto.Type;
+
+            switch (type)
+            {
+                case ManufacturingOperationType.LaserCutting:
+                    result = new LaserCuttingOperation
+                    {
+                        CutLength = dto.CutLength,
+                        EngravingLength = dto.EngravingLength
+                    };
+                    break;
+                case ManufacturingOperationType.Bending:
+                    result = new BendingOperation
+                    {
+                        BendAngle = dto.BendAngle,
+                        BendLength = dto.BendLength
+                    };
+                    break;
+                case ManufacturingOperationType.Rolling:
+                    result = new RollingOperation
+                    {
+                        RollDiameter = dto.RollDiameter,
+                        Radius = dto.Radius,
+                        Length = dto.Length
+                    };
+                    break;
+                case ManufacturingOperationType.Flanging:
+                    result = new FlangingOperation
+                    {
+                        Diameter = dto.Diameter,
+                        Radius = dto.Radius
+                    };
+                    break;
+            }
+
+            if (result != null)
+                result.Cost = dto.Cost;
+
+            return result;
+        }
+
         /// <summary>
-        /// Преобразует относительный или абсолютный путь из DTO в абсолютный путь.
-        /// Если путь абсолютный и файл существует — используем как есть.
-        /// Если путь абсолютный но файл не существует — пробуем найти в папке продукта.
-        /// Если путь относительный — разрешаем относительно папки продукта.
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ DTO пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ.
+        /// пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ.
+        /// пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+        /// пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
         /// </summary>
         private static string ResolveAbsolutePath(string path, string productFolder)
         {
@@ -912,40 +993,40 @@ namespace TankManager.Core.Services
             {
                 if (!Path.IsPathRooted(path))
                 {
-                    // Относительный путь — разрешаем относительно папки продукта
+                    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     string resolved = Path.Combine(productFolder, path);
                     if (File.Exists(resolved))
                         return resolved;
 
-                    // Если не нашли напрямую, пробуем в подпапке images
+                    // пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ images
                     string fileName = Path.GetFileName(path);
                     string inImages = Path.Combine(productFolder, ImagesSubfolder, fileName);
                     if (File.Exists(inImages))
                         return inImages;
 
-                    // Возвращаем первый вариант даже если файл не существует
+                    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     return resolved;
                 }
                 else
                 {
-                    // Абсолютный путь
+                    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
                     if (File.Exists(path))
                         return path;
 
-                    // Файл не существует по абсолютному пути — пробуем найти в папке продукта
+                    // пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     string fileName = Path.GetFileName(path);
                     
-                    // Проверяем в images подпапке
+                    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ images пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     string inImages = Path.Combine(productFolder, ImagesSubfolder, fileName);
                     if (File.Exists(inImages))
                         return inImages;
 
-                    // Проверяем напрямую в папке продукта
+                    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     string inFolder = Path.Combine(productFolder, fileName);
                     if (File.Exists(inFolder))
                         return inFolder;
 
-                    // Ничего не нашли — возвращаем исходный путь
+                    // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
                     return path;
                 }
             }
@@ -996,19 +1077,19 @@ namespace TankManager.Core.Services
             string absoluteCdfPath = null;
             string absoluteFilePreviewPath = null;
             
-            // Преобразуем относительный путь в абсолютный
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             if (!string.IsNullOrEmpty(dto.CdfFilePath) && !string.IsNullOrEmpty(productFolder))
             {
                 absoluteCdfPath = ResolveAbsolutePath(dto.CdfFilePath, productFolder);
             }
 
-            // Преобразуем путь к превью 3D-файла
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ 3D-пїЅпїЅпїЅпїЅпїЅ
             if (!string.IsNullOrEmpty(dto.FilePreviewPngPath) && !string.IsNullOrEmpty(productFolder))
             {
                 absoluteFilePreviewPath = ResolveAbsolutePath(dto.FilePreviewPngPath, productFolder);
             }
             
-            return new PartModelFromStorage
+            var part = new PartModelFromStorage
             {
                 Name = dto.Name,
                 Marking = dto.Marking,
@@ -1020,14 +1101,29 @@ namespace TankManager.Core.Services
                 CdfFilePath = absoluteCdfPath,
                 SourceCdwPath = dto.SourceCdwPath,
                 FilePreviewPngPath = absoluteFilePreviewPath,
-                DxfFilePath = dto.DxfFilePath
+                DxfFilePath = dto.DxfFilePath,
+                MetalCost = dto.MetalCost,
+                OperationsCost = dto.OperationsCost,
+                TotalCost = dto.TotalCost
             };
+
+            if (dto.Operations != null)
+            {
+                foreach (var opDto in dto.Operations)
+                {
+                    var op = FromOperationDto(opDto);
+                    if (op != null)
+                        part.Operations.Add(op);
+                }
+            }
+
+            return part;
         }
 
         /// <summary>
-        /// Преобразует относительный путь в абсолютный для сохранения.
-        /// Если путь находится внутри папки продукта — делает его относительным.
-        /// Если путь находится в другой папке products — сохраняет только относительную часть images\filename.
+        /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+        /// пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+        /// пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ products пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ images\filename.
         /// </summary>
         private static string MakeRelativePath(string absolutePath, string productFolder)
         {
@@ -1036,14 +1132,14 @@ namespace TankManager.Core.Services
 
             try
             {
-                // Если путь уже находится внутри папки продукта, делаем его относительным
+                // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                 if (absolutePath.StartsWith(productFolder, StringComparison.OrdinalIgnoreCase))
                 {
                     return absolutePath.Substring(productFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 }
 
-                // Если путь содержит images\filename — извлекаем относительную часть
-                // Это нужно когда путь указывает на локальную папку products, а сохраняем в серверную
+                // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ images\filename пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
+                // пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ products, пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                 string fileName = Path.GetFileName(absolutePath);
                 string parentDir = Path.GetFileName(Path.GetDirectoryName(absolutePath) ?? "");
                 if (string.Equals(parentDir, ImagesSubfolder, StringComparison.OrdinalIgnoreCase))
@@ -1051,7 +1147,7 @@ namespace TankManager.Core.Services
                     return Path.Combine(ImagesSubfolder, fileName);
                 }
 
-                // Сохраняем только имя файла как fallback
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ fallback
                 return fileName;
             }
             catch
@@ -1063,10 +1159,10 @@ namespace TankManager.Core.Services
         #endregion
     }
 
-    #region DTO и вспомогательные классы
+    #region DTO пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 
     /// <summary>
-    /// Информация о сохранённом файле продукта
+    /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     /// </summary>
     public class ProductFileInfo
     {
@@ -1076,11 +1172,11 @@ namespace TankManager.Core.Services
         public int DetailsCount { get; set; }
         public DateTime SavedDate { get; set; }
 
-        public string DisplayName => $"{ProductName} ({Marking}) - {DetailsCount} дет.";
+        public string DisplayName => $"{ProductName} ({Marking}) - {DetailsCount} пїЅпїЅпїЅ.";
     }
 
     /// <summary>
-    /// Настройки хранения
+    /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     /// </summary>
     [System.Runtime.Serialization.DataContract]
     public class StorageSettings
@@ -1164,6 +1260,18 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public string DxfFilePath { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double MetalCost { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double OperationsCost { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double TotalCost { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public List<OperationDto> Operations { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
@@ -1177,6 +1285,40 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public double TotalLength { get; set; }
+    }
+
+    [System.Runtime.Serialization.DataContract]
+    public class OperationDto
+    {
+        [System.Runtime.Serialization.DataMember]
+        public int Type { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double Cost { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double CutLength { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double EngravingLength { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double BendAngle { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double BendLength { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double RollDiameter { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double Radius { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double Length { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double Diameter { get; set; }
     }
 
     #endregion

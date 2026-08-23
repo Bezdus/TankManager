@@ -17,5 +17,23 @@ namespace TankManager.Core.Models
             get => base.DetailType;
             set => base.DetailType = value;
         }
+
+        public new double MetalCost
+        {
+            get => base.MetalCost;
+            set => base.MetalCost = value;
+        }
+
+        public new double OperationsCost
+        {
+            get => base.OperationsCost;
+            set => base.OperationsCost = value;
+        }
+
+        public new double TotalCost
+        {
+            get => base.TotalCost;
+            set => base.TotalCost = value;
+        }
     }
 }

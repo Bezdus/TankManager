@@ -114,6 +114,12 @@ namespace TankManager.Core.Models
             _name = string.Empty;
         }
 
+        /// <summary>
+        /// Рассчитать стоимость операции на основе расценок
+        /// </summary>
+        /// <param name="settings">Настройки расценок</param>
+        public abstract void CalculateCost(PricingSettings settings);
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -133,6 +139,12 @@ namespace TankManager.Core.Models
         public LaserCuttingOperation()
             : base(ManufacturingOperationType.LaserCutting)
         {
+        }
+
+        public override void CalculateCost(PricingSettings settings)
+        {
+            if (settings == null) return;
+            Cost = CutLength * settings.LaserCuttingPricePerMm + EngravingLength * settings.EngravingPricePerMm;
         }
 
         /// <summary>
@@ -181,6 +193,12 @@ namespace TankManager.Core.Models
         {
         }
 
+        public override void CalculateCost(PricingSettings settings)
+        {
+            if (settings == null) return;
+            Cost = settings.BendingPricePerOperation;
+        }
+
         /// <summary>
         /// Угол гиба, град
         /// </summary>
@@ -226,6 +244,12 @@ namespace TankManager.Core.Models
         public RollingOperation()
             : base(ManufacturingOperationType.Rolling)
         {
+        }
+
+        public override void CalculateCost(PricingSettings settings)
+        {
+            if (settings == null) return;
+            Cost = Length * settings.RollingPricePerMm;
         }
 
         /// <summary>
@@ -288,6 +312,12 @@ namespace TankManager.Core.Models
         public FlangingOperation()
             : base(ManufacturingOperationType.Flanging)
         {
+        }
+
+        public override void CalculateCost(PricingSettings settings)
+        {
+            if (settings == null) return;
+            Cost = settings.FlangingPricePerOperation;
         }
 
         /// <summary>

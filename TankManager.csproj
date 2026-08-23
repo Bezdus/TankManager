@@ -99,8 +99,13 @@
     <Compile Include="Views\MaterialsPanel.xaml.cs" />
     <Compile Include="Views\PartPropertiesPanel.xaml.cs" />
     <Compile Include="Views\PartsListPanel.xaml.cs" />
+    <Compile Include="Views\PricingSettingsDialog.xaml.cs" />
     <Compile Include="Views\SavedProductsPanel.xaml.cs" />
     <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\PricingSettingsDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -112,6 +117,7 @@
     <Compile Include="Converters\NullToVisibilityConverter.cs" />
     <Compile Include="Core\Constants\KompasConstants.cs" />
     <Compile Include="Core\Models\ManufacturingOperations.cs" />
+    <Compile Include="Core\Models\PricingSettings.cs" />
     <Compile Include="Core\Models\MaterialInfo.cs" />
     <Compile Include="Core\Models\MaterialSortType.cs" />
     <Compile Include="Core\Models\PartModel.cs" />

@@ -26,6 +26,7 @@ namespace TankManager.Core.ViewModels
         private readonly ProductStorageService _storageService = new ProductStorageService();
         private readonly ExcelService _excelService = new ExcelService();
         private readonly Dictionary<string, Product> _linkedProductsCache = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
+        private PricingSettings _pricingSettings;
         
         private bool _isUpdatingCalculations;
         private Product _currentProduct;
@@ -429,6 +430,15 @@ namespace TankManager.Core.ViewModels
         /// </summary>
         public bool IsServerAvailable => _storageService.IsServerAvailable;
 
+        /// <summary>
+        /// Настройки расценок для расчёта стоимости
+        /// </summary>
+        public PricingSettings PricingSettings
+        {
+            get => _pricingSettings;
+            private set => SetProperty(ref _pricingSettings, value, nameof(PricingSettings));
+        }
+
         #endregion
 
         #region Commands
@@ -456,6 +466,7 @@ namespace TankManager.Core.ViewModels
         public ICommand ClearServerStorageFolderCommand { get; private set; }
         public ICommand SyncFromServerCommand { get; private set; }
         public ICommand ExportToExcelCommand { get; private set; }
+        public ICommand OpenPricingSettingsCommand { get; private set; }
 
         #endregion
 
@@ -466,6 +477,7 @@ namespace TankManager.Core.ViewModels
         public MainViewModel(IKompasService kompasService)
         {
             _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
+            _pricingSettings = PricingSettings.Load();
             
             SavedProducts = new ObservableCollection<ProductFileInfo>();
             CurrentProduct = new Product();
@@ -498,6 +510,68 @@ namespace TankManager.Core.ViewModels
             ClearServerStorageFolderCommand = new RelayCommand(ClearServerStorageFolder, () => HasServerStorageFolder);
             SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable);
             ExportToExcelCommand = new RelayCommand(ExportToExcel, () => Details?.Any() == true || StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
+            OpenPricingSettingsCommand = new RelayCommand(OpenPricingSettings);
+        }
+
+        #endregion
+
+        #region Pricing
+
+        private void OpenPricingSettings()
+        {
+            var dialog = new TankManager.Views.PricingSettingsDialog(_pricingSettings);
+            dialog.Owner = Application.Current.MainWindow;
+            if (dialog.ShowDialog() == true)
+            {
+                var newSettings = dialog.PricingSettings;
+                newSettings.Save();
+                PricingSettings = newSettings;
+                RecalculateAllCosts();
+            }
+        }
+
+        /// <summary>
+        /// Пересчитать стоимость всех деталей на основе текущих расценок
+        /// </summary>
+        public void RecalculateAllCosts()
+        {
+            if (_pricingSettings == null) return;
+
+            var allParts = (Details ?? Enumerable.Empty<PartModel>())
+                .Concat(StandardParts ?? Enumerable.Empty<PartModel>());
+
+            foreach (var part in allParts)
+            {
+                // Считаем стоимость металла
+                part.MetalCost = CalculateMetalCost(part);
+
+                // Считаем стоимость операций
+                foreach (var op in part.Operations)
+                {
+                    op.CalculateCost(_pricingSettings);
+                }
+
+                part.RecalculateOperationsCost();
+            }
+
+            CurrentProduct?.NotifyAggregatesChanged();
+        }
+
+        private double CalculateMetalCost(PartModel part)
+        {
+            if (part.ProductType == ProductType.PurchasedPart)
+                return 0;
+
+            if (part.ProductType == ProductType.TubularProduct)
+            {
+                double pricePerMeter = _pricingSettings.GetTubularPricePerMeter(part.Material);
+                return (part.Length / 1000.0) * pricePerMeter;
+            }
+
+            if (part.ProductType == ProductType.SheetMaterial)
+                return part.Mass * _pricingSettings.SheetMetalPricePerKg;
+
+            return part.Mass * _pricingSettings.OtherMetalPricePerKg;
         }
 
         #endregion
@@ -544,6 +618,7 @@ namespace TankManager.Core.ViewModels
                     _linkedProductsCache[filePath] = linkedProduct;
                     RestoreImagePathsFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
+                    RecalculateAllCosts();
                     StatusMessage = $"Связано с КОМПАС: {CurrentProduct.Name}";
                 }
                 else
@@ -612,6 +687,7 @@ namespace TankManager.Core.ViewModels
                     _linkedProductsCache[filePath] = refreshedProduct;
                     RestoreImagePathsFromSaved(refreshedProduct);
                     SetCurrentProduct(refreshedProduct, isLinked: true);
+                    RecalculateAllCosts();
                     StatusMessage = $"Данные обновлены: {CurrentProduct.Name}, деталей: {Details?.Count ?? 0}";
                 }
             }
@@ -723,6 +799,7 @@ namespace TankManager.Core.ViewModels
                     _linkedProductsCache[filePath] = linkedProduct;
                     RestoreImagePathsFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
+                    RecalculateAllCosts();
                 }
             }
             catch (Exception ex)
@@ -753,6 +830,7 @@ namespace TankManager.Core.ViewModels
                 IsLinkedToKompas = true;
 
                 UpdateCalculations();
+                RecalculateAllCosts();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
 
                 _ = GenerateDrawingPreviewsInBackgroundAsync();
@@ -787,6 +865,7 @@ namespace TankManager.Core.ViewModels
                 IsLinkedToKompas = true;
 
                 UpdateCalculations();
+                RecalculateAllCosts();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
 
                 _ = GenerateDrawingPreviewsInBackgroundAsync();
@@ -863,6 +942,7 @@ namespace TankManager.Core.ViewModels
             OnPropertyChanged(nameof(KompasLinkStatus));
             InitializeCollectionViews();
             UpdateCalculations();
+            product.NotifyAggregatesChanged();
             NotifyCopyCommandsCanExecuteChanged();
             NotifySaveCommandCanExecuteChanged();
             NotifyRefreshCommandCanExecuteChanged();

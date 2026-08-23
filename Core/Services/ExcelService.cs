@@ -49,7 +49,7 @@ namespace TankManager.Core.Services
             try
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("Наименование\tОбозначение\tМатериал\tКоличество\tМасса ед. (кг)\tМасса общ. (кг)");
+                sb.AppendLine("Наименование\tОбозначение\tМатериал\tКоличество\tМасса ед. (кг)\tМасса общ. (кг)\tСтоимость металла (руб)\tСтоимость операций (руб)\tОбщая стоимость (руб)");
 
                 var groupedParts = parts
                     .GroupBy(p => new { p.Name, p.Marking, p.Material })
@@ -61,8 +61,11 @@ namespace TankManager.Core.Services
                     int count = group.Count();
                     double unitMass = group.First().Mass;
                     double totalMass = group.Sum(p => p.Mass);
+                    double metalCost = group.Sum(p => p.MetalCost);
+                    double opsCost = group.Sum(p => p.OperationsCost);
+                    double totalCost = group.Sum(p => p.TotalCost);
 
-                    sb.AppendLine($"{group.Key.Name}\t{group.Key.Marking}\t{group.Key.Material}\t{count}\t{unitMass:F3}\t{totalMass:F3}");
+                    sb.AppendLine($"{group.Key.Name}\t{group.Key.Marking}\t{group.Key.Material}\t{count}\t{unitMass:F3}\t{totalMass:F3}\t{metalCost:F2}\t{opsCost:F2}\t{totalCost:F2}");
                 }
 
                 Clipboard.SetText(sb.ToString());
@@ -108,7 +111,10 @@ namespace TankManager.Core.Services
                         Material = g.Key.Material,
                         Count = g.Count(),
                         UnitMass = g.First().Mass,
-                        TotalMass = g.Sum(p => p.Mass)
+                        TotalMass = g.Sum(p => p.Mass),
+                        MetalCost = g.Sum(p => p.MetalCost),
+                        OperationsCost = g.Sum(p => p.OperationsCost),
+                        TotalCost = g.Sum(p => p.TotalCost)
                     })
                     .ToList();
 
@@ -118,13 +124,13 @@ namespace TankManager.Core.Services
                 var sb = new StringBuilder();
 
                 // Заголовки: Покупные детали | пустой столбец | Листовые материалы | пустой столбец | Трубные материалы | пустой столбец | Прочие материалы
-                sb.AppendLine("Наименование\tОбозначение\tМатериал\tКоличество\tМасса ед. (кг)\tМасса общ. (кг)\t\tМатериал\tМасса (кг)\t\tМатериал\tДлина (мм)\t\tМатериал\tМасса (кг)");
+                sb.AppendLine("Наименование\tОбозначение\tМатериал\tКоличество\tМасса ед. (кг)\tМасса общ. (кг)\tСтоим. металла (руб)\tСтоим. операций (руб)\tОбщая стоим. (руб)\t\tМатериал\tМасса (кг)\t\tМатериал\tДлина (мм)\t\tМатериал\tМасса (кг)");
 
                 for (int i = 0; i < maxRows; i++)
                 {
                     var row = new List<string>();
 
-                    // Покупные детали (6 столбцов)
+                    // Покупные детали (9 столбцов)
                     if (i < groupedParts.Count)
                     {
                         var part = groupedParts[i];
@@ -134,10 +140,13 @@ namespace TankManager.Core.Services
                         row.Add(part.Count.ToString());
                         row.Add(part.UnitMass.ToString("F3"));
                         row.Add(part.TotalMass.ToString("F3"));
+                        row.Add(part.MetalCost.ToString("F2"));
+                        row.Add(part.OperationsCost.ToString("F2"));
+                        row.Add(part.TotalCost.ToString("F2"));
                     }
                     else
                     {
-                        row.AddRange(new[] { "", "", "", "", "", "" });
+                        row.AddRange(new[] { "", "", "", "", "", "", "", "", "" });
                     }
 
                     // Пустой столбец
@@ -252,7 +261,10 @@ namespace TankManager.Core.Services
                     wsDetails.Cell(1, 4).Value = "Количество";
                     wsDetails.Cell(1, 5).Value = "Масса ед. (кг)";
                     wsDetails.Cell(1, 6).Value = "Масса общ. (кг)";
-                    StyleHeaderRow(wsDetails, 1, 6);
+                    wsDetails.Cell(1, 7).Value = "Стоимость металла (руб)";
+                    wsDetails.Cell(1, 8).Value = "Стоимость операций (руб)";
+                    wsDetails.Cell(1, 9).Value = "Общая стоимость (руб)";
+                    StyleHeaderRow(wsDetails, 1, 9);
 
                     for (int i = 0; i < groupedDetails.Count; i++)
                     {
@@ -265,6 +277,9 @@ namespace TankManager.Core.Services
                         wsDetails.Cell(row, 4).Value = count;
                         wsDetails.Cell(row, 5).Value = Math.Round(g.First().Mass, 3);
                         wsDetails.Cell(row, 6).Value = Math.Round(g.Sum(p => p.Mass), 3);
+                        wsDetails.Cell(row, 7).Value = Math.Round(g.Sum(p => p.MetalCost), 2);
+                        wsDetails.Cell(row, 8).Value = Math.Round(g.Sum(p => p.OperationsCost), 2);
+                        wsDetails.Cell(row, 9).Value = Math.Round(g.Sum(p => p.TotalCost), 2);
                     }
 
                     wsDetails.Columns().AdjustToContents();
@@ -286,7 +301,10 @@ namespace TankManager.Core.Services
                     wsStandard.Cell(1, 4).Value = "Количество";
                     wsStandard.Cell(1, 5).Value = "Масса ед. (кг)";
                     wsStandard.Cell(1, 6).Value = "Масса общ. (кг)";
-                    StyleHeaderRow(wsStandard, 1, 6);
+                    wsStandard.Cell(1, 7).Value = "Стоимость металла (руб)";
+                    wsStandard.Cell(1, 8).Value = "Стоимость операций (руб)";
+                    wsStandard.Cell(1, 9).Value = "Общая стоимость (руб)";
+                    StyleHeaderRow(wsStandard, 1, 9);
 
                     for (int i = 0; i < groupedParts.Count; i++)
                     {
@@ -299,6 +317,9 @@ namespace TankManager.Core.Services
                         wsStandard.Cell(row, 4).Value = count;
                         wsStandard.Cell(row, 5).Value = Math.Round(g.First().Mass, 3);
                         wsStandard.Cell(row, 6).Value = Math.Round(g.Sum(p => p.Mass), 3);
+                        wsStandard.Cell(row, 7).Value = Math.Round(g.Sum(p => p.MetalCost), 2);
+                        wsStandard.Cell(row, 8).Value = Math.Round(g.Sum(p => p.OperationsCost), 2);
+                        wsStandard.Cell(row, 9).Value = Math.Round(g.Sum(p => p.TotalCost), 2);
                     }
 
                     wsStandard.Columns().AdjustToContents();

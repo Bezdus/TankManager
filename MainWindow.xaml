@@ -716,6 +716,17 @@
 
                     <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
 
+                    <Button Command="{Binding OpenPricingSettingsCommand}"
+                            Style="{StaticResource PanelButtonStyle}"
+                            ToolTip="Настроить расценки для расчёта стоимости деталей">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚙" Margin="0,0,5,0" FontSize="13"/>
+                            <TextBlock Text="Расценки"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+
                     <Button Command="{Binding CopyAllDataToClipboardCommand}"
                             Style="{StaticResource PanelButtonStyle}"
                             ToolTip="Копировать покупные детали, листовые и трубные материалы в Excel">
@@ -820,24 +831,63 @@
                                Visibility="{Binding CurrentProduct.Marking, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
                 </StackPanel>
 
-                <Border Grid.Column="2" 
-                        Background="#20FFFFFF" 
-                        CornerRadius="6" 
-                        Padding="12,8"
-                        VerticalAlignment="Center">
-                    <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="МАССА" 
-                                   FontSize="9" 
-                                   Foreground="#AAFFFFFF" 
-                                   HorizontalAlignment="Center"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F2} кг'}" 
-                                   FontSize="18" 
-                                   FontWeight="Bold" 
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#20FFFFFF" 
+                            CornerRadius="6" 
+                            Padding="12,8"
+                            VerticalAlignment="Center">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="МАССА" 
+                                       FontSize="9" 
+                                       Foreground="#AAFFFFFF" 
+                                       HorizontalAlignment="Center"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F2} кг'}" 
+                                       FontSize="18" 
+                                       FontWeight="Bold" 
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#20FFFFFF" 
+                            CornerRadius="6" 
+                            Padding="12,8"
+                            Margin="6,0,0,0"
+                            VerticalAlignment="Center">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="ДЕТАЛЕЙ" 
+                                       FontSize="9" 
+                                       Foreground="#AAFFFFFF" 
+                                       HorizontalAlignment="Center"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding CurrentProduct.TotalPartsCount, StringFormat='{}{0} шт'}" 
+                                       FontSize="18" 
+                                       FontWeight="Bold" 
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#20FFFFFF" 
+                            CornerRadius="6" 
+                            Padding="12,8"
+                            Margin="6,0,0,0"
+                            VerticalAlignment="Center">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="СТОИМОСТЬ" 
+                                       FontSize="9" 
+                                       Foreground="#AAFFFFFF" 
+                                       HorizontalAlignment="Center"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding CurrentProduct.TotalAssemblyCost, StringFormat='{}{0:N2} ₽'}" 
+                                       FontSize="18" 
+                                       FontWeight="Bold" 
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -1049,24 +1099,113 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <!-- Превью 3D модели -->
-                            <Border Grid.Row="0" 
-                                    BorderBrush="{StaticResource BorderColor}" 
-                                    BorderThickness="1" 
-                                    CornerRadius="3" 
-                                    Padding="8" 
-                                    Margin="3"
-                                    Visibility="{Binding FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
-                                <Image Source="{Binding FilePreview}" 
-                                       MaxHeight="200"
-                                       Stretch="Uniform"
-                                       StretchDirection="DownOnly"
-                                       HorizontalAlignment="Center"/>
-                            </Border>
+                            <!-- Превью 3D модели + Чертёж детали (бок о бок) -->
+                            <Grid Grid.Row="0" Margin="3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="4*"/>
+                                    <ColumnDefinition Width="6*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Превью 3D модели (слева, 40%) -->
+                                <Border Grid.Column="0"
+                                        BorderBrush="{StaticResource BorderColor}" 
+                                        BorderThickness="1" 
+                                        CornerRadius="3" 
+                                        Padding="8" 
+                                        Margin="0,0,3,0"
+                                        Visibility="{Binding FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                    <Grid>
+                                        <Image Source="{Binding FilePreview}" 
+                                               MaxHeight="200"
+                                               Stretch="Uniform"
+                                               StretchDirection="DownOnly"
+                                               HorizontalAlignment="Center"/>
+
+                                        <!-- Оверлей: показать в КОМПАС -->
+                                        <Button Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                IsEnabled="{Binding DataContext.IsLinkedToKompas, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="4"
+                                                Padding="8,4"
+                                                FontSize="11"
+                                                FontWeight="SemiBold"
+                                                Background="{StaticResource AccentColor}"
+                                                Foreground="White"
+                                                BorderThickness="0"
+                                                Cursor="Hand"
+                                                ToolTip="Показать деталь в КОМПАС-3D">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Opacity" Value="0.9"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsEnabled" Value="False">
+                                                            <Setter Property="Background" Value="#FF9E9E9E"/>
+                                                            <Setter Property="Opacity" Value="0.7"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🔍" Margin="0,0,5,0" FontSize="12"/>
+                                                <TextBlock Text="КОМПАС"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Чертёж детали (справа, 60%) -->
+                                <Border Grid.Column="1"
+                                        BorderBrush="{StaticResource BorderColor}" 
+                                        BorderThickness="1" 
+                                        CornerRadius="3"
+                                        Padding="8"
+                                        Margin="3,0,0,0"
+                                        Visibility="{Binding DrawingPreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                            <TextBlock Text="Чертёж детали" 
+                                                       FontSize="12" 
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimary}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text=" (клик для увеличения)" 
+                                                       FontSize="10" 
+                                                       Foreground="{StaticResource TextSecondary}"
+                                                       VerticalAlignment="Center"
+                                                       FontStyle="Italic"/>
+                                        </StackPanel>
+
+                                        <Border Grid.Row="1" 
+                                                Background="Transparent"
+                                                Cursor="Hand"
+                                                MouseLeftButtonDown="DrawingPreview_MouseLeftButtonDown">
+                                            <Image Source="{Binding DrawingPreview}" 
+                                                   MaxHeight="200"
+                                                   Stretch="Uniform"
+                                                   StretchDirection="DownOnly"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Grid>
 
                             <!-- Свойства детали -->
                             <Border Grid.Row="1" 
@@ -1081,6 +1220,10 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
@@ -1106,6 +1249,18 @@
 
                                     <TextBlock Grid.Row="5" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
                                     <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <!-- Разделитель стоимости -->
+                                    <Rectangle Grid.Row="6" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" Margin="0,4"/>
+
+                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Стоимость металла:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding MetalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Стоимость операций:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding OperationsCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="9" Grid.Column="0" Text="Общая стоимость:" Style="{StaticResource PropertyLabel}" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding TotalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}" FontWeight="SemiBold"/>
                                 </Grid>
                             </Border>
 
@@ -1142,72 +1297,6 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Кнопка показать в КОМПАС -->
-                            <Button Grid.Row="3"
-                                    Content="Показать в КОМПАС" 
-                                    Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    Margin="3,3,3,6"
-                                    Padding="12,6"
-                                    FontSize="12"
-                                    FontWeight="SemiBold"
-                                    Background="{StaticResource AccentColor}"
-                                    Foreground="White"
-                                    BorderThickness="0"
-                                    Cursor="Hand">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-
-                            <!-- Превью чертежа (занимает оставшееся пространство) -->
-                            <Border Grid.Row="4"
-                                    BorderBrush="{StaticResource BorderColor}" 
-                                    BorderThickness="1" 
-                                    CornerRadius="3"
-                                    Padding="8"
-                                    Margin="3"
-                                    Visibility="{Binding DrawingPreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-
-                                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
-                                        <TextBlock Text="Чертёж детали" 
-                                                   FontSize="12" 
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimary}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text=" (клик для увеличения)" 
-                                                   FontSize="10" 
-                                                   Foreground="{StaticResource TextSecondary}"
-                                                   VerticalAlignment="Center"
-                                                   FontStyle="Italic"/>
-                                    </StackPanel>
-
-                                    <Border Grid.Row="1" 
-                                            Background="Transparent"
-                                            Cursor="Hand"
-                                            MouseLeftButtonDown="DrawingPreview_MouseLeftButtonDown">
-                                        <Image Source="{Binding DrawingPreview}" 
-                                               Stretch="Uniform"
-                                               StretchDirection="DownOnly"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                    </Border>
-                                </Grid>
-                            </Border>
                         </Grid>
                     </Grid>
                 </GroupBox>

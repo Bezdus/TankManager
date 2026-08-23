@@ -36,6 +36,10 @@ namespace TankManager.Core.Models
         private string _filePreviewPngPath; // Путь к сохранённому превью 3D-файла
         private string _dxfFilePath; // Путь к DXF-файлу для лазерной резки
 
+        private double _metalCost;
+        private double _operationsCost;
+        private double _totalCost;
+
         private static readonly DrawingPreviewService _previewService = new DrawingPreviewService();
 
         /// <summary>
@@ -193,6 +197,61 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
+        /// Стоимость металла детали, руб
+        /// </summary>
+        public double MetalCost
+        {
+            get => _metalCost;
+            set
+            {
+                if (Math.Abs(_metalCost - value) > 0.0001)
+                {
+                    _metalCost = value;
+                    OnPropertyChanged(nameof(MetalCost));
+                    UpdateTotalCost();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Суммарная стоимость операций, руб
+        /// </summary>
+        public double OperationsCost
+        {
+            get => _operationsCost;
+            set
+            {
+                if (Math.Abs(_operationsCost - value) > 0.0001)
+                {
+                    _operationsCost = value;
+                    OnPropertyChanged(nameof(OperationsCost));
+                    UpdateTotalCost();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Общая стоимость детали, руб
+        /// </summary>
+        public double TotalCost
+        {
+            get => _totalCost;
+            set
+            {
+                if (Math.Abs(_totalCost - value) > 0.0001)
+                {
+                    _totalCost = value;
+                    OnPropertyChanged(nameof(TotalCost));
+                }
+            }
+        }
+
+        private void UpdateTotalCost()
+        {
+            TotalCost = _metalCost + _operationsCost;
+        }
+
+        /// <summary>
         /// Путь к сохранённому PNG-превью 3D-файла (для работы без исходных файлов КОМПАС)
         /// </summary>
         public string FilePreviewPngPath
@@ -281,7 +340,22 @@ namespace TankManager.Core.Models
             _material = string.Empty;
             _filePath = string.Empty;
             _productType = ProductType.Part;
-            Operations.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasOperations));
+            Operations.CollectionChanged += (s, e) =>
+            {
+                OnPropertyChanged(nameof(HasOperations));
+                RecalculateOperationsCost();
+            };
+        }
+
+        /// <summary>
+        /// Пересчитать стоимость операций из сумм Cost каждой операции
+        /// </summary>
+        public void RecalculateOperationsCost()
+        {
+            double sum = 0;
+            foreach (var op in Operations)
+                sum += op.Cost;
+            OperationsCost = sum;
         }
 
         public PartModel(IPart7 part, KompasContext context, int instanceIndex = 0)
@@ -305,7 +379,11 @@ namespace TankManager.Core.Models
             else
                 Length = -1;
 
-            Operations.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasOperations));
+            Operations.CollectionChanged += (s, e) =>
+            {
+                OnPropertyChanged(nameof(HasOperations));
+                RecalculateOperationsCost();
+            };
 
         }
 

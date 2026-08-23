@@ -136,6 +136,8 @@ namespace TankManager.Core.Services
                     product.StandardParts.Add(part);
                 }
             }
+
+            product.NotifyAggregatesChanged();
         }
 
         /// <summary>

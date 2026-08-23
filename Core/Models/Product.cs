@@ -65,6 +65,25 @@ namespace TankManager.Core.Models
         public ObservableCollection<MaterialInfo> OtherMaterials { get; }
 
         /// <summary>
+        /// Общее количество деталей в изделии
+        /// </summary>
+        public int TotalPartsCount => Details.Count + StandardParts.Count;
+
+        /// <summary>
+        /// Суммарная стоимость всех деталей изделия, руб
+        /// </summary>
+        public double TotalAssemblyCost => Details.Sum(p => p.TotalCost) + StandardParts.Sum(p => p.TotalCost);
+
+        /// <summary>
+        /// Уведомляет UI об изменении агрегированных свойств (количество, стоимость)
+        /// </summary>
+        public void NotifyAggregatesChanged()
+        {
+            OnPropertyChanged(nameof(TotalPartsCount));
+            OnPropertyChanged(nameof(TotalAssemblyCost));
+        }
+
+        /// <summary>
         /// Проверяет, связан ли продукт с активным документом KOMPAS
         /// </summary>
         public bool IsLinkedToKompas => Context?.IsDocumentLoaded == true && Context.TopPart != null;
@@ -140,6 +159,7 @@ namespace TankManager.Core.Models
             _filePreview = null;
             _previewLoaded = false;
             InvalidateDrawingPreviewCache();
+            NotifyAggregatesChanged();
         }
     }
 }
