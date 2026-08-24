@@ -146,6 +146,12 @@ namespace TankManager
             _viewModel.ClearMaterialFilter();
         }
 
+        private void ProductHeader_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _viewModel.IsProductSelected = true;
+            e.Handled = true;
+        }
+
         private void SheetMaterialsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             HandleMaterialListBoxClick(sender, e, 
@@ -158,64 +164,6 @@ namespace TankManager
             HandleMaterialListBoxClick(sender, e, 
                 () => _viewModel.SelectedTubularProduct, 
                 () => _viewModel.SelectedTubularProduct = null);
-        }
-
-        private void DetailsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            HandlePartListBoxClick(sender, e, 
-                () => _viewModel.SelectedDetail, 
-                () => _viewModel.SelectedDetail = null);
-        }
-
-        private void StandardPartsListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            HandlePartListBoxClick(sender, e, 
-                () => _viewModel.SelectedStandardPart, 
-                () => _viewModel.SelectedStandardPart = null);
-        }
-
-        private void HandlePartListBoxClick(object sender, MouseButtonEventArgs e, 
-            Func<PartModel> getSelected, Action clearSelection)
-        {
-            var listBox = sender as ListBox;
-            if (listBox == null)
-                return;
-
-            var clickedElement = e.OriginalSource as DependencyObject;
-            
-            // Если это не Visual (например, Run), пытаемся получить родительский Visual
-            if (clickedElement != null && !(clickedElement is Visual || clickedElement is System.Windows.Media.Media3D.Visual3D))
-            {
-                // Для элементов типа Run, получаем Parent через логическое дерево
-                if (clickedElement is FrameworkContentElement fce)
-                {
-                    clickedElement = fce.Parent as DependencyObject;
-                }
-            }
-            
-            var listBoxItem = FindParent<ListBoxItem>(clickedElement);
-
-            if (listBoxItem != null)
-            {
-                if (listBoxItem.Content is PartModel clickedPart)
-                {
-                    var selected = getSelected();
-                    // Сброс выбора при клике по уже выбранной детали
-                    if (selected != null && 
-                        clickedPart.Name == selected.Name && 
-                        clickedPart.Marking == selected.Marking &&
-                        clickedPart.Material == selected.Material)
-                    {
-                        clearSelection();
-                        e.Handled = true;
-                    }
-                }
-            }
-            else
-            {
-                // Сброс выбора при клике в пустую область
-                clearSelection();
-            }
         }
 
         private void HandleMaterialListBoxClick(object sender, MouseButtonEventArgs e, 

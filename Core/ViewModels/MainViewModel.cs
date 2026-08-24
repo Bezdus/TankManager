@@ -52,6 +52,7 @@ namespace TankManager.Core.ViewModels
         private string _snackbarMessage;
         private System.Threading.Timer _snackbarTimer;
         private CancellationTokenSource _backgroundPreviewCts;
+        private bool _isProductSelected;
 
         #endregion
 
@@ -298,6 +299,7 @@ namespace TankManager.Core.ViewModels
                 {
                     if (value != null)
                     {
+                        IsProductSelected = false;
                         SelectedStandardPart = null;
                         CurrentlySelectedPart = value;
                         _ = LoadDrawingPreviewForSelectedPartAsync();
@@ -320,6 +322,7 @@ namespace TankManager.Core.ViewModels
                 {
                     if (value != null)
                     {
+                        IsProductSelected = false;
                         SelectedDetail = null;
                         CurrentlySelectedPart = value;
                         _ = LoadDrawingPreviewForSelectedPartAsync();
@@ -327,6 +330,26 @@ namespace TankManager.Core.ViewModels
                     else
                     {
                         // При сбросе выбора очищаем CurrentlySelectedPart
+                        CurrentlySelectedPart = null;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Выбрано ли изделие (для отображения сводной карточки)
+        /// </summary>
+        public bool IsProductSelected
+        {
+            get => _isProductSelected;
+            set
+            {
+                if (SetProperty(ref _isProductSelected, value, nameof(IsProductSelected)))
+                {
+                    if (value)
+                    {
+                        SelectedDetail = null;
+                        SelectedStandardPart = null;
                         CurrentlySelectedPart = null;
                     }
                 }
@@ -1650,6 +1673,7 @@ namespace TankManager.Core.ViewModels
             SelectedSheetMaterial = null;
             SelectedTubularProduct = null;
             CurrentlySelectedPart = null;
+            IsProductSelected = false;
         }
 
         private void OnMaterialFilterChanged()

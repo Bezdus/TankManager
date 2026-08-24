@@ -18,6 +18,7 @@
         <local:GroupCountToVisibilityConverter x:Key="GroupCountToVisibilityConverter"/>
         <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
         <local:InverseNullToVisibilityConverter x:Key="InverseNullToVisibilityConverter"/>
+        <local:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
         <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
         <local:DoubleNonZeroToVisibilityConverter x:Key="DoubleNonZeroToVisibilityConverter"/>
@@ -663,7 +664,6 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -795,104 +795,8 @@
             </Grid>
         </Border>
 
-        <!-- Информация об изделии -->
-        <Border Grid.Row="1" 
-                Padding="12,10"
-                Margin="3,3,3,0"
-                Background="{StaticResource AccentColor}"
-                CornerRadius="4"
-                Visibility="{Binding CurrentProduct.Name, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" 
-                        Background="#20FFFFFF" 
-                        CornerRadius="4" 
-                        Padding="8,6"
-                        Margin="0,0,12,0"
-                        VerticalAlignment="Center">
-                    <TextBlock Text="📦" FontSize="20"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding CurrentProduct.Name}" 
-                               FontSize="16" 
-                               FontWeight="SemiBold" 
-                               Foreground="White"
-                               TextWrapping="Wrap"/>
-                    <TextBlock Text="{Binding CurrentProduct.Marking}" 
-                               FontSize="11" 
-                               Foreground="#CCFFFFFF"
-                               Margin="0,2,0,0"
-                               Visibility="{Binding CurrentProduct.Marking, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#20FFFFFF" 
-                            CornerRadius="6" 
-                            Padding="12,8"
-                            VerticalAlignment="Center">
-                        <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="МАССА" 
-                                       FontSize="9" 
-                                       Foreground="#AAFFFFFF" 
-                                       HorizontalAlignment="Center"
-                                       FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F2} кг'}" 
-                                       FontSize="18" 
-                                       FontWeight="Bold" 
-                                       Foreground="White"
-                                       HorizontalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="#20FFFFFF" 
-                            CornerRadius="6" 
-                            Padding="12,8"
-                            Margin="6,0,0,0"
-                            VerticalAlignment="Center">
-                        <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="ДЕТАЛЕЙ" 
-                                       FontSize="9" 
-                                       Foreground="#AAFFFFFF" 
-                                       HorizontalAlignment="Center"
-                                       FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding CurrentProduct.TotalPartsCount, StringFormat='{}{0} шт'}" 
-                                       FontSize="18" 
-                                       FontWeight="Bold" 
-                                       Foreground="White"
-                                       HorizontalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="#20FFFFFF" 
-                            CornerRadius="6" 
-                            Padding="12,8"
-                            Margin="6,0,0,0"
-                            VerticalAlignment="Center">
-                        <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="СТОИМОСТЬ" 
-                                       FontSize="9" 
-                                       Foreground="#AAFFFFFF" 
-                                       HorizontalAlignment="Center"
-                                       FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding CurrentProduct.TotalAssemblyCost, StringFormat='{}{0:N2} ₽'}" 
-                                       FontSize="18" 
-                                       FontWeight="Bold" 
-                                       Foreground="White"
-                                       HorizontalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Grid>
-        </Border>
-
         <!-- Основной контент с выдвижной панелью поверх -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="1">
             <!-- Основной контент -->
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -923,11 +827,71 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Поле поиска -->
+                        <!-- Головное изделие -->
                         <Border Grid.Row="0" 
+                                Padding="8,6"
+                                Margin="3,3,3,0"
+                                CornerRadius="3"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="ProductHeader_MouseLeftButtonDown"
+                                Visibility="{Binding CurrentProduct.Name, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource AccentColor}"/>
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="2"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsProductSelected}" Value="True">
+                                            <Setter Property="BorderBrush" Value="#FFFFFFFF"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" 
+                                        Background="#20FFFFFF" 
+                                        CornerRadius="3" 
+                                        Padding="6,4"
+                                        Margin="0,0,8,0"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="📦" FontSize="14"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding CurrentProduct.Name}" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="White"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding CurrentProduct.Marking}" 
+                                               FontSize="10" 
+                                               Foreground="#CCFFFFFF"
+                                               Margin="0,1,0,0"
+                                               Visibility="{Binding CurrentProduct.Marking, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
+                                </StackPanel>
+
+                                <TextBlock Grid.Column="2" 
+                                           Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F2} кг'}" 
+                                           FontSize="11" 
+                                           FontWeight="Bold" 
+                                           Foreground="White"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Поле поиска -->
+                        <Border Grid.Row="1" 
                                 Background="{StaticResource PrimaryBackground}" 
                                 BorderBrush="{StaticResource BorderColor}" 
                                 BorderThickness="1" 
@@ -993,7 +957,7 @@
                         </Border>
 
                         <!-- Индикатор активного фильтра -->
-                        <Border Grid.Row="1" 
+                        <Border Grid.Row="2" 
                                 Background="#FFF5F5F5" 
                                 BorderBrush="{StaticResource BorderColor}" 
                                 BorderThickness="1" 
@@ -1023,15 +987,14 @@
                             </Grid>
                         </Border>
 
-                        <ListBox Grid.Row="2" x:Name="Список_всех_деталей" 
+                        <ListBox Grid.Row="3" x:Name="Список_всех_деталей" 
                                  ItemsSource="{Binding DetailsView}"
                                  SelectedItem="{Binding SelectedDetail}"
                                  ItemTemplate="{StaticResource PartItemTemplate}"
                                  ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Background="Transparent"
-                                 BorderThickness="0"
-                                 PreviewMouseDown="DetailsListBox_PreviewMouseDown">
+                                 BorderThickness="0">
                             <ListBox.GroupStyle>
                                 <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                             </ListBox.GroupStyle>
@@ -1041,8 +1004,18 @@
 
                 <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 
-                <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Свойства выбранной детали -->
-                <GroupBox Grid.Column="2" Header="Свойства детали">
+                <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Свойства выбранной детали / изделия -->
+                <GroupBox Grid.Column="2">
+                    <GroupBox.Header>
+                        <Grid>
+                            <TextBlock Text="Свойства детали" 
+                                       VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                            <TextBlock Text="Изделие" 
+                                       VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </Grid>
+                    </GroupBox.Header>
                     <Grid>
                         <!-- Превью изделия когда ничего не выбрано -->
                         <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
@@ -1089,6 +1062,84 @@
                                            Stretch="Uniform"
                                            StretchDirection="DownOnly"
                                            HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- Карточка сводки изделия при выборе баннера -->
+                        <Grid Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              Background="{StaticResource PrimaryBackground}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Превью изделия -->
+                            <Border Grid.Row="0"
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3" 
+                                    Padding="8" 
+                                    Margin="3"
+                                    VerticalAlignment="Top"
+                                    Visibility="{Binding CurrentProduct.FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" 
+                                               Text="Превью изделия" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,8"/>
+
+                                    <Image Grid.Row="1"
+                                           Source="{Binding CurrentProduct.FilePreview}" 
+                                           MaxHeight="250"
+                                           Stretch="Uniform"
+                                           StretchDirection="DownOnly"
+                                           HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Свойства изделия -->
+                            <Border Grid.Row="1" 
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3" 
+                                    Padding="8" 
+                                    Margin="3">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Название:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentProduct.Name}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Обозначение:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentProduct.Marking}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Деталей:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentProduct.TotalPartsCount, StringFormat='{}{0} шт'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Стоимость:" Style="{StaticResource PropertyLabel}" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding CurrentProduct.TotalAssemblyCost, StringFormat='{}{0:N2} ₽'}" Style="{StaticResource PropertyValue}" FontWeight="SemiBold"/>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -1506,8 +1557,7 @@
                                  ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Background="Transparent"
-                                 BorderThickness="0"
-                                 PreviewMouseDown="StandardPartsListBox_PreviewMouseDown">
+                                 BorderThickness="0">
                             <ListBox.GroupStyle>
                                 <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                             </ListBox.GroupStyle>
@@ -1886,13 +1936,13 @@
         </Popup>
 
         <!-- Статус-бар -->
-        <Border Grid.Row="3" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="8,4">
+        <Border Grid.Row="2" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="8,4">
             <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
         </Border>
 
         <!-- Popup превью чертежа -->
         <Grid x:Name="DrawingPopupOverlay"
-              Grid.Row="0" Grid.RowSpan="4"
+              Grid.Row="0" Grid.RowSpan="3"
               Visibility="Collapsed"
               Panel.ZIndex="100">
             <!-- Затемнение фона -->
