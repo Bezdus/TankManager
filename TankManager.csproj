@@ -93,13 +93,19 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Core\Services\DrawingPreviewService.cs" />
+    <Compile Include="Core\Services\DxfResolver.cs" />
     <Compile Include="Core\Services\FileLockDiagnostics.cs" />
     <Compile Include="Core\Services\ImageSyncService.cs" />
     <Compile Include="Views\MaterialsPanel.xaml.cs" />
     <Compile Include="Views\PartPropertiesPanel.xaml.cs" />
     <Compile Include="Views\PartsListPanel.xaml.cs" />
+    <Compile Include="Views\PricingSettingsDialog.xaml.cs" />
     <Compile Include="Views\SavedProductsPanel.xaml.cs" />
     <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\PricingSettingsDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -110,6 +116,8 @@
     <Compile Include="Converters\MaterialSortTypeConverter.cs" />
     <Compile Include="Converters\NullToVisibilityConverter.cs" />
     <Compile Include="Core\Constants\KompasConstants.cs" />
+    <Compile Include="Core\Models\ManufacturingOperations.cs" />
+    <Compile Include="Core\Models\PricingSettings.cs" />
     <Compile Include="Core\Models\MaterialInfo.cs" />
     <Compile Include="Core\Models\MaterialSortType.cs" />
     <Compile Include="Core\Models\PartModel.cs" />
@@ -124,7 +132,9 @@
     <Compile Include="Core\Services\ILogger.cs" />
     <Compile Include="Core\Services\KompasCameraController.cs" />
     <Compile Include="Core\Services\KompasContext.cs" />
+    <Compile Include="Core\Services\KompasPathResolver.cs" />
     <Compile Include="Core\Services\KompasService.cs" />
+    <Compile Include="Core\Services\LaserCuttingService.cs" />
     <Compile Include="Core\Services\MaterialAggregator.cs" />
     <Compile Include="Core\Services\PartExtractor.cs" />
     <Compile Include="Core\Services\PartFinder.cs" />

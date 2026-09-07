@@ -18,8 +18,10 @@
         <local:GroupCountToVisibilityConverter x:Key="GroupCountToVisibilityConverter"/>
         <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
         <local:InverseNullToVisibilityConverter x:Key="InverseNullToVisibilityConverter"/>
+        <local:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
         <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
+        <local:DoubleNonZeroToVisibilityConverter x:Key="DoubleNonZeroToVisibilityConverter"/>
         <local:GroupItemPropertyConverter x:Key="GroupItemPropertyConverter"/>
         <local:MaterialSortTypeConverter x:Key="MaterialSortTypeConverter"/>
 
@@ -430,11 +432,237 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- DataTemplates для операций изготовления -->
+        <DataTemplate DataType="{x:Type models:BendingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Гибка"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}">
+                            <Run Text="Угол: "/><Run Text="{Binding BendAngle, StringFormat='{}{0:F1}°'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding BendLength, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Длина: "/><Run Text="{Binding BendLength, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type models:FlangingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Отбортовка"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Radius, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Радиус: "/><Run Text="{Binding Radius, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"
+                                   Visibility="{Binding Radius, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Diameter, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Ø: "/><Run Text="{Binding Diameter, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type models:RollingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Вальцовка"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Length, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Длина: "/><Run Text="{Binding Length, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"
+                                   Visibility="{Binding Length, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding RollDiameter, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Ø: "/><Run Text="{Binding RollDiameter, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"
+                                   Visibility="{Binding RollDiameter, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Radius, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Радиус: "/><Run Text="{Binding Radius, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type models:LaserCuttingOperation}">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="6,4"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Резка на лазере"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,8,2"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}">
+                            <Run Text="Рез: "/><Run Text="{Binding CutLength, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="10"/>
+                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding EngravingLength, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Гравировка: "/><Run Text="{Binding EngravingLength, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Толщина: "/><Run Text="{Binding MaterialThickness, StringFormat='{}{0:F1} мм'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding MaterialThickness, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  " FontSize="9"
+                                   Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                        <TextBlock FontSize="9" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
+                            <Run Text="Стоимость: "/><Run Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -483,6 +711,17 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="💾" Margin="0,0,5,0"/>
                             <TextBlock Text="Сохранить"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+
+                    <Button Command="{Binding OpenPricingSettingsCommand}"
+                            Style="{StaticResource PanelButtonStyle}"
+                            ToolTip="Настроить расценки для расчёта стоимости деталей">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚙" Margin="0,0,5,0" FontSize="13"/>
+                            <TextBlock Text="Расценки"/>
                         </StackPanel>
                     </Button>
 
@@ -556,65 +795,8 @@
             </Grid>
         </Border>
 
-        <!-- Информация об изделии -->
-        <Border Grid.Row="1" 
-                Padding="12,10"
-                Margin="3,3,3,0"
-                Background="{StaticResource AccentColor}"
-                CornerRadius="4"
-                Visibility="{Binding CurrentProduct.Name, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" 
-                        Background="#20FFFFFF" 
-                        CornerRadius="4" 
-                        Padding="8,6"
-                        Margin="0,0,12,0"
-                        VerticalAlignment="Center">
-                    <TextBlock Text="📦" FontSize="20"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding CurrentProduct.Name}" 
-                               FontSize="16" 
-                               FontWeight="SemiBold" 
-                               Foreground="White"
-                               TextWrapping="Wrap"/>
-                    <TextBlock Text="{Binding CurrentProduct.Marking}" 
-                               FontSize="11" 
-                               Foreground="#CCFFFFFF"
-                               Margin="0,2,0,0"
-                               Visibility="{Binding CurrentProduct.Marking, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
-                </StackPanel>
-
-                <Border Grid.Column="2" 
-                        Background="#20FFFFFF" 
-                        CornerRadius="6" 
-                        Padding="12,8"
-                        VerticalAlignment="Center">
-                    <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="МАССА" 
-                                   FontSize="9" 
-                                   Foreground="#AAFFFFFF" 
-                                   HorizontalAlignment="Center"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F2} кг'}" 
-                                   FontSize="18" 
-                                   FontWeight="Bold" 
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
-
         <!-- Основной контент с выдвижной панелью поверх -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="1">
             <!-- Основной контент -->
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -645,11 +827,71 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Поле поиска -->
+                        <!-- Головное изделие -->
                         <Border Grid.Row="0" 
+                                Padding="8,6"
+                                Margin="3,3,3,0"
+                                CornerRadius="3"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="ProductHeader_MouseLeftButtonDown"
+                                Visibility="{Binding CurrentProduct.Name, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource AccentColor}"/>
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="2"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsProductSelected}" Value="True">
+                                            <Setter Property="BorderBrush" Value="#FFFFFFFF"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" 
+                                        Background="#20FFFFFF" 
+                                        CornerRadius="3" 
+                                        Padding="6,4"
+                                        Margin="0,0,8,0"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="📦" FontSize="14"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding CurrentProduct.Name}" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="White"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding CurrentProduct.Marking}" 
+                                               FontSize="10" 
+                                               Foreground="#CCFFFFFF"
+                                               Margin="0,1,0,0"
+                                               Visibility="{Binding CurrentProduct.Marking, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
+                                </StackPanel>
+
+                                <TextBlock Grid.Column="2" 
+                                           Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F2} кг'}" 
+                                           FontSize="11" 
+                                           FontWeight="Bold" 
+                                           Foreground="White"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Поле поиска -->
+                        <Border Grid.Row="1" 
                                 Background="{StaticResource PrimaryBackground}" 
                                 BorderBrush="{StaticResource BorderColor}" 
                                 BorderThickness="1" 
@@ -715,7 +957,7 @@
                         </Border>
 
                         <!-- Индикатор активного фильтра -->
-                        <Border Grid.Row="1" 
+                        <Border Grid.Row="2" 
                                 Background="#FFF5F5F5" 
                                 BorderBrush="{StaticResource BorderColor}" 
                                 BorderThickness="1" 
@@ -745,15 +987,14 @@
                             </Grid>
                         </Border>
 
-                        <ListBox Grid.Row="2" x:Name="Список_всех_деталей" 
+                        <ListBox Grid.Row="3" x:Name="Список_всех_деталей" 
                                  ItemsSource="{Binding DetailsView}"
                                  SelectedItem="{Binding SelectedDetail}"
                                  ItemTemplate="{StaticResource PartItemTemplate}"
                                  ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Background="Transparent"
-                                 BorderThickness="0"
-                                 PreviewMouseDown="DetailsListBox_PreviewMouseDown">
+                                 BorderThickness="0">
                             <ListBox.GroupStyle>
                                 <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                             </ListBox.GroupStyle>
@@ -763,8 +1004,18 @@
 
                 <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 
-                <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Свойства выбранной детали -->
-                <GroupBox Grid.Column="2" Header="Свойства детали">
+                <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Свойства выбранной детали / изделия -->
+                <GroupBox Grid.Column="2">
+                    <GroupBox.Header>
+                        <Grid>
+                            <TextBlock Text="Свойства детали" 
+                                       VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                            <TextBlock Text="Изделие" 
+                                       VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </Grid>
+                    </GroupBox.Header>
                     <Grid>
                         <!-- Превью изделия когда ничего не выбрано -->
                         <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
@@ -815,29 +1066,197 @@
                             </Border>
                         </Grid>
 
+                        <!-- Карточка сводки изделия при выборе баннера -->
+                        <Grid Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              Background="{StaticResource PrimaryBackground}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Превью изделия -->
+                            <Border Grid.Row="0"
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3" 
+                                    Padding="8" 
+                                    Margin="3"
+                                    VerticalAlignment="Top"
+                                    Visibility="{Binding CurrentProduct.FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" 
+                                               Text="Превью изделия" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,8"/>
+
+                                    <Image Grid.Row="1"
+                                           Source="{Binding CurrentProduct.FilePreview}" 
+                                           MaxHeight="250"
+                                           Stretch="Uniform"
+                                           StretchDirection="DownOnly"
+                                           HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Свойства изделия -->
+                            <Border Grid.Row="1" 
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="3" 
+                                    Padding="8" 
+                                    Margin="3">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Название:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentProduct.Name}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Обозначение:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentProduct.Marking}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Деталей:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentProduct.TotalPartsCount, StringFormat='{}{0} шт'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Стоимость:" Style="{StaticResource PropertyLabel}" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding CurrentProduct.TotalAssemblyCost, StringFormat='{}{0:N2} ₽'}" Style="{StaticResource PropertyValue}" FontWeight="SemiBold"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
                         <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseNullToVisibilityConverter}}"
                               DataContext="{Binding CurrentlySelectedPart}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <!-- Превью 3D модели -->
-                            <Border Grid.Row="0" 
-                                    BorderBrush="{StaticResource BorderColor}" 
-                                    BorderThickness="1" 
-                                    CornerRadius="3" 
-                                    Padding="8" 
-                                    Margin="3"
-                                    Visibility="{Binding FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
-                                <Image Source="{Binding FilePreview}" 
-                                       MaxHeight="200"
-                                       Stretch="Uniform"
-                                       StretchDirection="DownOnly"
-                                       HorizontalAlignment="Center"/>
-                            </Border>
+                            <!-- Превью 3D модели + Чертёж детали (бок о бок) -->
+                            <Grid Grid.Row="0" Margin="3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="4*"/>
+                                    <ColumnDefinition Width="6*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Превью 3D модели (слева, 40%) -->
+                                <Border Grid.Column="0"
+                                        BorderBrush="{StaticResource BorderColor}" 
+                                        BorderThickness="1" 
+                                        CornerRadius="3" 
+                                        Padding="8" 
+                                        Margin="0,0,3,0"
+                                        Visibility="{Binding FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                    <Grid>
+                                        <Image Source="{Binding FilePreview}" 
+                                               MaxHeight="200"
+                                               Stretch="Uniform"
+                                               StretchDirection="DownOnly"
+                                               HorizontalAlignment="Center"/>
+
+                                        <!-- Оверлей: показать в КОМПАС -->
+                                        <Button Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                IsEnabled="{Binding DataContext.IsLinkedToKompas, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="4"
+                                                Padding="8,4"
+                                                FontSize="11"
+                                                FontWeight="SemiBold"
+                                                Background="{StaticResource AccentColor}"
+                                                Foreground="White"
+                                                BorderThickness="0"
+                                                Cursor="Hand"
+                                                ToolTip="Показать деталь в КОМПАС-3D">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Opacity" Value="0.9"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsEnabled" Value="False">
+                                                            <Setter Property="Background" Value="#FF9E9E9E"/>
+                                                            <Setter Property="Opacity" Value="0.7"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🔍" Margin="0,0,5,0" FontSize="12"/>
+                                                <TextBlock Text="КОМПАС"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Чертёж детали (справа, 60%) -->
+                                <Border Grid.Column="1"
+                                        BorderBrush="{StaticResource BorderColor}" 
+                                        BorderThickness="1" 
+                                        CornerRadius="3"
+                                        Padding="8"
+                                        Margin="3,0,0,0"
+                                        Visibility="{Binding DrawingPreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                            <TextBlock Text="Чертёж детали" 
+                                                       FontSize="12" 
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimary}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text=" (клик для увеличения)" 
+                                                       FontSize="10" 
+                                                       Foreground="{StaticResource TextSecondary}"
+                                                       VerticalAlignment="Center"
+                                                       FontStyle="Italic"/>
+                                        </StackPanel>
+
+                                        <Border Grid.Row="1" 
+                                                Background="Transparent"
+                                                Cursor="Hand"
+                                                MouseLeftButtonDown="DrawingPreview_MouseLeftButtonDown">
+                                            <Image Source="{Binding DrawingPreview}" 
+                                                   MaxHeight="200"
+                                                   Stretch="Uniform"
+                                                   StretchDirection="DownOnly"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Grid>
 
                             <!-- Свойства детали -->
                             <Border Grid.Row="1" 
@@ -852,6 +1271,10 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
@@ -877,75 +1300,54 @@
 
                                     <TextBlock Grid.Row="5" Grid.Column="0" Text="Масса:" Style="{StaticResource PropertyLabel}"/>
                                     <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <!-- Разделитель стоимости -->
+                                    <Rectangle Grid.Row="6" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" Margin="0,4"/>
+
+                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Стоимость металла:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding MetalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Стоимость операций:" Style="{StaticResource PropertyLabel}"/>
+                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding OperationsCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+
+                                    <TextBlock Grid.Row="9" Grid.Column="0" Text="Общая стоимость:" Style="{StaticResource PropertyLabel}" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding TotalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}" FontWeight="SemiBold"/>
                                 </Grid>
                             </Border>
 
-                            <!-- Кнопка показать в КОМПАС -->
-                            <Button Grid.Row="2"
-                                    Content="Показать в КОМПАС" 
-                                    Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    Margin="3,3,3,6"
-                                    Padding="12,6"
-                                    FontSize="12"
-                                    FontWeight="SemiBold"
-                                    Background="{StaticResource AccentColor}"
-                                    Foreground="White"
-                                    BorderThickness="0"
-                                    Cursor="Hand">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-
-                            <!-- Превью чертежа (занимает оставшееся пространство) -->
-                            <Border Grid.Row="3"
-                                    BorderBrush="{StaticResource BorderColor}" 
-                                    BorderThickness="1" 
+                            <!-- Операции изготовления -->
+                            <Border Grid.Row="2"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1"
                                     CornerRadius="3"
                                     Padding="8"
                                     Margin="3"
-                                    Visibility="{Binding DrawingPreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
+                                    Visibility="{Binding HasOperations, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
-                                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
-                                        <TextBlock Text="Чертёж детали" 
-                                                   FontSize="12" 
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimary}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text=" (клик для увеличения)" 
-                                                   FontSize="10" 
-                                                   Foreground="{StaticResource TextSecondary}"
-                                                   VerticalAlignment="Center"
-                                                   FontStyle="Italic"/>
-                                    </StackPanel>
+                                    <TextBlock Grid.Row="0"
+                                               Text="Операции изготовления"
+                                               FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               Margin="0,0,0,4"/>
 
-                                    <Border Grid.Row="1" 
-                                            Background="Transparent"
-                                            Cursor="Hand"
-                                            MouseLeftButtonDown="DrawingPreview_MouseLeftButtonDown">
-                                        <Image Source="{Binding DrawingPreview}" 
-                                               Stretch="Uniform"
-                                               StretchDirection="DownOnly"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                    </Border>
+                                    <ItemsControl Grid.Row="1"
+                                                  ItemsSource="{Binding Operations}"
+                                                  Background="Transparent"
+                                                  BorderThickness="0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
                                 </Grid>
                             </Border>
+
                         </Grid>
                     </Grid>
                 </GroupBox>
@@ -1155,8 +1557,7 @@
                                  ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Background="Transparent"
-                                 BorderThickness="0"
-                                 PreviewMouseDown="StandardPartsListBox_PreviewMouseDown">
+                                 BorderThickness="0">
                             <ListBox.GroupStyle>
                                 <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                             </ListBox.GroupStyle>
@@ -1535,13 +1936,13 @@
         </Popup>
 
         <!-- Статус-бар -->
-        <Border Grid.Row="3" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="8,4">
+        <Border Grid.Row="2" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="8,4">
             <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
         </Border>
 
         <!-- Popup превью чертежа -->
         <Grid x:Name="DrawingPopupOverlay"
-              Grid.Row="0" Grid.RowSpan="4"
+              Grid.Row="0" Grid.RowSpan="3"
               Visibility="Collapsed"
               Panel.ZIndex="100">
             <!-- Затемнение фона -->

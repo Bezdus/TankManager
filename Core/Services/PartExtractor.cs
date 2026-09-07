@@ -185,7 +185,13 @@ namespace TankManager.Core.Services
         {
             int instanceIndex = CountMatchingParts(details, subPart.Name, subPart.Marking,
                 isBodyBased: false, filePath: subPart.FileName);
-            details.Add(new PartModel(subPart, _context, instanceIndex));
+            var partModel = new PartModel(subPart, _context, instanceIndex);
+
+            var ops = _context.GetManufacturingOperations(subPart);
+            foreach (var op in ops)
+                partModel.Operations.Add(op);
+
+            details.Add(partModel);
         }
 
         private int CountMatchingParts(List<PartModel> details, string name, string marking,

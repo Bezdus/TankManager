@@ -76,6 +76,26 @@ namespace TankManager
     }
 
     /// <summary>
+    /// Возвращает Visible если double > 0, иначе Collapsed
+    /// </summary>
+    public class DoubleNonZeroToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is double d)
+            {
+                return Math.Abs(d) > 0.0001 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            return Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
     /// Возвращает Visible если строка не пустая и не null, иначе Collapsed
     /// </summary>
     public class StringNotEmptyToVisibilityConverter : IValueConverter

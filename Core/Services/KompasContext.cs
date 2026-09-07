@@ -1,11 +1,15 @@
 ﻿using Kompas6API5;
+using Kompas6Constants;
+using Kompas6Constants3D;
 using KompasAPI7;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
 {
@@ -209,6 +213,166 @@ namespace TankManager.Core.Services
                 ReleaseComObject(property);
                 ReleaseComObjectIfNeeded(propertyKeeper, body);
             }
+        }
+
+        /// <summary>
+        /// Получает список технологических операций для листовой детали из дерева построения
+        /// </summary>
+        /// <param name="part">Деталь для анализа</param>
+        /// <returns>Список операций изготовления</returns>
+        public List<ManufacturingOperationBase> GetManufacturingOperations(IPart7 part)
+        {
+            var operations = new List<ManufacturingOperationBase>();
+
+            if (part == null)
+                return operations;
+
+            IFeature7 feature = null;
+            object modelObjects = null;
+
+            try
+            {
+                feature = part as IFeature7;
+                if (feature == null)
+                    return operations;
+
+                modelObjects = feature.SubFeatures[Kompas6Constants.ksTreeTypeEnum.ksOperTree, false, false];
+                if (modelObjects == null)
+                    return operations;
+
+                if (modelObjects is Array modelArray)
+                {
+                    foreach (IModelObject modelObject in modelArray)
+                    {
+                        try
+                        {
+                            ProcessModelObject(modelObject, operations);
+                        }
+                        finally
+                        {
+                            ReleaseComObject(modelObject);
+                        }
+                    }
+                }
+
+                if (operations.Count > 0)
+                {
+                    double thickness = ParseMaterialThickness(part.Material);
+                    foreach (var op in operations)
+                        op.MaterialThickness = thickness;
+                }
+            }
+            catch
+            {
+                // Игнорируем ошибки чтения операций
+            }
+            finally
+            {
+                ReleaseComObject(modelObjects);
+                ReleaseComObjectIfNeeded(feature, part);
+            }
+
+            return operations;
+        }
+
+        private void ProcessModelObject(IModelObject modelObject, List<ManufacturingOperationBase> operations)
+        {
+            if (modelObject == null)
+                return;
+
+            switch (modelObject.ModelObjectType)
+            {
+                case Kompas6Constants3D.ksObj3dTypeEnum.o3d_sheetMetalBody:
+                    object childrenContainer = null;
+
+                    try
+                    {
+                        IModelObject1 modelObject1 = modelObject as IModelObject1;
+                        if (modelObject1 == null)
+                            return;
+
+                        childrenContainer = modelObject1.Childrens[Kompas6Constants3D.ksRelationTypeEnum.ksRTIndifferent];
+                        if (childrenContainer is Array childrenArray)
+                        {
+                            foreach (IModelObject child in childrenArray)
+                            {
+                                try
+                                {
+                                    if (child.ModelObjectType == Kompas6Constants3D.ksObj3dTypeEnum.o3d_sheetMetalBendObject)
+                                    {
+                                        operations.Add(new BendingOperation());
+                                    }
+                                }
+                                finally
+                                {
+                                    ReleaseComObject(child);
+                                }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        ReleaseComObject(childrenContainer);
+                    }
+                    break;
+
+                case Kompas6Constants3D.ksObj3dTypeEnum.o3d_sheetMetalBend:
+                    ISheetMetalBend sheetMetalBend = modelObject as ISheetMetalBend;
+                    if (sheetMetalBend != null)
+                    {
+                        operations.Add(new BendingOperation
+                        {
+                            BendAngle = sheetMetalBend.Angle,
+                            BendLength = sheetMetalBend.BendValue
+                        });
+                        ReleaseComObjectIfNeeded(sheetMetalBend, modelObject);
+                    }
+                    break;
+
+                case Kompas6Constants3D.ksObj3dTypeEnum.o3d_sheetMetalCowling:
+                    ISheetMetalRuledShell cowling = modelObject as ISheetMetalRuledShell;
+                    if (cowling != null)
+                    {
+                        // TODO: свойство Depth отсутствует в ISheetMetalRuledShell текущей версии;
+                        // доступны: DraftValue, GapOffsetLength, RuledBorder, RuledJoint и др.
+                        operations.Add(new RollingOperation
+                        {
+                            Length = 0
+                        });
+                        ReleaseComObjectIfNeeded(cowling, modelObject);
+                    }
+                    break;
+
+                case Kompas6Constants3D.ksObj3dTypeEnum.o3d_sheetMetalFlanging:
+                    ISheetMetalBend flanging = modelObject as ISheetMetalBend;
+                    if (flanging != null)
+                    {
+                        operations.Add(new FlangingOperation
+                        {
+                            Radius = flanging.Radius
+                        });
+                        ReleaseComObjectIfNeeded(flanging, modelObject);
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Извлекает толщину материала из строки материала KOMPAS ($d<число>)
+        /// </summary>
+        private double ParseMaterialThickness(string material)
+        {
+            if (string.IsNullOrWhiteSpace(material))
+                return 0;
+
+            var match = Regex.Match(material, @"\$d(\d+\.?\d*)");
+            if (match.Success)
+                return double.TryParse(match.Groups[1].Value,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out double thickness) ? thickness : 0;
+
+            return 0;
         }
 
         /// <summary>

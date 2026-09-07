@@ -1,0 +1,164 @@
+<Window x:Class="TankManager.Views.PricingSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:TankManager.Views"
+        Title="Настройки расценок"
+        Width="520" Height="580"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <TextBlock Grid.Row="0"
+                   Text="Расценки для расчёта стоимости деталей"
+                   FontSize="14" FontWeight="SemiBold"
+                   Margin="0,0,0,12"
+                   Foreground="#FF303030"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Секция: Металл -->
+                <Border BorderBrush="#FFD0D0D0" BorderThickness="1" CornerRadius="3" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="Металл" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#FF303030" Margin="0,0,0,8"/>
+
+                        <!-- Листовой прокат -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Листовой прокат (руб/кг):" VerticalAlignment="Center"
+                                       Foreground="#FF505050" FontSize="12"/>
+                            <TextBox Grid.Column="1" Text="{Binding SheetMetalPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
+                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Прочий металл -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Прочий металл (руб/кг):" VerticalAlignment="Center"
+                                       Foreground="#FF505050" FontSize="12"/>
+                            <TextBox Grid.Column="1" Text="{Binding OtherMetalPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
+                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Трубный прокат -->
+                        <TextBlock Text="Трубный прокат (руб/м):" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="#FF303030" Margin="0,0,0,6"/>
+
+                        <DataGrid x:Name="TubularGrid"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="True"
+                                  CanUserDeleteRows="True"
+                                  MaxHeight="160"
+                                  HeadersVisibility="Column"
+                                  RowHeaderWidth="0"
+                                  Margin="0,0,0,6">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Сортамент (подстрока)" Width="*"
+                                                    Binding="{Binding Size, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTextColumn Header="Цена (руб/м)" Width="120"
+                                                    Binding="{Binding PricePerMeter, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Text="Подстрока ищется в наименовании материала (например: 104x2)"
+                                   FontSize="10" Foreground="#FF909090" FontStyle="Italic"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Секция: Операции -->
+                <Border BorderBrush="#FFD0D0D0" BorderThickness="1" CornerRadius="3" Padding="10">
+                    <StackPanel>
+                        <TextBlock Text="Операции" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#FF303030" Margin="0,0,0,8"/>
+
+                        <!-- Лазерная резка -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Резка на лазере (руб/мм):" VerticalAlignment="Center"
+                                       Foreground="#FF505050" FontSize="12"/>
+                            <TextBox Grid.Column="1" Text="{Binding LaserCuttingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"
+                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Гравировка -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Гравировка (руб/мм):" VerticalAlignment="Center"
+                                       Foreground="#FF505050" FontSize="12"/>
+                            <TextBox Grid.Column="1" Text="{Binding EngravingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"
+                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Гибка -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Гибка (руб/операция):" VerticalAlignment="Center"
+                                       Foreground="#FF505050" FontSize="12"/>
+                            <TextBox Grid.Column="1" Text="{Binding BendingPricePerOperation, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
+                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Вальцовка -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Вальцовка (руб/мм):" VerticalAlignment="Center"
+                                       Foreground="#FF505050" FontSize="12"/>
+                            <TextBox Grid.Column="1" Text="{Binding RollingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"
+                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Отбортовка -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Отбортовка (руб/операция):" VerticalAlignment="Center"
+                                       Foreground="#FF505050" FontSize="12"/>
+                            <TextBox Grid.Column="1" Text="{Binding FlangingPricePerOperation, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
+                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Кнопки -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Сохранить" IsDefault="True" Click="SaveButton_Click"
+                    Width="100" Height="30" Margin="0,0,10,0"
+                    Background="#FF0078D4" Foreground="White"
+                    BorderThickness="1" BorderBrush="#FF005A9E"
+                    FontSize="12" FontWeight="SemiBold"
+                    Cursor="Hand"/>
+            <Button Content="Отмена" IsCancel="True" Click="CancelButton_Click"
+                    Width="80" Height="30"
+                    FontSize="12"
+                    Cursor="Hand"/>
+        </StackPanel>
+    </Grid>
+</Window>

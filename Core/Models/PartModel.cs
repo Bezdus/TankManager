@@ -1,6 +1,7 @@
 ﻿using Kompas6API5;
 using KompasAPI7;
 using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -33,8 +34,24 @@ namespace TankManager.Core.Models
         private BitmapSource _drawingPreview;
         private bool _drawingPreviewLoaded;
         private string _filePreviewPngPath; // Путь к сохранённому превью 3D-файла
+        private string _dxfFilePath; // Путь к DXF-файлу для лазерной резки
+
+        private double _metalCost;
+        private double _operationsCost;
+        private double _totalCost;
 
         private static readonly DrawingPreviewService _previewService = new DrawingPreviewService();
+
+        /// <summary>
+        /// Операции изготовления детали
+        /// </summary>
+        public ObservableCollection<ManufacturingOperationBase> Operations { get; }
+            = new ObservableCollection<ManufacturingOperationBase>();
+
+        /// <summary>
+        /// Есть ли операции изготовления
+        /// </summary>
+        public bool HasOperations => Operations.Count > 0;
 
         // Уникальные идентификаторы для поиска в KOMPAS
         public string PartId { get; private set; }
@@ -164,6 +181,77 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
+        /// Путь к DXF-файлу для лазерной резки
+        /// </summary>
+        public string DxfFilePath
+        {
+            get { return _dxfFilePath; }
+            set
+            {
+                if (_dxfFilePath != value)
+                {
+                    _dxfFilePath = value;
+                    OnPropertyChanged(nameof(DxfFilePath));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Стоимость металла детали, руб
+        /// </summary>
+        public double MetalCost
+        {
+            get => _metalCost;
+            set
+            {
+                if (Math.Abs(_metalCost - value) > 0.0001)
+                {
+                    _metalCost = value;
+                    OnPropertyChanged(nameof(MetalCost));
+                    UpdateTotalCost();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Суммарная стоимость операций, руб
+        /// </summary>
+        public double OperationsCost
+        {
+            get => _operationsCost;
+            set
+            {
+                if (Math.Abs(_operationsCost - value) > 0.0001)
+                {
+                    _operationsCost = value;
+                    OnPropertyChanged(nameof(OperationsCost));
+                    UpdateTotalCost();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Общая стоимость детали, руб
+        /// </summary>
+        public double TotalCost
+        {
+            get => _totalCost;
+            set
+            {
+                if (Math.Abs(_totalCost - value) > 0.0001)
+                {
+                    _totalCost = value;
+                    OnPropertyChanged(nameof(TotalCost));
+                }
+            }
+        }
+
+        private void UpdateTotalCost()
+        {
+            TotalCost = _metalCost + _operationsCost;
+        }
+
+        /// <summary>
         /// Путь к сохранённому PNG-превью 3D-файла (для работы без исходных файлов КОМПАС)
         /// </summary>
         public string FilePreviewPngPath
@@ -252,6 +340,22 @@ namespace TankManager.Core.Models
             _material = string.Empty;
             _filePath = string.Empty;
             _productType = ProductType.Part;
+            Operations.CollectionChanged += (s, e) =>
+            {
+                OnPropertyChanged(nameof(HasOperations));
+                RecalculateOperationsCost();
+            };
+        }
+
+        /// <summary>
+        /// Пересчитать стоимость операций из сумм Cost каждой операции
+        /// </summary>
+        public void RecalculateOperationsCost()
+        {
+            double sum = 0;
+            foreach (var op in Operations)
+                sum += op.Cost;
+            OperationsCost = sum;
         }
 
         public PartModel(IPart7 part, KompasContext context, int instanceIndex = 0)
@@ -275,6 +379,11 @@ namespace TankManager.Core.Models
             else
                 Length = -1;
 
+            Operations.CollectionChanged += (s, e) =>
+            {
+                OnPropertyChanged(nameof(HasOperations));
+                RecalculateOperationsCost();
+            };
 
         }
 
@@ -310,6 +419,8 @@ namespace TankManager.Core.Models
                     Length = GetLength(body, context);
                 else
                     Length = -1;
+
+                Operations.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasOperations));
 
             }
             finally
