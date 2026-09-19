@@ -592,6 +592,10 @@ namespace TankManager.Core.ViewModels
                 // Считаем стоимость операций
                 foreach (var op in part.Operations)
                 {
+                    var rolling = op as RollingOperation;
+                    if (rolling != null)
+                        rolling.PartMass = part.Mass;
+
                     op.CalculateCost(_pricingSettings);
                     if (!op.IsCostReliable)
                         unreliableOperations++;

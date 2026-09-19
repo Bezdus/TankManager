@@ -125,9 +125,9 @@
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Вальцовка (руб/мм):" VerticalAlignment="Center"
+                            <TextBlock Grid.Column="0" Text="Вальцовка (руб/кг):" VerticalAlignment="Center"
                                        Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding RollingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"
+                            <TextBox Grid.Column="1" Text="{Binding RollingPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
                                      Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
                         </Grid>
 

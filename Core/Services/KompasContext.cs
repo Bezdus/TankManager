@@ -412,12 +412,9 @@ namespace TankManager.Core.Services
                     ISheetMetalRuledShell cowling = modelObject as ISheetMetalRuledShell;
                     if (cowling != null)
                     {
-                        // TODO: свойство Depth отсутствует в ISheetMetalRuledShell текущей версии;
-                        // доступны: DraftValue, GapOffsetLength, RuledBorder, RuledJoint и др.
-                        operations.Add(new RollingOperation
-                        {
-                            Length = 0
-                        });
+                        // Стоимость вальцовки считается по массе детали (см. RollingOperation.CalculateCost),
+                        // поэтому геометрические параметры здесь не нужны
+                        operations.Add(new RollingOperation());
                         ReleaseComObjectIfNeeded(cowling, modelObject);
                     }
                     break;

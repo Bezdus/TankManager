@@ -70,7 +70,7 @@ namespace TankManager.Core.Models
         private double _laserCuttingPricePerMm;
         private double _engravingPricePerMm;
         private double _bendingPricePerOperation;
-        private double _rollingPricePerMm;
+        private double _rollingPricePerKg;
         private double _flangingPricePerOperation;
 
         /// <summary>
@@ -166,18 +166,18 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
-        /// Цена вальцовки, руб/мм
+        /// Цена вальцовки, руб/кг (по массе детали)
         /// </summary>
         [DataMember]
-        public double RollingPricePerMm
+        public double RollingPricePerKg
         {
-            get => _rollingPricePerMm;
+            get => _rollingPricePerKg;
             set
             {
-                if (Math.Abs(_rollingPricePerMm - value) > 0.0001)
+                if (Math.Abs(_rollingPricePerKg - value) > 0.0001)
                 {
-                    _rollingPricePerMm = value;
-                    OnPropertyChanged(nameof(RollingPricePerMm));
+                    _rollingPricePerKg = value;
+                    OnPropertyChanged(nameof(RollingPricePerKg));
                 }
             }
         }

@@ -77,8 +77,9 @@ syncs saved products to local/server storage.
   (`TankManager-vX.Y.Z.zip`).
 
 ## Known limitations
-- Rolling ("вальцовка") length is not read from KOMPAS yet (`KompasContext.ProcessModelObject`,
-  TODO), so its cost is 0; `IsCostReliable` marks such operations and the UI warns about them.
+- Rolling ("вальцовка") cost = part mass × `RollingPricePerKg`; the mass is set by
+  `MainViewModel.RecalculateAllCosts` (`RollingOperation.PartMass`, not persisted). The old
+  `RollingPricePerMm` setting was replaced, so the rolling price must be re-entered once.
 - `FilePath`/`DxfFilePath` from `product.json` may point to network shares; only preview PNG paths
   are restricted to the local products folder. Treat a writable server folder as trusted.
 - `update.xml` has no `<checksum>`: add SHA-256 of the release zip when publishing a release.
