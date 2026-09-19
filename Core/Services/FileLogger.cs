@@ -6,11 +6,23 @@ namespace TankManager.Core.Services
     public class FileLogger : ILogger
     {
         private readonly string _logFilePath;
-        private readonly object _lockObject = new object();
+        private static readonly object _lockObject = new object();
 
-        public FileLogger(string logFilePath = "TankManager.log")
+        public FileLogger(string logFilePath = null)
         {
-            _logFilePath = logFilePath;
+            _logFilePath = logFilePath ?? GetDefaultLogPath();
+        }
+
+        private static string GetDefaultLogPath()
+        {
+            string directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "TankManager");
+
+            try { Directory.CreateDirectory(directory); }
+            catch { }
+
+            return Path.Combine(directory, "TankManager.log");
         }
 
         public void LogInfo(string message) => WriteLog("INFO", message);

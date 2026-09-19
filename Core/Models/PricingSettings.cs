@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using TankManager.Core.Services;
 
 namespace TankManager.Core.Models
 {
@@ -61,6 +62,8 @@ namespace TankManager.Core.Models
     {
         private static readonly string SettingsPath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "pricing_settings.json");
+
+        private static readonly ILogger Logger = new FileLogger();
 
         private double _sheetMetalPricePerKg;
         private double _otherMetalPricePerKg;
@@ -204,16 +207,20 @@ namespace TankManager.Core.Models
             if (string.IsNullOrEmpty(material) || TubularPricing == null || TubularPricing.Count == 0)
                 return 0;
 
+            // Самая длинная подходящая запись = самая точная («40х40х3» приоритетнее «40х40»)
+            TubularPricingEntry best = null;
+
             foreach (var entry in TubularPricing)
             {
-                if (!string.IsNullOrEmpty(entry.Size) &&
-                    material.IndexOf(entry.Size, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return entry.PricePerMeter;
-                }
+                if (string.IsNullOrEmpty(entry.Size) ||
+                    material.IndexOf(entry.Size, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                if (best == null || entry.Size.Length > best.Size.Length)
+                    best = entry;
             }
 
-            return 0;
+            return best != null ? best.PricePerMeter : 0;
         }
 
         /// <summary>
@@ -221,37 +228,42 @@ namespace TankManager.Core.Models
         /// </summary>
         public static PricingSettings Load()
         {
+            if (!File.Exists(SettingsPath))
+                return new PricingSettings();
+
             try
             {
-                if (File.Exists(SettingsPath))
+                using (var stream = new FileStream(SettingsPath, FileMode.Open, FileAccess.Read))
                 {
-                    using (var stream = new FileStream(SettingsPath, FileMode.Open, FileAccess.Read))
-                    {
-                        var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
-                        return (PricingSettings)serializer.ReadObject(stream);
-                    }
+                    var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
+                    var loaded = (PricingSettings)serializer.ReadObject(stream);
+                    if (loaded != null)
+                        return loaded;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Не удалось прочитать {SettingsPath}, используются расценки по умолчанию", ex);
+
+                // Сохраняем повреждённый файл, чтобы следующее сохранение не стёрло расценки безвозвратно
+                try { File.Copy(SettingsPath, SettingsPath + ".bad", true); }
+                catch (Exception copyEx) { Logger.LogWarning($"Не удалось сохранить копию повреждённого файла: {copyEx.Message}"); }
+            }
 
             return new PricingSettings();
         }
 
         /// <summary>
-        /// Сохранить настройки в файл
+        /// Сохранить настройки в файл (атомарно). При ошибке бросает исключение.
         /// </summary>
         public void Save()
         {
-            try
+            var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
+            using (var stream = new MemoryStream())
             {
-                var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
-                using (var stream = new MemoryStream())
-                {
-                    serializer.WriteObject(stream, this);
-                    File.WriteAllBytes(SettingsPath, stream.ToArray());
-                }
+                serializer.WriteObject(stream, this);
+                AtomicFile.WriteAllBytes(SettingsPath, stream.ToArray());
             }
-            catch { }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

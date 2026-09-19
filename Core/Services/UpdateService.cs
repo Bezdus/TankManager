@@ -1,20 +1,20 @@
-using System;
+п»їusing System;
 using System.Windows;
 using AutoUpdaterDotNET;
 
 namespace TankManager.Core.Services
 {
     /// <summary>
-    /// Сервис для проверки и установки обновлений приложения
+    /// РЎРµСЂРІРёСЃ РґР»СЏ РїСЂРѕРІРµСЂРєРё Рё СѓСЃС‚Р°РЅРѕРІРєРё РѕР±РЅРѕРІР»РµРЅРёР№ РїСЂРёР»РѕР¶РµРЅРёСЏ
     /// </summary>
     public class UpdateService
     {
         private const string UPDATE_URL = "https://raw.githubusercontent.com/Bezdus/TankManager/master/update.xml";
 
         /// <summary>
-        /// Проверяет наличие обновлений
+        /// РџСЂРѕРІРµСЂСЏРµС‚ РЅР°Р»РёС‡РёРµ РѕР±РЅРѕРІР»РµРЅРёР№
         /// </summary>
-        /// <param name="showNoUpdateMessage">Показывать ли сообщение, если обновлений нет</param>
+        /// <param name="showNoUpdateMessage">РџРѕРєР°Р·С‹РІР°С‚СЊ Р»Рё СЃРѕРѕР±С‰РµРЅРёРµ, РµСЃР»Рё РѕР±РЅРѕРІР»РµРЅРёР№ РЅРµС‚</param>
         public static void CheckForUpdates(bool showNoUpdateMessage = false)
         {
             try
@@ -34,8 +34,8 @@ namespace TankManager.Core.Services
                 if (showNoUpdateMessage)
                 {
                     MessageBox.Show(
-                        $"Не удалось проверить обновления:\n{ex.Message}",
-                        "Ошибка проверки обновлений",
+                        $"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕРІРµСЂРёС‚СЊ РѕР±РЅРѕРІР»РµРЅРёСЏ:\n{ex.Message}",
+                        "РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё РѕР±РЅРѕРІР»РµРЅРёР№",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                 }

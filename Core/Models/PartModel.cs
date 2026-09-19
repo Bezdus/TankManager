@@ -54,9 +54,9 @@ namespace TankManager.Core.Models
         public bool HasOperations => Operations.Count > 0;
 
         // Уникальные идентификаторы для поиска в KOMPAS
-        public string PartId { get; private set; }
-        public bool IsBodyBased { get; private set; }
-        public int InstanceIndex { get; private set; } // Индекс экземпляра в сборке
+        public string PartId { get; protected set; }
+        public bool IsBodyBased { get; protected set; }
+        public int InstanceIndex { get; protected set; } // Индекс экземпляра в сборке
 
         public string Name
         {
@@ -131,7 +131,7 @@ namespace TankManager.Core.Models
                 if (Math.Abs(_length - value) > 0.0001)
                 {
                     _length = value;
-                    OnPropertyChanged(nameof(Mass));
+                    OnPropertyChanged(nameof(Length));
                 }
             }
         }
@@ -402,11 +402,13 @@ namespace TankManager.Core.Models
                 Name = body.Name ?? string.Empty;
                 Marking = body.Marking ?? string.Empty;
                 DetailType = KompasConstants.PartType;
-                Material = FormatMaterial(
-                    context.GetBodyPropertyValue(body, KompasConstants.MaterialPropertyName));
+                var properties = context.GetBodyPropertyValues(
+                    body,
+                    KompasConstants.MaterialPropertyName,
+                    KompasConstants.MassPropertyName);
 
-                Mass = ParseMass(
-                    context.GetBodyPropertyValue(body, KompasConstants.MassPropertyName));
+                Material = FormatMaterial(properties[0]);
+                Mass = ParseMass(properties[1]);
                 
                 parentPart = body.Parent as IPart7;
                 string parentFileName = parentPart?.FileName ?? string.Empty;
@@ -508,11 +510,6 @@ namespace TankManager.Core.Models
 
             return null;
         }
-
-        /// <summary>
-        /// Статический доступ к сервису превью (для очистки кэша и т.д.)
-        /// </summary>
-        public static DrawingPreviewService PreviewService => _previewService;
 
         private  double GetLength(object detail, KompasContext context)
         {
@@ -637,43 +634,6 @@ namespace TankManager.Core.Models
 
             return result;
         }
-
-        //private static string FormatMaterial(string material)
-        //{
-        //    if (string.IsNullOrWhiteSpace(material))
-        //        return material ?? string.Empty;
-
-        //    // Удаляем состояние поверхности
-        //    string result = Regex.Replace(material,
-        //        @"\s+х/к\s*\([^)]+\)", "", RegexOptions.IgnoreCase);
-
-        //    // Извлекаем толщину
-        //    var thicknessMatch = Regex.Match(result, @"\$d(\d+\.?\d*)");
-        //    string thickness = thicknessMatch.Success ? thicknessMatch.Groups[1].Value : null;
-
-        //    // Извлекаем марку стали
-        //    var steelGradeMatch = Regex.Match(result, @";([A-Z]+\s*\d*)");
-        //    string steelGrade = steelGradeMatch.Success
-        //        ? steelGradeMatch.Groups[1].Value.Trim()
-        //        : null;
-
-        //    if (thicknessMatch.Success || steelGradeMatch.Success)
-        //    {
-        //        var baseMatch = Regex.Match(result, @"^([А-Яа-яA-Za-z]+)");
-        //        string basePart = baseMatch.Success ? baseMatch.Groups[1].Value : "Лист";
-
-        //        var parts = new[]
-        //        {
-        //            basePart,
-        //            thickness != null ? $"{thickness} мм" : null,
-        //            steelGrade ?? DefaultSteelGrade
-        //        };
-
-        //        return string.Join(" ", Array.FindAll(parts, p => p != null));
-        //    }
-
-        //    return result;
-        //}
 
         public event PropertyChangedEventHandler PropertyChanged;
 

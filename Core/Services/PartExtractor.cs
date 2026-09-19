@@ -18,6 +18,7 @@ namespace TankManager.Core.Services
         private readonly KompasContext _context;
         private readonly ILogger _logger;
         private readonly ComObjectManager _comManager;
+        private readonly Dictionary<string, int> _instanceCounters = new Dictionary<string, int>();
 
         public PartExtractor(KompasContext context, ILogger logger, ComObjectManager comManager)
         {
@@ -52,7 +53,6 @@ namespace TankManager.Core.Services
                 if (feature == null)
                     return;
 
-                _comManager.Track(feature);
                 bodiesVariant = feature.ResultBodies;
 
                 if (bodiesVariant == null)
@@ -87,14 +87,17 @@ namespace TankManager.Core.Services
                     body = bodyObj as IBody7;
                     if (body != null && IsDetailBody(body))
                     {
-                        _comManager.Track(body);
-                        int instanceIndex = CountMatchingParts(details, body.Name, body.Marking, isBodyBased: true);
+                        int instanceIndex = NextInstanceIndex(body.Name, body.Marking, isBodyBased: true);
                         details.Add(new PartModel(body, _context, instanceIndex));
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning($"Error processing body: {ex.Message}");
+                }
+                finally
+                {
+                    // PartModel не хранит COM-ссылку на тело — освобождаем сразу
                     if (body != null)
                     {
                         _comManager.Release(body);
@@ -112,8 +115,7 @@ namespace TankManager.Core.Services
         {
             if (IsDetailBody(body))
             {
-                _comManager.Track(body);
-                int instanceIndex = CountMatchingParts(details, body.Name, body.Marking, isBodyBased: true);
+                int instanceIndex = NextInstanceIndex(body.Name, body.Marking, isBodyBased: true);
                 details.Add(new PartModel(body, _context, instanceIndex));
             }
         }
@@ -183,7 +185,7 @@ namespace TankManager.Core.Services
 
         private void AddPartToList(IPart7 subPart, List<PartModel> details)
         {
-            int instanceIndex = CountMatchingParts(details, subPart.Name, subPart.Marking,
+            int instanceIndex = NextInstanceIndex(subPart.Name, subPart.Marking,
                 isBodyBased: false, filePath: subPart.FileName);
             var partModel = new PartModel(subPart, _context, instanceIndex);
 
@@ -194,14 +196,18 @@ namespace TankManager.Core.Services
             details.Add(partModel);
         }
 
-        private int CountMatchingParts(List<PartModel> details, string name, string marking,
-            bool isBodyBased, string filePath = null)
+        /// <summary>
+        /// Порядковый номер экземпляра среди уже извлечённых деталей с тем же именем, обозначением и файлом
+        /// </summary>
+        private int NextInstanceIndex(string name, string marking, bool isBodyBased, string filePath = null)
         {
-            return details.Count(d =>
-                d.Name == name &&
-                d.Marking == marking &&
-                d.IsBodyBased == isBodyBased &&
-                (filePath == null || d.FilePath == filePath));
+            string key = $"{(isBodyBased ? 'B' : 'P')}|{name}|{marking}|{filePath}";
+
+            int index;
+            _instanceCounters.TryGetValue(key, out index);
+            _instanceCounters[key] = index + 1;
+
+            return index;
         }
 
         private bool IsDetailBody(IBody7 body)

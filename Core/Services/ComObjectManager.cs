@@ -18,7 +18,10 @@ namespace TankManager.Core.Services
         {
             if (comObject != null && Marshal.IsComObject(comObject))
             {
-                _comObjects.Add(comObject);
+                lock (_comObjects)
+                {
+                    _comObjects.Add(comObject);
+                }
             }
             return comObject;
         }
@@ -29,7 +32,11 @@ namespace TankManager.Core.Services
             {
                 try
                 {
-                    _comObjects.Remove(comObject);
+                    lock (_comObjects)
+                    {
+                        _comObjects.Remove(comObject);
+                    }
+
                     Marshal.ReleaseComObject(comObject);
                 }
                 catch (Exception ex)
@@ -41,7 +48,14 @@ namespace TankManager.Core.Services
 
         public void Dispose()
         {
-            foreach (var comObject in _comObjects)
+            object[] snapshot;
+            lock (_comObjects)
+            {
+                snapshot = _comObjects.ToArray();
+                _comObjects.Clear();
+            }
+
+            foreach (var comObject in snapshot)
             {
                 try
                 {
@@ -56,9 +70,6 @@ namespace TankManager.Core.Services
                 }
             }
             _comObjects.Clear();
-
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
         }
     }
 }

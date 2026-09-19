@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
@@ -17,7 +18,7 @@ namespace TankManager.Core.Services
         private readonly ILogger _logger;
         private readonly ComObjectManager _comManager;
         private readonly MaterialAggregator _materialAggregator;
-        private readonly DrawingPreviewService _previewService;
+        private readonly object _kompasLock = new object();
 
         public KompasService() : this(new FileLogger())
         {
@@ -28,7 +29,6 @@ namespace TankManager.Core.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _comManager = new ComObjectManager(_logger);
             _materialAggregator = new MaterialAggregator(_logger);
-            _previewService = new DrawingPreviewService();
         }
 
         /// <summary>
@@ -37,6 +37,14 @@ namespace TankManager.Core.Services
         /// <param name="filePath">Путь к файлу документа</param>
         /// <returns>Загруженный продукт</returns>
         public Product LoadDocument(string filePath)
+        {
+            lock (_kompasLock)
+            {
+                return LoadDocumentCore(filePath);
+            }
+        }
+
+        private Product LoadDocumentCore(string filePath)
         {
             _logger.LogInfo($"Loading document: {filePath}");
 
@@ -73,6 +81,14 @@ namespace TankManager.Core.Services
         /// </summary>
         /// <returns>Загруженный продукт</returns>
         public Product LoadActiveDocument()
+        {
+            lock (_kompasLock)
+            {
+                return LoadActiveDocumentCore();
+            }
+        }
+
+        private Product LoadActiveDocumentCore()
         {
             _logger.LogInfo("Loading active document from KOMPAS");
 
@@ -146,6 +162,22 @@ namespace TankManager.Core.Services
         /// <param name="detail">Деталь для отображения</param>
         /// <param name="product">Продукт, содержащий деталь</param>
         public void ShowDetailInKompas(PartModel detail, Product product)
+        {
+            // Вызывается из UI-потока: не ждём бесконечно, пока фоновая операция держит КОМПАС
+            if (!Monitor.TryEnter(_kompasLock, TimeSpan.FromSeconds(3)))
+                throw new TimeoutException("КОМПАС занят фоновой операцией. Повторите через несколько секунд.");
+
+            try
+            {
+                ShowDetailInKompasCore(detail, product);
+            }
+            finally
+            {
+                Monitor.Exit(_kompasLock);
+            }
+        }
+
+        private void ShowDetailInKompasCore(PartModel detail, Product product)
         {
             if (!ValidateShowDetailParameters(detail, product))
                 return;
@@ -243,6 +275,14 @@ namespace TankManager.Core.Services
         /// <param name="targetDirectory">Целевая папка для сохранения превью</param>
         public void LoadDrawingPreview(PartModel detail, Product product, string targetDirectory)
         {
+            lock (_kompasLock)
+            {
+                LoadDrawingPreviewCore(detail, product, targetDirectory);
+            }
+        }
+
+        private void LoadDrawingPreviewCore(PartModel detail, Product product, string targetDirectory)
+        {
             if (detail == null || product?.Context == null || !product.Context.IsDocumentLoaded)
                 return;
 
@@ -276,6 +316,14 @@ namespace TankManager.Core.Services
         /// </summary>
         /// <param name="product">Продукт, чьи листовые детали обрабатываются</param>
         public void AttachLaserCutting(Product product)
+        {
+            lock (_kompasLock)
+            {
+                AttachLaserCuttingCore(product);
+            }
+        }
+
+        private void AttachLaserCuttingCore(Product product)
         {
             if (product == null || string.IsNullOrEmpty(product.FilePath))
                 return;

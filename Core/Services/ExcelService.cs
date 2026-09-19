@@ -20,7 +20,7 @@ namespace TankManager.Core.Services
                 materials,
                 "Список материалов пуст",
                 "Материал\tМасса (кг)",
-                m => $"{m.Name}\t{m.TotalMass:F2}");
+                m => $"{Cell(m.Name)}\t{m.TotalMass:F2}");
         }
 
         /// <summary>
@@ -32,7 +32,7 @@ namespace TankManager.Core.Services
                 materials,
                 "Список материалов пуст",
                 "Материал\tДлина (мм)",
-                m => $"{m.Name}\t{m.TotalLength:F2}");
+                m => $"{Cell(m.Name)}\t{m.TotalLength:F2}");
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace TankManager.Core.Services
                     double opsCost = group.Sum(p => p.OperationsCost);
                     double totalCost = group.Sum(p => p.TotalCost);
 
-                    sb.AppendLine($"{group.Key.Name}\t{group.Key.Marking}\t{group.Key.Material}\t{count}\t{unitMass:F3}\t{totalMass:F3}\t{metalCost:F2}\t{opsCost:F2}\t{totalCost:F2}");
+                    sb.AppendLine($"{Cell(group.Key.Name)}\t{Cell(group.Key.Marking)}\t{Cell(group.Key.Material)}\t{count}\t{unitMass:F3}\t{totalMass:F3}\t{metalCost:F2}\t{opsCost:F2}\t{totalCost:F2}");
                 }
 
                 Clipboard.SetText(sb.ToString());
@@ -134,9 +134,9 @@ namespace TankManager.Core.Services
                     if (i < groupedParts.Count)
                     {
                         var part = groupedParts[i];
-                        row.Add(part.Name ?? "");
-                        row.Add(part.Marking ?? "");
-                        row.Add(part.Material ?? "");
+                        row.Add(Cell(part.Name));
+                        row.Add(Cell(part.Marking));
+                        row.Add(Cell(part.Material));
                         row.Add(part.Count.ToString());
                         row.Add(part.UnitMass.ToString("F3"));
                         row.Add(part.TotalMass.ToString("F3"));
@@ -156,7 +156,7 @@ namespace TankManager.Core.Services
                     if (i < sheetMaterialsList.Count)
                     {
                         var material = sheetMaterialsList[i];
-                        row.Add(material.Name ?? "");
+                        row.Add(Cell(material.Name));
                         row.Add(material.TotalMass.ToString("F2"));
                     }
                     else
@@ -171,7 +171,7 @@ namespace TankManager.Core.Services
                     if (i < tubularProductsList.Count)
                     {
                         var tubular = tubularProductsList[i];
-                        row.Add(tubular.Name ?? "");
+                        row.Add(Cell(tubular.Name));
                         row.Add(tubular.TotalLength.ToString("F2"));
                     }
                     else
@@ -186,7 +186,7 @@ namespace TankManager.Core.Services
                     if (i < otherMaterialsList.Count)
                     {
                         var other = otherMaterialsList[i];
-                        row.Add(other.Name ?? "");
+                        row.Add(Cell(other.Name));
                         row.Add(other.TotalMass.ToString("F2"));
                     }
                     else
@@ -383,6 +383,24 @@ namespace TankManager.Core.Services
             }
 
             return filePath;
+        }
+
+        /// <summary>
+        /// Подготавливает значение для вставки в TSV: без табов и переводов строк,
+        /// а строки, начинающиеся с символов формулы, защищены апострофом (защита от формульной инъекции в Excel)
+        /// </summary>
+        private static string Cell(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            string text = value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
+
+            char first = text[0];
+            if (first == '=' || first == '+' || first == '-' || first == '@')
+                text = "'" + text;
+
+            return text;
         }
 
         private static void StyleHeaderRow(IXLWorksheet ws, int row, int columnCount)

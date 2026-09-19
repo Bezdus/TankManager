@@ -25,6 +25,7 @@ namespace TankManager.Core.ViewModels
         private readonly IKompasService _kompasService;
         private readonly ProductStorageService _storageService = new ProductStorageService();
         private readonly ExcelService _excelService = new ExcelService();
+        private readonly ILogger _logger = new FileLogger();
         private readonly Dictionary<string, Product> _linkedProductsCache = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
         private PricingSettings _pricingSettings;
         
@@ -65,11 +66,13 @@ namespace TankManager.Core.ViewModels
             {
                 if (_currentProduct == value) return;
                 
+                var previous = _currentProduct;
                 _currentProduct = value;
                 NotifyProductChanged();
                 ResetSelections();
                 InitializeCollectionViews();
                 NotifySaveCommandCanExecuteChanged();
+                ReleaseProductIfUnused(previous);
             }
         }
 
@@ -145,7 +148,7 @@ namespace TankManager.Core.ViewModels
             set
             {
                 if (SetProperty(ref _filePath, value, nameof(FilePath)))
-                    _ = LoadDocumentAsync(value);
+                    RunSafe(LoadDocumentAsync(value));
             }
         }
 
@@ -302,7 +305,7 @@ namespace TankManager.Core.ViewModels
                         IsProductSelected = false;
                         SelectedStandardPart = null;
                         CurrentlySelectedPart = value;
-                        _ = LoadDrawingPreviewForSelectedPartAsync();
+                        RunSafe(LoadDrawingPreviewForSelectedPartAsync());
                     }
                     else
                     {
@@ -325,7 +328,7 @@ namespace TankManager.Core.ViewModels
                         IsProductSelected = false;
                         SelectedDetail = null;
                         CurrentlySelectedPart = value;
-                        _ = LoadDrawingPreviewForSelectedPartAsync();
+                        RunSafe(LoadDrawingPreviewForSelectedPartAsync());
                     }
                     else
                     {
@@ -363,7 +366,11 @@ namespace TankManager.Core.ViewModels
         public bool IsLoading
         {
             get => _isLoading;
-            set => SetProperty(ref _isLoading, value, nameof(IsLoading));
+            set
+            {
+                if (SetProperty(ref _isLoading, value, nameof(IsLoading)))
+                    NotifyLoadingDependentCommands();
+            }
         }
 
         public string StatusMessage
@@ -510,15 +517,15 @@ namespace TankManager.Core.ViewModels
 
         private void InitializeCommands()
         {
-            ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null && IsLinkedToKompas);
-            LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync());
+            ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null && IsLinkedToKompas && !IsLoading);
+            LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync(), () => !IsLoading);
             ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
-            LoadProductCommand = new RelayCommand<string>(fileName => _ = LoadProductAsync(fileName));
-            DeleteProductCommand = new RelayCommand(DeleteSelectedProduct, () => SelectedSavedProduct != null);
-            DeleteProductLocalCommand = new RelayCommand(DeleteSelectedProductLocal, () => SelectedSavedProduct != null);
-            DeleteProductEverywhereCommand = new RelayCommand(DeleteSelectedProductEverywhere, () => SelectedSavedProduct != null);
+            LoadProductCommand = new RelayCommand<string>(LoadProduct);
+            DeleteProductCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => SelectedSavedProduct != null && !IsLoading);
+            DeleteProductLocalCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: false), () => SelectedSavedProduct != null && !IsLoading);
+            DeleteProductEverywhereCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => SelectedSavedProduct != null && !IsLoading);
             ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
-            SwitchToProductCommand = new RelayCommand<ProductFileInfo>(info => _ = SwitchToProductAsync(info));
+            SwitchToProductCommand = new RelayCommand<ProductFileInfo>(SwitchToProduct);
             CopyAllToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyPartsToClipboard, Details), () => Details?.Any() == true);
             CopySheetToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, SheetMaterials), () => SheetMaterials?.Any() == true);
             CopyTubularProductsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyTubularProductsToClipboard, TubularProducts), () => TubularProducts?.Any() == true);
@@ -526,12 +533,12 @@ namespace TankManager.Core.ViewModels
             CopyOtherMaterialsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, OtherMaterials), () => OtherMaterials?.Any() == true);
             CopyAllDataToClipboardCommand = new RelayCommand(CopyAllDataToClipboard, () => StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
             CheckForUpdatesCommand = new RelayCommand(() => UpdateService.CheckForUpdates(showNoUpdateMessage: true));
-            LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
-            SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name) && IsLinkedToKompas);
-            RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath));
+            LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath) && !IsLoading);
+            SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name) && IsLinkedToKompas && !IsLoading);
+            RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath) && !IsLoading);
             SelectServerStorageFolderCommand = new RelayCommand(SelectServerStorageFolder);
             ClearServerStorageFolderCommand = new RelayCommand(ClearServerStorageFolder, () => HasServerStorageFolder);
-            SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable);
+            SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable && !IsLoading);
             ExportToExcelCommand = new RelayCommand(ExportToExcel, () => Details?.Any() == true || StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
             OpenPricingSettingsCommand = new RelayCommand(OpenPricingSettings);
         }
@@ -547,7 +554,19 @@ namespace TankManager.Core.ViewModels
             if (dialog.ShowDialog() == true)
             {
                 var newSettings = dialog.PricingSettings;
-                newSettings.Save();
+
+                try
+                {
+                    newSettings.Save();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Не удалось сохранить расценки", ex);
+                    MessageBox.Show(
+                        $"Расценки применены, но не сохранены на диск:\n{ex.Message}",
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
                 PricingSettings = newSettings;
                 RecalculateAllCosts();
             }
@@ -559,6 +578,8 @@ namespace TankManager.Core.ViewModels
         public void RecalculateAllCosts()
         {
             if (_pricingSettings == null) return;
+
+            int unreliableOperations = 0;
 
             var allParts = (Details ?? Enumerable.Empty<PartModel>())
                 .Concat(StandardParts ?? Enumerable.Empty<PartModel>());
@@ -572,12 +593,20 @@ namespace TankManager.Core.ViewModels
                 foreach (var op in part.Operations)
                 {
                     op.CalculateCost(_pricingSettings);
+                    if (!op.IsCostReliable)
+                        unreliableOperations++;
                 }
 
                 part.RecalculateOperationsCost();
             }
 
             CurrentProduct?.NotifyAggregatesChanged();
+
+            if (unreliableOperations > 0)
+            {
+                _logger.LogWarning($"Стоимость не рассчитана для операций: {unreliableOperations}");
+                ShowSnackbar($"Стоимость не рассчитана для операций: {unreliableOperations} (нет исходных данных)", 6000);
+            }
         }
 
         private double CalculateMetalCost(PartModel part)
@@ -587,6 +616,10 @@ namespace TankManager.Core.ViewModels
 
             if (part.ProductType == ProductType.TubularProduct)
             {
+                // Длина неизвестна (например, старый файл без длины) — оставляем сохранённую стоимость
+                if (part.Length <= 0)
+                    return part.MetalCost;
+
                 double pricePerMeter = _pricingSettings.GetTubularPricePerMeter(part.Material);
                 return (part.Length / 1000.0) * pricePerMeter;
             }
@@ -601,7 +634,7 @@ namespace TankManager.Core.ViewModels
 
         #region Product Loading
 
-        private async Task LoadAndLinkProductAsync(Product savedProduct, string successMessage)
+        private void LoadAndLinkProduct(Product savedProduct, string successMessage)
         {
             var filePath = savedProduct.FilePath;
 
@@ -620,6 +653,8 @@ namespace TankManager.Core.ViewModels
 
         private async Task LinkToKompasAsync()
         {
+            if (IsLoading) return;
+
             var filePath = CurrentProduct?.FilePath;
             if (string.IsNullOrEmpty(filePath)) return;
 
@@ -638,7 +673,7 @@ namespace TankManager.Core.ViewModels
                 var linkedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
                 if (linkedProduct != null)
                 {
-                    _linkedProductsCache[filePath] = linkedProduct;
+                    CacheProduct(filePath, linkedProduct);
                     RestoreImagePathsFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
                     RecalculateAllCosts();
@@ -660,7 +695,7 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка связывания с КОМПАС: {ex.Message}");
+                _logger.LogWarning($"Ошибка связывания с КОМПАС: {ex.Message}");
                 
                 string errorMessage = "Не удалось установить связь с КОМПАС.\n\n";
                 
@@ -693,6 +728,8 @@ namespace TankManager.Core.ViewModels
 
         private async Task RefreshFromKompasAsync()
         {
+            if (IsLoading) return;
+
             var filePath = CurrentProduct?.FilePath;
             if (string.IsNullOrEmpty(filePath) || !IsLinkedToKompas) return;
 
@@ -707,7 +744,7 @@ namespace TankManager.Core.ViewModels
                 var refreshedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
                 if (refreshedProduct != null)
                 {
-                    _linkedProductsCache[filePath] = refreshedProduct;
+                    CacheProduct(filePath, refreshedProduct);
                     RestoreImagePathsFromSaved(refreshedProduct);
                     SetCurrentProduct(refreshedProduct, isLinked: true);
                     RecalculateAllCosts();
@@ -716,26 +753,13 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка обновления из КОМПАС: {ex.Message}");
+                _logger.LogWarning($"Ошибка обновления из КОМПАС: {ex.Message}");
                 StatusMessage = $"Ошибка обновления: {ex.Message}";
             }
             finally
             {
                 IsLoading = false;
                 NotifyCopyCommandsCanExecuteChanged();
-            }
-        }
-
-        /// <summary>
-        /// Инвалидирует кэш превью чертежей для всех деталей продукта
-        /// </summary>
-        private void InvalidateDrawingPreviewsCache(Product product)
-        {
-            if (product?.Details == null) return;
-
-            foreach (var detail in product.Details)
-            {
-                detail.InvalidateDrawingPreviewCache();
             }
         }
 
@@ -797,12 +821,14 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка восстановления путей изображений: {ex.Message}");
+                _logger.LogWarning($"Ошибка восстановления путей изображений: {ex.Message}");
             }
         }
 
         private async Task TryLinkToKompasAsync(string filePath)
         {
+            if (IsLoading) return;
+
             if (string.IsNullOrEmpty(filePath)) return;
 
             try
@@ -819,7 +845,7 @@ namespace TankManager.Core.ViewModels
                 var linkedProduct = await Task.Run(() => _kompasService.LoadDocument(filePath));
                 if (linkedProduct != null)
                 {
-                    _linkedProductsCache[filePath] = linkedProduct;
+                    CacheProduct(filePath, linkedProduct);
                     RestoreImagePathsFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
                     RecalculateAllCosts();
@@ -827,7 +853,7 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка связывания с КОМПАС: {ex.Message}");
+                _logger.LogWarning($"Ошибка связывания с КОМПАС: {ex.Message}");
                 IsLinkedToKompas = false;
             }
             finally
@@ -839,6 +865,8 @@ namespace TankManager.Core.ViewModels
 
         private async Task LoadDocumentAsync(string filePath)
         {
+            if (IsLoading) return;
+
             if (string.IsNullOrEmpty(filePath)) return;
 
             try
@@ -847,7 +875,7 @@ namespace TankManager.Core.ViewModels
                 StatusMessage = "Загрузка документа...";
 
                 var product = await Task.Run(() => _kompasService.LoadDocument(filePath));
-                _linkedProductsCache[filePath] = product;
+                CacheProduct(filePath, product);
                 RestoreImagePathsFromSaved(product);
                 CurrentProduct = product;
                 IsLinkedToKompas = true;
@@ -856,7 +884,7 @@ namespace TankManager.Core.ViewModels
                 RecalculateAllCosts();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
 
-                _ = GenerateDrawingPreviewsInBackgroundAsync();
+                RunSafe(GenerateDrawingPreviewsInBackgroundAsync());
             }
             catch (Exception ex)
             {
@@ -873,6 +901,8 @@ namespace TankManager.Core.ViewModels
 
         public async Task LoadFromActiveDocumentAsync()
         {
+            if (IsLoading) return;
+
             try
             {
                 IsLoading = true;
@@ -881,7 +911,7 @@ namespace TankManager.Core.ViewModels
                 var product = await Task.Run(() => _kompasService.LoadActiveDocument());
 
                 if (!string.IsNullOrEmpty(product.FilePath))
-                    _linkedProductsCache[product.FilePath] = product;
+                    CacheProduct(product.FilePath, product);
 
                 RestoreImagePathsFromSaved(product);
                 CurrentProduct = product;
@@ -891,7 +921,7 @@ namespace TankManager.Core.ViewModels
                 RecalculateAllCosts();
                 StatusMessage = $"Загружено изделие: {CurrentProduct.Name}, деталей: {Details.Count}";
 
-                _ = GenerateDrawingPreviewsInBackgroundAsync();
+                RunSafe(GenerateDrawingPreviewsInBackgroundAsync());
             }
             catch (Exception ex)
             {
@@ -906,16 +936,16 @@ namespace TankManager.Core.ViewModels
             }
         }
 
-        private async Task LoadProductAsync(string fileName)
+        private void LoadProduct(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return;
 
             var product = _storageService.Load(fileName);
             if (product != null)
-                await LoadAndLinkProductAsync(product, $"Загружено: {product.Name}");
+                LoadAndLinkProduct(product, $"Загружено: {product.Name}");
         }
 
-        private async Task SwitchToProductAsync(ProductFileInfo productInfo)
+        private void SwitchToProduct(ProductFileInfo productInfo)
         {
             if (productInfo == null) return;
 
@@ -923,7 +953,7 @@ namespace TankManager.Core.ViewModels
             if (product != null)
             {
                 IsProductsPanelOpen = false;
-                await LoadAndLinkProductAsync(product, $"Переключено на: {product.Name}");
+                LoadAndLinkProduct(product, $"Переключено на: {product.Name}");
             }
         }
 
@@ -956,6 +986,7 @@ namespace TankManager.Core.ViewModels
                 }
             }
             
+            var previous = _currentProduct;
             _currentProduct = product;
             _isLinkedToKompas = isLinked;
 
@@ -971,43 +1002,57 @@ namespace TankManager.Core.ViewModels
             NotifyRefreshCommandCanExecuteChanged();
             NotifyLinkCommandCanExecuteChanged();
 
+            ReleaseProductIfUnused(previous);
+
             // Фоновая синхронизация изображений с сервером
-            _ = SyncProductImagesInBackgroundAsync(product);
+            RunSafe(SyncProductImagesInBackgroundAsync(product));
 
             // Фоновая генерация превью чертежей для нового изделия с КОМПАС
             if (isLinked)
             {
-                _ = GenerateDrawingPreviewsInBackgroundAsync();
+                RunSafe(GenerateDrawingPreviewsInBackgroundAsync());
             }
 
-            // Принудительная сборка мусора после смены продукта
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
         }
 
         private async Task SaveProductAsync()
         {
+            if (IsLoading) return;
             if (CurrentProduct == null || string.IsNullOrEmpty(CurrentProduct.Name)) return;
+
+            var product = CurrentProduct;
 
             try
             {
                 IsLoading = true;
 
                 // Получаем папку для изображений продукта
-                string imagesFolder = _storageService.GetProductImagesFolder(CurrentProduct);
+                string imagesFolder = await Task.Run(() => _storageService.GetProductImagesFolder(product));
 
                 // Сохраняем превью 3D-файлов для работы без исходных файлов КОМПАС
                 await SaveAllFilePreviewsAsync(imagesFolder);
 
-                var filePath = _storageService.Save(CurrentProduct);
+                // Запись на диск и в сетевую папку — вне UI-потока
+                var filePath = await Task.Run(() => _storageService.Save(product));
                 var fileName = Path.GetFileName(filePath);
-                StatusMessage = $"Сохранено: {fileName}";
-                ShowSnackbar($"Изделие \"{CurrentProduct.Name}\" успешно сохранено");
+
+                var serverError = _storageService.LastServerError;
+                if (string.IsNullOrEmpty(serverError))
+                {
+                    StatusMessage = $"Сохранено: {fileName}";
+                    ShowSnackbar($"Изделие \"{product.Name}\" успешно сохранено");
+                }
+                else
+                {
+                    StatusMessage = $"Сохранено локально: {fileName}. Сервер: {serverError}";
+                    ShowSnackbar($"Изделие сохранено только локально: {serverError}", 6000);
+                }
+
                 RefreshSavedProducts();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка сохранения: {ex.Message}");
+                _logger.LogError("Ошибка сохранения изделия", ex);
                 StatusMessage = $"Ошибка сохранения: {ex.Message}";
                 MessageBox.Show($"Не удалось сохранить изделие:\n{ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -1065,7 +1110,7 @@ namespace TankManager.Core.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Ошибка сохранения превью для {part.Name}: {ex.Message}");
+                    _logger.LogWarning($"Ошибка сохранения превью для {part.Name}: {ex.Message}");
                     saved++;
                 }
             }
@@ -1127,7 +1172,7 @@ namespace TankManager.Core.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Фоновая генерация превью {detail.Name}: {ex.Message}");
+                    _logger.LogWarning($"Фоновая генерация превью {detail.Name}: {ex.Message}");
                     processed++;
                 }
             }
@@ -1138,112 +1183,61 @@ namespace TankManager.Core.ViewModels
             }
         }
 
-        /// <summary>
-        /// Загружает превью чертежей для всех деталей, у которых их ещё нет
-        /// </summary>
-        private async Task LoadAllDrawingPreviewsAsync()
+        private async Task DeleteSelectedProductAsync(bool everywhere)
         {
-            if (Details == null || !IsLinkedToKompas || CurrentProduct?.Context == null)
-                return;
+            var info = SelectedSavedProduct;
+            if (info == null || IsLoading) return;
 
-            // Получаем папку для изображений продукта
-            string imagesFolder = _storageService.GetProductImagesFolder(CurrentProduct);
+            var confirmation = everywhere
+                ? MessageBox.Show(
+                    $"Удалить \"{info.ProductName}\" локально и с сервера?\n\nЭто действие нельзя отменить.",
+                    "Подтверждение удаления",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning)
+                : MessageBox.Show(
+                    $"Удалить \"{info.ProductName}\" локально?\n\nИзделие останется на сервере.",
+                    "Подтверждение удаления",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
 
-            // Группируем по уникальным деталям (по FilePath), чтобы не загружать одно и то же несколько раз
-            var uniqueDetailsWithoutPreview = Details
-                .Where(d => string.IsNullOrEmpty(d.CdfFilePath) && !d.IsBodyBased && !string.IsNullOrEmpty(d.FilePath))
-                .GroupBy(d => d.FilePath)
-                .Select(g => g.First())
-                .ToList();
+            if (confirmation != MessageBoxResult.Yes) return;
 
-            if (uniqueDetailsWithoutPreview.Count == 0)
-                return;
+            var currentFilePath = CurrentProduct?.FilePath;
+            ClearCurrentProductIfMatches(info);
+            if (CurrentProduct == null || CurrentProduct.FilePath != currentFilePath)
+                InvalidateProductCache(currentFilePath);
 
-            int loaded = 0;
-            int total = uniqueDetailsWithoutPreview.Count;
-
-            foreach (var detail in uniqueDetailsWithoutPreview)
+            try
             {
-                try
+                IsLoading = true;
+
+                // Удаление с повторными попытками и сетевые операции — вне UI-потока
+                bool deleted = await Task.Run(() => everywhere
+                    ? _storageService.Delete(info.FileName)
+                    : _storageService.DeleteLocal(info.FileName));
+
+                if (deleted)
                 {
-                    StatusMessage = $"Загрузка чертежей: {loaded + 1}/{total} - {detail.Name}";
-                    
-                    await Task.Run(() => _kompasService.LoadDrawingPreview(detail, CurrentProduct, imagesFolder));
-                    
-                    // Копируем путь к превью для всех одинаковых деталей
-                    if (!string.IsNullOrEmpty(detail.CdfFilePath))
-                    {
-                        foreach (var samePart in Details.Where(d => d.FilePath == detail.FilePath && d != detail))
-                        {
-                        samePart.CdfFilePath = detail.CdfFilePath;
-                            samePart.SourceCdwPath = detail.SourceCdwPath;
-                        }
-                    }
-                    
-                    loaded++;
+                    StatusMessage = everywhere
+                        ? $"Удалено отовсюду: {info.ProductName}"
+                        : $"Удалено локально: {info.ProductName}";
+                    RefreshSavedProducts();
                 }
-                catch (Exception ex)
+
+                if (everywhere && !string.IsNullOrEmpty(_storageService.LastServerError))
                 {
-                    Debug.WriteLine($"Ошибка загрузки превью для {detail.Name}: {ex.Message}");
-                    loaded++;
+                    StatusMessage += $". {_storageService.LastServerError}";
+                    ShowSnackbar(_storageService.LastServerError, 6000);
                 }
             }
-        }
-
-        private void DeleteSelectedProduct()
-        {
-            DeleteSelectedProductEverywhere();
-        }
-
-        private void DeleteSelectedProductLocal()
-        {
-            if (SelectedSavedProduct == null) return;
-
-            var result = MessageBox.Show(
-                $"Удалить \"{SelectedSavedProduct.ProductName}\" локально?\n\nИзделие останется на сервере.",
-                "Подтверждение удаления",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
+            catch (Exception ex)
             {
-                ClearCurrentProductIfMatches(SelectedSavedProduct);
-                InvalidateProductCache(CurrentProduct?.FilePath);
-
-                if (_storageService.DeleteLocal(SelectedSavedProduct.FileName))
-                {
-                    StatusMessage = $"Удалено локально: {SelectedSavedProduct.ProductName}";
-                    RefreshSavedProducts();
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                    GC.Collect();
-                }
+                _logger.LogError("Ошибка удаления изделия", ex);
+                ShowError("Не удалось удалить изделие", ex);
             }
-        }
-
-        private void DeleteSelectedProductEverywhere()
-        {
-            if (SelectedSavedProduct == null) return;
-
-            var result = MessageBox.Show(
-                $"Удалить \"{SelectedSavedProduct.ProductName}\" локально и с сервера?\n\nЭто действие нельзя отменить.",
-                "Подтверждение удаления",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Yes)
+            finally
             {
-                ClearCurrentProductIfMatches(SelectedSavedProduct);
-                InvalidateProductCache(CurrentProduct?.FilePath);
-
-                if (_storageService.Delete(SelectedSavedProduct.FileName))
-                {
-                    StatusMessage = $"Удалено отовсюду: {SelectedSavedProduct.ProductName}";
-                    RefreshSavedProducts();
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                    GC.Collect();
-                }
+                IsLoading = false;
             }
         }
 
@@ -1273,12 +1267,17 @@ namespace TankManager.Core.ViewModels
                 SavedProducts.Add(product);
         }
 
-        public void ClearProductCache() => _linkedProductsCache.Clear();
-
         public void InvalidateProductCache(string filePath)
         {
-            if (!string.IsNullOrEmpty(filePath))
+            if (string.IsNullOrEmpty(filePath))
+                return;
+
+            Product removed;
+            if (_linkedProductsCache.TryGetValue(filePath, out removed))
+            {
                 _linkedProductsCache.Remove(filePath);
+                ReleaseProductIfUnused(removed);
+            }
         }
 
         #endregion
@@ -1302,7 +1301,10 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                ShowError("Не удалось показать деталь в КОМПАС", ex);
+                if (IsKompasLinkLost())
+                    MarkLinkLost();
+                else
+                    ShowError("Не удалось показать деталь в КОМПАС", ex);
             }
         }
 
@@ -1311,6 +1313,9 @@ namespace TankManager.Core.ViewModels
             var part = CurrentlySelectedPart;
             if (part == null)
                 return;
+
+            if (IsLinkedToKompas && IsKompasLinkLost())
+                MarkLinkLost();
 
             bool needsPreview = string.IsNullOrEmpty(part.CdfFilePath);
             bool isStale = !needsPreview && ImageSyncService.IsDrawingPreviewStale(part.CdfFilePath, part.SourceCdwPath);
@@ -1330,7 +1335,7 @@ namespace TankManager.Core.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Ошибка загрузки превью чертежа: {ex.Message}");
+                    _logger.LogWarning($"Ошибка загрузки превью чертежа: {ex.Message}");
                 }
             }
 
@@ -1472,7 +1477,7 @@ namespace TankManager.Core.ViewModels
                     StatusMessage = $"Серверная папка: {ServerStorageFolderDisplay}";
                     
                     // После выбора папки автоматически синхронизируем
-                    _ = SyncFromServerAsync();
+                    RunSafe(SyncFromServerAsync());
                 }
             }
         }
@@ -1494,6 +1499,8 @@ namespace TankManager.Core.ViewModels
 
         private async Task SyncFromServerAsync()
         {
+            if (IsLoading) return;
+
             if (!IsServerAvailable)
             {
                 StatusMessage = "Серверная папка недоступна";
@@ -1528,7 +1535,7 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка синхронизации: {ex.Message}");
+                _logger.LogWarning($"Ошибка синхронизации: {ex.Message}");
                 StatusMessage = $"Ошибка синхронизации: {ex.Message}";
             }
             finally
@@ -1551,7 +1558,7 @@ namespace TankManager.Core.ViewModels
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка фоновой синхронизации изображений: {ex.Message}");
+                _logger.LogWarning($"Ошибка фоновой синхронизации изображений: {ex.Message}");
             }
         }
 
@@ -1685,6 +1692,73 @@ namespace TankManager.Core.ViewModels
             UpdateCalculations();
         }
 
+        /// <summary>
+        /// Запускает фоновую задачу и логирует необработанное исключение
+        /// </summary>
+        private void RunSafe(Task task)
+        {
+            task.ContinueWith(
+                t => _logger.LogError("Необработанная ошибка фоновой операции", t.Exception?.GetBaseException()),
+                TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        private void NotifyLoadingDependentCommands()
+        {
+            ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)LoadFromActiveDocumentCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)LinkToKompasCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)SaveProductCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)RefreshFromKompasCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)SyncFromServerCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)DeleteProductCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)DeleteProductLocalCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)DeleteProductEverywhereCommand)?.NotifyCanExecuteChanged();
+        }
+
+        /// <summary>
+        /// Кладёт связанный продукт в кэш; заменённый продукт освобождается, если он больше не используется
+        /// </summary>
+        private void CacheProduct(string filePath, Product product)
+        {
+            Product old;
+            bool hadOld = _linkedProductsCache.TryGetValue(filePath, out old);
+            _linkedProductsCache[filePath] = product;
+
+            if (hadOld && old != product)
+                ReleaseProductIfUnused(old);
+        }
+
+        /// <summary>
+        /// Освобождает COM-контекст продукта, если он не текущий и не лежит в кэше
+        /// </summary>
+        private void ReleaseProductIfUnused(Product product)
+        {
+            if (product == null || product == _currentProduct)
+                return;
+
+            if (_linkedProductsCache.ContainsValue(product))
+                return;
+
+            product.Dispose();
+        }
+
+        private bool IsKompasLinkLost()
+        {
+            var context = CurrentProduct?.Context;
+            return context != null && !context.IsDocumentAlive();
+        }
+
+        private void MarkLinkLost()
+        {
+            IsLinkedToKompas = false;
+            StatusMessage = "Связь с КОМПАС потеряна. Запустите КОМПАС и нажмите «Связать».";
+            ShowSnackbar("Связь с КОМПАС потеряна", 5000);
+            NotifyCopyCommandsCanExecuteChanged();
+            NotifySaveCommandCanExecuteChanged();
+            NotifyLinkCommandCanExecuteChanged();
+            NotifyRefreshCommandCanExecuteChanged();
+        }
+
         private void ShowError(string message, Exception ex)
         {
             StatusMessage = $"Ошибка: {ex.Message}";
@@ -1744,14 +1818,15 @@ namespace TankManager.Core.ViewModels
                 }
             }
             
+            foreach (var cached in _linkedProductsCache.Values.ToList())
+            {
+                if (cached != CurrentProduct)
+                    cached.Dispose();
+            }
+
             _linkedProductsCache.Clear();
             CurrentProduct?.Clear();
             _kompasService?.Dispose();
-            
-            // Принудительная сборка мусора для освобождения файлов
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
         }
 
         #endregion

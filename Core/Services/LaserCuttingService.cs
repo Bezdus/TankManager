@@ -16,7 +16,6 @@ namespace TankManager.Core.Services
     public class LaserCuttingService
     {
         private const string ScribeLayerName = "Scribe";
-        private const string TempFolderName = "TempFrw";
 
         private readonly ILogger _logger;
 
@@ -48,6 +47,7 @@ namespace TankManager.Core.Services
             ILayers layers = null;
             object drawingObjects = null;
             string frwFilePath = null;
+            string tempFolder = null;
 
             try
             {
@@ -55,11 +55,8 @@ namespace TankManager.Core.Services
                 if (converter == null)
                     return null;
 
-                string dxfDirectory = Path.GetDirectoryName(dxfFilePath);
-                if (string.IsNullOrEmpty(dxfDirectory))
-                    dxfDirectory = Path.GetTempPath();
-
-                string tempFolder = Path.Combine(dxfDirectory, TempFolderName);
+                // Временные файлы — в %TEMP%, а не рядом с DXF (там может быть общая или защищённая от записи папка)
+                tempFolder = Path.Combine(Path.GetTempPath(), "TankManager", "frw", Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(tempFolder);
 
                 frwFilePath = Path.Combine(
@@ -141,10 +138,10 @@ namespace TankManager.Core.Services
                 ReleaseComObject(document);
                 ReleaseComObject(converter);
 
-                if (!string.IsNullOrEmpty(frwFilePath))
+                if (!string.IsNullOrEmpty(tempFolder))
                 {
-                    try { if (File.Exists(frwFilePath)) File.Delete(frwFilePath); }
-                    catch { }
+                    try { if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true); }
+                    catch (Exception ex) { _logger.LogWarning($"Не удалось удалить временную папку {tempFolder}: {ex.Message}"); }
                 }
             }
         }

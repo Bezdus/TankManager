@@ -128,6 +128,17 @@ namespace TankManager.Core.Models
             }
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && Context != null)
+            {
+                Context.Dispose();
+                Context = null;
+            }
+
+            base.Dispose(disposing);
+        }
+
         public void Clear()
         {
             // Очищаем превью у всех деталей перед очисткой коллекций
@@ -153,6 +164,7 @@ namespace TankManager.Core.Models
             Name = null;
             Marking = null;
             Mass = 0;
+            Context?.Dispose();
             Context = null;
             
             // Освобождаем собственные ресурсы

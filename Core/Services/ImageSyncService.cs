@@ -73,19 +73,5 @@ namespace TankManager.Core.Services
 
             return File.GetLastWriteTimeUtc(cdwPath) > File.GetLastWriteTimeUtc(pngPath);
         }
-
-        /// <summary>
-        /// Проверяет, устарело ли превью 3D-файла по сравнению с исходным файлом
-        /// </summary>
-        public static bool IsFilePreviewStale(string previewPngPath, string sourceFilePath)
-        {
-            if (string.IsNullOrEmpty(sourceFilePath) || !File.Exists(sourceFilePath))
-                return false;
-
-            if (string.IsNullOrEmpty(previewPngPath) || !File.Exists(previewPngPath))
-                return true;
-
-            return File.GetLastWriteTimeUtc(sourceFilePath) > File.GetLastWriteTimeUtc(previewPngPath);
-        }
     }
 }
