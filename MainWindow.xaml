@@ -8,6 +8,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="Tank Manager v1.1.5"
+        Width="1280" Height="800"
+        MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         AllowDrop="True"
         Drop="FileDropZone_Drop"
@@ -102,6 +104,30 @@
             <Setter Property="Padding" Value="5"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
             <Setter Property="Background" Value="{StaticResource PrimaryBackground}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="3">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="8,5">
+                                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                                </Border>
+                                <ContentPresenter Grid.Row="1" Margin="{TemplateBinding Padding}"/>
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         
         <Style TargetType="TextBlock" x:Key="PropertyLabel">
@@ -246,7 +272,8 @@
                                            BorderBrush="{StaticResource BorderColor}"
                                            BorderThickness="1"
                                            CornerRadius="3"
-                                           Margin="0,2,0,0">
+                                           Margin="0,2,0,0"
+                                           MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                         <Border.Effect>
                                             <DropShadowEffect ShadowDepth="2" Opacity="0.2" BlurRadius="5"/>
                                         </Border.Effect>
@@ -671,7 +698,11 @@
         <!-- Панель инструментов -->
         <Border Grid.Row="0" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="8,6">
             <Grid>
-                <StackPanel Orientation="Horizontal">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Command="{Binding ToggleProductsPanelCommand}"
                             Style="{StaticResource PanelButtonStyle}"
                             ToolTip="Список сохранённых изделий">
@@ -681,7 +712,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="8,2" VerticalAlignment="Center"/>
 
                     <Button x:Name="LoadDocumentButton" 
                             Click="LoadDocumentButton_Click"
@@ -692,7 +723,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="8,2" VerticalAlignment="Center"/>
 
                     <Button Command="{Binding SaveProductCommand}"
                             ToolTipService.ShowOnDisabled="True">
@@ -714,7 +745,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="8,2" VerticalAlignment="Center"/>
 
                     <Button Command="{Binding OpenPricingSettingsCommand}"
                             Style="{StaticResource PanelButtonStyle}"
@@ -725,7 +756,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="8,2" VerticalAlignment="Center"/>
 
                     <Button Command="{Binding CopyAllDataToClipboardCommand}"
                             Style="{StaticResource PanelButtonStyle}"
@@ -736,7 +767,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="8,2" VerticalAlignment="Center"/>
 
                     <Button Command="{Binding ExportToExcelCommand}"
                             Style="{StaticResource PanelButtonStyle}"
@@ -747,7 +778,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="8,2"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="8,2" VerticalAlignment="Center"/>
 
                     <!-- Кнопка связи с КОМПАС / индикатор статуса -->
                     <Button Command="{Binding LinkToKompasCommand}"
@@ -781,14 +812,14 @@
                             </Button>
                         </StackPanel>
                     </Border>
-                </StackPanel>
+                </WrapPanel>
 
-                <Button HorizontalAlignment="Right"
+                <Button Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
                         Command="{Binding CheckForUpdatesCommand}"
                         Style="{StaticResource PanelButtonStyle}"
                         ToolTip="Проверить наличие обновлений">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🔄" Margin="0,0,5,0"/>
+                        <TextBlock Text="⬆" Margin="0,0,5,0"/>
                         <TextBlock Text="Проверить обновления"/>
                     </StackPanel>
                 </Button>
@@ -804,7 +835,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="2.5*" MinWidth="250"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="1.5*" MinWidth="200"/>
+                    <ColumnDefinition Width="1.5*" MinWidth="300"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ЛЕВАЯ ПАНЕЛЬ: Список всех деталей -->
@@ -1016,6 +1047,7 @@
                                        Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </GroupBox.Header>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid>
                         <!-- Превью изделия когда ничего не выбрано -->
                         <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
@@ -1305,13 +1337,13 @@
                                     <Rectangle Grid.Row="6" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" Margin="0,4"/>
 
                                     <TextBlock Grid.Row="7" Grid.Column="0" Text="Стоимость металла:" Style="{StaticResource PropertyLabel}"/>
-                                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding MetalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+                                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding MetalCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource PropertyValue}"/>
 
                                     <TextBlock Grid.Row="8" Grid.Column="0" Text="Стоимость операций:" Style="{StaticResource PropertyLabel}"/>
-                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding OperationsCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding OperationsCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource PropertyValue}"/>
 
                                     <TextBlock Grid.Row="9" Grid.Column="0" Text="Общая стоимость:" Style="{StaticResource PropertyLabel}" FontWeight="SemiBold"/>
-                                    <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding TotalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding TotalCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource PropertyValue}" FontWeight="SemiBold"/>
                                 </Grid>
                             </Border>
 
@@ -1350,6 +1382,7 @@
 
                         </Grid>
                     </Grid>
+                    </ScrollViewer>
                 </GroupBox>
 
                 <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
@@ -1374,34 +1407,37 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="📄" Margin="0,0,5,0"/>
                                     <TextBlock Text="Листовой" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                 </StackPanel>
-                                <ComboBox Grid.Column="1"
-                                          SelectedValue="{Binding SheetMaterialsSortType, Mode=TwoWay}"
-                                          Style="{StaticResource SortComboBoxStyle}"
-                                          Width="110"
-                                          Margin="4,0"
-                                          ToolTip="Выберите тип сортировки">
-                                    <models:MaterialSortType>ByName</models:MaterialSortType>
-                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Grid.Column="2" 
+                                <Button Grid.Column="1" 
                                         Content="📋" 
                                         Style="{StaticResource CopyButtonStyle}"
                                         Command="{Binding CopySheetToClipboardCommand}"
                                         ToolTip="Копировать в Excel"/>
                             </Grid>
                         </GroupBox.Header>
-                        <ListBox ItemsSource="{Binding SheetMaterialsView}"
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <ComboBox Grid.Row="0"
+                                SelectedValue="{Binding SheetMaterialsSortType, Mode=TwoWay}"
+                                Style="{StaticResource SortComboBoxStyle}"
+                                Margin="0,0,0,4"
+                                ToolTip="Выберите тип сортировки">
+                                <models:MaterialSortType>ByName</models:MaterialSortType>
+                                <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
+                                </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            <ListBox Grid.Row="1" ItemsSource="{Binding SheetMaterialsView}"
                                  SelectedItem="{Binding SelectedSheetMaterial}"
                                  SelectionMode="Single"
                                  PreviewMouseDown="SheetMaterialsListBox_PreviewMouseDown"
@@ -1419,6 +1455,7 @@
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialListBoxItemStyle}"/>
                             </ListBox.ItemContainerStyle>
                         </ListBox>
+                        </Grid>
                     </GroupBox>
 
                     <!-- Трубный прокат -->
@@ -1428,35 +1465,38 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="🔩" Margin="0,0,5,0"/>
                                     <TextBlock Text="Трубный" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                 </StackPanel>
-                                <ComboBox Grid.Column="1"
-                                          SelectedValue="{Binding TubularProductsSortType, Mode=TwoWay}"
-                                          Style="{StaticResource SortComboBoxStyle}"
-                                          Width="110"
-                                          Margin="4,0"
-                                          ToolTip="Выберите тип сортировки">
-                                    <models:MaterialSortType>ByLength</models:MaterialSortType>
-                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
-                                    <models:MaterialSortType>ByName</models:MaterialSortType>
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Grid.Column="2" 
+                                <Button Grid.Column="1" 
                                         Content="📋" 
                                         Style="{StaticResource CopyButtonStyle}"
                                         Command="{Binding CopyTubularProductsToClipboardCommand}"
                                         ToolTip="Копировать в Excel"/>
                             </Grid>
                         </GroupBox.Header>
-                        <ListBox ItemsSource="{Binding TubularProductsView}"
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <ComboBox Grid.Row="0"
+                                SelectedValue="{Binding TubularProductsSortType, Mode=TwoWay}"
+                                Style="{StaticResource SortComboBoxStyle}"
+                                Margin="0,0,0,4"
+                                ToolTip="Выберите тип сортировки">
+                                <models:MaterialSortType>ByLength</models:MaterialSortType>
+                                <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                <models:MaterialSortType>ByName</models:MaterialSortType>
+                                <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
+                                </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            <ListBox Grid.Row="1" ItemsSource="{Binding TubularProductsView}"
                                  SelectedItem="{Binding SelectedTubularProduct}"
                                  SelectionMode="Single"
                                  PreviewMouseDown="TubularProductsListBox_PreviewMouseDown"
@@ -1474,6 +1514,7 @@
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialListBoxItemStyle}"/>
                             </ListBox.ItemContainerStyle>
                         </ListBox>
+                        </Grid>
                     </GroupBox>
 
                     <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Grid.ColumnSpan="2" Background="Transparent"/>
@@ -1485,34 +1526,37 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🔩" Margin="0,0,5,0"/>
+                                    <TextBlock Text="🧰" Margin="0,0,5,0"/>
                                     <TextBlock Text="Прочие" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                 </StackPanel>
-                                 <ComboBox Grid.Column="1"
-                                          SelectedValue="{Binding OtherMaterialsSortType, Mode=TwoWay}"
-                                          Style="{StaticResource SortComboBoxStyle}"
-                                          Width="110"
-                                          Margin="4,0"
-                                          ToolTip="Выберите тип сортировки">
-                                    <models:MaterialSortType>ByName</models:MaterialSortType>
-                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Grid.Column="2" 
+                                <Button Grid.Column="1" 
                                         Content="📋" 
                                         Style="{StaticResource CopyButtonStyle}"
                                         Command="{Binding CopyOtherMaterialsToClipboardCommand}"
                                         ToolTip="Копировать в Excel"/>
                             </Grid>
                         </GroupBox.Header>
-                        <ListBox ItemsSource="{Binding OtherMaterialsView}"
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <ComboBox Grid.Row="0"
+                                SelectedValue="{Binding OtherMaterialsSortType, Mode=TwoWay}"
+                                Style="{StaticResource SortComboBoxStyle}"
+                                Margin="0,0,0,4"
+                                ToolTip="Выберите тип сортировки">
+                                <models:MaterialSortType>ByName</models:MaterialSortType>
+                                <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}"/>
+                                </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            <ListBox Grid.Row="1" ItemsSource="{Binding OtherMaterialsView}"
                                  SelectedItem="{Binding SelectedTubularProduct}"
                                  SelectionMode="Single"
                                  PreviewMouseDown="TubularProductsListBox_PreviewMouseDown"
@@ -1530,6 +1574,7 @@
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialListBoxItemStyle}"/>
                             </ListBox.ItemContainerStyle>
                         </ListBox>
+                        </Grid>
                     </GroupBox>
 
                     <!-- Стандартные изделия -->
@@ -2001,7 +2046,7 @@
 
         <!-- SnackBar уведомление -->
         <Border x:Name="SnackbarNotification"
-                Grid.Row="0" Grid.RowSpan="4"
+                Grid.Row="0" Grid.RowSpan="3"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="0,0,0,20"
