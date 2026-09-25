@@ -8,6 +8,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="Tank Manager v1.1.5"
+        Width="1280" Height="800"
+        MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         AllowDrop="True"
         Drop="FileDropZone_Drop"
@@ -588,7 +590,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal">
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Command="{Binding ToggleProductsPanelCommand}"
                             Style="{StaticResource PanelButtonStyle}"
                             ToolTip="Список сохранённых изделий">
@@ -659,7 +661,7 @@
                             <TextBlock Text="Цены"/>
                         </StackPanel>
                     </Button>
-                </StackPanel>
+                </WrapPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- Кнопка связи с КОМПАС / индикатор статуса -->
@@ -724,7 +726,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="2.5*" MinWidth="250"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="1.5*" MinWidth="200"/>
+                    <ColumnDefinition Width="1.5*" MinWidth="300"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ЛЕВАЯ ПАНЕЛЬ: Список всех деталей -->
@@ -1167,13 +1169,13 @@
                                         <Rectangle Grid.Row="6" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" Margin="0,8"/>
 
                                         <TextBlock Grid.Row="7" Grid.Column="0" Text="Металл" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding MetalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+                                        <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding MetalCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource PropertyValue}"/>
 
                                         <TextBlock Grid.Row="8" Grid.Column="0" Text="Операции" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding OperationsCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource PropertyValue}"/>
+                                        <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding OperationsCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource PropertyValue}"/>
 
                                         <TextBlock Grid.Row="9" Grid.Column="0" Text="Итого" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding TotalCost, StringFormat='{}{0:F2} руб'}" Style="{StaticResource TotalValue}"/>
+                                        <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding TotalCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource TotalValue}"/>
                                     </Grid>
 
                                     <!-- Операции изготовления -->
@@ -1784,7 +1786,7 @@
 
         <!-- SnackBar уведомление -->
         <Border x:Name="SnackbarNotification"
-                Grid.Row="0" Grid.RowSpan="4"
+                Grid.Row="0" Grid.RowSpan="3"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="0,0,0,24"

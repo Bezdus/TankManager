@@ -18,6 +18,8 @@ namespace TankManager.Core.Services
     /// </summary>
     public class KompasContext : IDisposable
     {
+        private static readonly ILogger Logger = new FileLogger();
+
         public IApplication Application { get; private set; }
         public IKompasDocument3D Document { get; private set; }
         public IPart7 TopPart { get; private set; }
@@ -29,6 +31,29 @@ namespace TankManager.Core.Services
 
         public bool IsInitialized => Application != null;
         public bool IsDocumentLoaded => Document != null && TopPart != null;
+
+        /// <summary>
+        /// Проверяет, что COM-ссылка на документ ещё жива (документ не закрыт, КОМПАС не перезапущен)
+        /// </summary>
+        public bool IsDocumentAlive()
+        {
+            if (Document == null || TopPart == null)
+                return false;
+
+            try
+            {
+                var name = Document.Name;
+                return true;
+            }
+            catch (COMException)
+            {
+                return false;
+            }
+            catch (InvalidComObjectException)
+            {
+                return false;
+            }
+        }
 
         public KompasContext()
         {
@@ -179,39 +204,92 @@ namespace TankManager.Core.Services
         /// <returns>Значение свойства или null</returns>
         public string GetBodyPropertyValue(IBody7 body, string propertyName)
         {
-            if (body == null || string.IsNullOrEmpty(propertyName))
-                return null;
+            return GetBodyPropertyValues(body, propertyName)[0];
+        }
 
-            IProperty property = null;
-            IPropertyKeeper propertyKeeper = null;
+        /// <summary>
+        /// Получает значения нескольких свойств тела за одно открытие родительского документа
+        /// </summary>
+        /// <param name="body">Тело детали</param>
+        /// <param name="propertyNames">Имена свойств</param>
+        /// <returns>Значения в том же порядке (null, если свойство не найдено)</returns>
+        public string[] GetBodyPropertyValues(IBody7 body, params string[] propertyNames)
+        {
+            var result = new string[propertyNames.Length];
+            if (body == null || propertyNames.Length == 0)
+                return result;
+
             IKompasDocument3D parentDocument3D = null;
-            
+            IPropertyKeeper propertyKeeper = null;
+
             try
             {
                 IPart7 parentPart = body.Parent as IPart7;
-                parentDocument3D = Application.Documents.Open(parentPart.FileName, false, true) as IKompasDocument3D;
+                if (parentPart == null)
+                    return result;
 
-                property = PropertyManager.GetProperty(parentDocument3D, propertyName);
-                if (property == null)
-                    return null;
+                parentDocument3D = Application.Documents.Open(parentPart.FileName, false, true) as IKompasDocument3D;
+                if (parentDocument3D == null)
+                    return result;
 
                 propertyKeeper = body as IPropertyKeeper;
                 if (propertyKeeper == null)
-                    return null;
+                    return result;
 
-                propertyKeeper.GetPropertyValue(
-                    (KompasAPI7._Property)property, 
-                    out object markingObj, 
-                    false, 
-                    out bool fromSource);
-                
-                return markingObj?.ToString();
+                for (int i = 0; i < propertyNames.Length; i++)
+                {
+                    if (string.IsNullOrEmpty(propertyNames[i]))
+                        continue;
+
+                    IProperty property = null;
+                    try
+                    {
+                        property = PropertyManager.GetProperty(parentDocument3D, propertyNames[i]);
+                        if (property == null)
+                            continue;
+
+                        propertyKeeper.GetPropertyValue(
+                            (KompasAPI7._Property)property,
+                            out object value,
+                            false,
+                            out bool fromSource);
+
+                        result[i] = value?.ToString();
+                    }
+                    finally
+                    {
+                        ReleaseComObject(property);
+                    }
+                }
+
+                return result;
             }
             finally
             {
+                CloseIfHidden(parentDocument3D);
                 ReleaseComObject(parentDocument3D);
-                ReleaseComObject(property);
                 ReleaseComObjectIfNeeded(propertyKeeper, body);
+            }
+        }
+
+        /// <summary>
+        /// Закрывает документ, открытый без окна (иначе он остаётся загруженным в КОМПАС).
+        /// Видимые документы (сборка пользователя) не трогаем.
+        /// </summary>
+        private static void CloseIfHidden(IKompasDocument3D document)
+        {
+            if (document == null)
+                return;
+
+            try
+            {
+                var kompasDocument = document as IKompasDocument;
+                if (kompasDocument != null && !kompasDocument.Visible)
+                    kompasDocument.Close(DocumentCloseOptions.kdDoNotSaveChanges);
+            }
+            catch (COMException ex)
+            {
+                Logger.LogWarning($"Не удалось закрыть скрытый документ: {ex.Message}");
             }
         }
 
@@ -262,9 +340,10 @@ namespace TankManager.Core.Services
                         op.MaterialThickness = thickness;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Игнорируем ошибки чтения операций
+                // Деталь остаётся с частичным списком операций — фиксируем это в логе
+                Logger.LogWarning($"Ошибка чтения операций детали {part.Name}: {ex.Message}");
             }
             finally
             {
@@ -333,12 +412,9 @@ namespace TankManager.Core.Services
                     ISheetMetalRuledShell cowling = modelObject as ISheetMetalRuledShell;
                     if (cowling != null)
                     {
-                        // TODO: свойство Depth отсутствует в ISheetMetalRuledShell текущей версии;
-                        // доступны: DraftValue, GapOffsetLength, RuledBorder, RuledJoint и др.
-                        operations.Add(new RollingOperation
-                        {
-                            Length = 0
-                        });
+                        // Стоимость вальцовки считается по массе детали (см. RollingOperation.CalculateCost),
+                        // поэтому геометрические параметры здесь не нужны
+                        operations.Add(new RollingOperation());
                         ReleaseComObjectIfNeeded(cowling, modelObject);
                     }
                     break;
@@ -458,9 +534,6 @@ namespace TankManager.Core.Services
             
             // Не освобождаем Application, т.к. получен через GetActiveObject
             Application = null;
-            
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
         }
     }
 }

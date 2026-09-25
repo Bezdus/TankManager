@@ -1,4 +1,4 @@
-using System;
+п»їusing System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -11,18 +11,18 @@ using KompasAPI7;
 namespace TankManager.Core.Services
 {
     /// <summary>
-    /// Сервис для создания и кэширования PNG-превью чертежей
+    /// РЎРµСЂРІРёСЃ РґР»СЏ СЃРѕР·РґР°РЅРёСЏ Рё РєСЌС€РёСЂРѕРІР°РЅРёСЏ PNG-РїСЂРµРІСЊСЋ С‡РµСЂС‚РµР¶РµР№
     /// </summary>
     public class DrawingPreviewService
     {
         /// <summary>
-        /// Получает или создаёт PNG-превью чертежа детали
+        /// РџРѕР»СѓС‡Р°РµС‚ РёР»Рё СЃРѕР·РґР°С‘С‚ PNG-РїСЂРµРІСЊСЋ С‡РµСЂС‚РµР¶Р° РґРµС‚Р°Р»Рё
         /// </summary>
-        /// <param name="part">Деталь</param>
-        /// <param name="context">Контекст KOMPAS</param>
-        /// <param name="sourceCdwPath">Выходной параметр: путь к исходному файлу чертежа</param>
-        /// <param name="targetDirectory">Целевая папка для сохранения превью</param>
-        /// <returns>Путь к PNG-файлу превью</returns>
+        /// <param name="part">Р”РµС‚Р°Р»СЊ</param>
+        /// <param name="context">РљРѕРЅС‚РµРєСЃС‚ KOMPAS</param>
+        /// <param name="sourceCdwPath">Р’С‹С…РѕРґРЅРѕР№ РїР°СЂР°РјРµС‚СЂ: РїСѓС‚СЊ Рє РёСЃС…РѕРґРЅРѕРјСѓ С„Р°Р№Р»Сѓ С‡РµСЂС‚РµР¶Р°</param>
+        /// <param name="targetDirectory">Р¦РµР»РµРІР°СЏ РїР°РїРєР° РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ РїСЂРµРІСЊСЋ</param>
+        /// <returns>РџСѓС‚СЊ Рє PNG-С„Р°Р№Р»Сѓ РїСЂРµРІСЊСЋ</returns>
         public string GetOrCreatePreview(IPart7 part, KompasContext context, out string sourceCdwPath, string targetDirectory)
         {
             sourceCdwPath = null;
@@ -35,29 +35,29 @@ namespace TankManager.Core.Services
 
             try
             {
-                // Получаем путь к чертежу
+                // РџРѕР»СѓС‡Р°РµРј РїСѓС‚СЊ Рє С‡РµСЂС‚РµР¶Сѓ
                 string cdwPath = GetAttachedDrawingPath(part, ref kompasDocument3D);
                 if (string.IsNullOrEmpty(cdwPath) || !File.Exists(cdwPath))
                     return null;
 
                 sourceCdwPath = cdwPath;
 
-                // Создаём целевую папку если её нет
+                // РЎРѕР·РґР°С‘Рј С†РµР»РµРІСѓСЋ РїР°РїРєСѓ РµСЃР»Рё РµС‘ РЅРµС‚
                 Directory.CreateDirectory(targetDirectory);
 
-                // Проверяем кэш
+                // РџСЂРѕРІРµСЂСЏРµРј РєСЌС€
                 string pngPath = GetCachedPngPath(cdwPath, targetDirectory);
                 if (IsCacheValid(cdwPath, pngPath))
                     return pngPath;
 
-                // Удаляем существующий файл, чтобы КОМПАС не показывал диалог подтверждения
+                // РЈРґР°Р»СЏРµРј СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ С„Р°Р№Р», С‡С‚РѕР±С‹ РљРћРњРџРђРЎ РЅРµ РїРѕРєР°Р·С‹РІР°Р» РґРёР°Р»РѕРі РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ
                 if (File.Exists(pngPath))
                 {
                     try { File.Delete(pngPath); }
-                    catch { /* Игнорируем ошибку удаления */ }
+                    catch { /* РРіРЅРѕСЂРёСЂСѓРµРј РѕС€РёР±РєСѓ СѓРґР°Р»РµРЅРёСЏ */ }
                 }
 
-                // Генерируем PNG
+                // Р“РµРЅРµСЂРёСЂСѓРµРј PNG
                 cdwDocument = context.Application.Documents.Open(cdwPath, false, false);
                 if (cdwDocument == null)
                     return null;
@@ -91,13 +91,13 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Загружает PNG-изображение для отображения в UI.
-        /// Проверяет актуальность кэша перед загрузкой.
-        /// Загружает изображение в память, чтобы не блокировать файл.
+        /// Р—Р°РіСЂСѓР¶Р°РµС‚ PNG-РёР·РѕР±СЂР°Р¶РµРЅРёРµ РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ UI.
+        /// РџСЂРѕРІРµСЂСЏРµС‚ Р°РєС‚СѓР°Р»СЊРЅРѕСЃС‚СЊ РєСЌС€Р° РїРµСЂРµРґ Р·Р°РіСЂСѓР·РєРѕР№.
+        /// Р—Р°РіСЂСѓР¶Р°РµС‚ РёР·РѕР±СЂР°Р¶РµРЅРёРµ РІ РїР°РјСЏС‚СЊ, С‡С‚РѕР±С‹ РЅРµ Р±Р»РѕРєРёСЂРѕРІР°С‚СЊ С„Р°Р№Р».
         /// </summary>
-        /// <param name="pngPath">Путь к PNG-файлу</param>
-        /// <param name="sourceCdwPath">Путь к исходному файлу чертежа для проверки актуальности</param>
-        /// <returns>Изображение или null, если кэш устарел или файл не существует</returns>
+        /// <param name="pngPath">РџСѓС‚СЊ Рє PNG-С„Р°Р№Р»Сѓ</param>
+        /// <param name="sourceCdwPath">РџСѓС‚СЊ Рє РёСЃС…РѕРґРЅРѕРјСѓ С„Р°Р№Р»Сѓ С‡РµСЂС‚РµР¶Р° РґР»СЏ РїСЂРѕРІРµСЂРєРё Р°РєС‚СѓР°Р»СЊРЅРѕСЃС‚Рё</param>
+        /// <returns>РР·РѕР±СЂР°Р¶РµРЅРёРµ РёР»Рё null, РµСЃР»Рё РєСЌС€ СѓСЃС‚Р°СЂРµР» РёР»Рё С„Р°Р№Р» РЅРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚</returns>
         public BitmapImage LoadPreviewImage(string pngPath, string sourceCdwPath = null)
         {
             if (string.IsNullOrEmpty(pngPath) || !File.Exists(pngPath))
@@ -105,7 +105,7 @@ namespace TankManager.Core.Services
                 return null;
             }
 
-            // Если указан исходный файл, проверяем актуальность кэша
+            // Р•СЃР»Рё СѓРєР°Р·Р°РЅ РёСЃС…РѕРґРЅС‹Р№ С„Р°Р№Р», РїСЂРѕРІРµСЂСЏРµРј Р°РєС‚СѓР°Р»СЊРЅРѕСЃС‚СЊ РєСЌС€Р°
             if (!string.IsNullOrEmpty(sourceCdwPath) && !IsCacheValid(sourceCdwPath, pngPath))
             {
                 return null;
@@ -117,7 +117,7 @@ namespace TankManager.Core.Services
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 
-                // Загружаем через поток в память, чтобы не блокировать файл
+                // Р—Р°РіСЂСѓР¶Р°РµРј С‡РµСЂРµР· РїРѕС‚РѕРє РІ РїР°РјСЏС‚СЊ, С‡С‚РѕР±С‹ РЅРµ Р±Р»РѕРєРёСЂРѕРІР°С‚СЊ С„Р°Р№Р»
                 using (var fileStream = new FileStream(pngPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var memoryStream = new MemoryStream())
                 {
@@ -127,7 +127,7 @@ namespace TankManager.Core.Services
                     bitmap.EndInit();
                 }
                 
-                bitmap.Freeze(); // Для потокобезопасности WPF
+                bitmap.Freeze(); // Р”Р»СЏ РїРѕС‚РѕРєРѕР±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё WPF
                 return bitmap;
             }
             catch (Exception)
@@ -165,7 +165,7 @@ namespace TankManager.Core.Services
         {
             string hash = ComputeHash(cdwPath);
             string fileName = Path.GetFileNameWithoutExtension(cdwPath);
-            // Убираем недопустимые символы из имени файла
+            // РЈР±РёСЂР°РµРј РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ СЃРёРјРІРѕР»С‹ РёР· РёРјРµРЅРё С„Р°Р№Р»Р°
             string safeFileName = string.Join("_", fileName.Split(Path.GetInvalidFileNameChars()));
             return Path.Combine(cacheDirectory, $"{safeFileName}_{hash}.png");
         }
@@ -199,7 +199,7 @@ namespace TankManager.Core.Services
                 if (kompasDoc != null && !kompasDoc.Visible)
                     kompasDoc.Close(DocumentCloseOptions.kdDoNotSaveChanges);
             }
-            catch { /* Игнорируем ошибки закрытия */ }
+            catch { /* РРіРЅРѕСЂРёСЂСѓРµРј РѕС€РёР±РєРё Р·Р°РєСЂС‹С‚РёСЏ */ }
             finally
             {
                 if (Marshal.IsComObject(document))

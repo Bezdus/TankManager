@@ -1,4 +1,4 @@
-using System;
+п»їusing System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -7,12 +7,12 @@ using System.Linq;
 namespace TankManager.Core.Services
 {
     /// <summary>
-    /// Утилита для диагностики проблем с блокировкой файлов
+    /// РЈС‚РёР»РёС‚Р° РґР»СЏ РґРёР°РіРЅРѕСЃС‚РёРєРё РїСЂРѕР±Р»РµРј СЃ Р±Р»РѕРєРёСЂРѕРІРєРѕР№ С„Р°Р№Р»РѕРІ
     /// </summary>
     public static class FileLockDiagnostics
     {
         /// <summary>
-        /// Проверяет, какие файлы в указанной папке заблокированы
+        /// РџСЂРѕРІРµСЂСЏРµС‚, РєР°РєРёРµ С„Р°Р№Р»С‹ РІ СѓРєР°Р·Р°РЅРЅРѕР№ РїР°РїРєРµ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅС‹
         /// </summary>
         public static List<string> FindLockedFiles(string directoryPath)
         {
@@ -30,20 +30,20 @@ namespace TankManager.Core.Services
                     if (IsFileLocked(file))
                     {
                         lockedFiles.Add(file);
-                        Debug.WriteLine($"?? Заблокирован: {file}");
+                        Debug.WriteLine($"?? Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ: {file}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка проверки блокировки файлов: {ex.Message}");
+                Debug.WriteLine($"РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё Р±Р»РѕРєРёСЂРѕРІРєРё С„Р°Р№Р»РѕРІ: {ex.Message}");
             }
 
             return lockedFiles;
         }
 
         /// <summary>
-        /// Проверяет, заблокирован ли конкретный файл
+        /// РџСЂРѕРІРµСЂСЏРµС‚, Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ Р»Рё РєРѕРЅРєСЂРµС‚РЅС‹Р№ С„Р°Р№Р»
         /// </summary>
         public static bool IsFileLocked(string filePath)
         {
@@ -54,11 +54,11 @@ namespace TankManager.Core.Services
             try
             {
                 stream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-                return false; // Файл не заблокирован
+                return false; // Р¤Р°Р№Р» РЅРµ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ
             }
             catch (IOException)
             {
-                return true; // Файл заблокирован
+                return true; // Р¤Р°Р№Р» Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ
             }
             finally
             {
@@ -67,46 +67,8 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Пытается удалить папку с диагностикой блокированных файлов
-        /// </summary>
-        public static bool TryDeleteDirectoryWithDiagnostics(string directoryPath, out List<string> blockedFiles)
-        {
-            blockedFiles = new List<string>();
-
-            if (!Directory.Exists(directoryPath))
-                return true;
-
-            // Сначала проверяем блокировки
-            blockedFiles = FindLockedFiles(directoryPath);
-
-            if (blockedFiles.Count > 0)
-            {
-                Debug.WriteLine($"? Не удалось удалить папку. Заблокировано файлов: {blockedFiles.Count}");
-                foreach (var file in blockedFiles)
-                {
-                    Debug.WriteLine($"   - {Path.GetFileName(file)}");
-                }
-                return false;
-            }
-
-            // Пытаемся удалить
-            try
-            {
-                Directory.Delete(directoryPath, true);
-                Debug.WriteLine($"? Папка успешно удалена: {directoryPath}");
-                return true;
-            }
-            catch (IOException ex)
-            {
-                Debug.WriteLine($"? Ошибка удаления папки: {ex.Message}");
-                // Повторно проверяем, что именно заблокировано
-                blockedFiles = FindLockedFiles(directoryPath);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Принудительная очистка с ожиданием и повторными попытками
+        /// РЈРґР°Р»СЏРµС‚ РїР°РїРєСѓ СЃ РЅРµСЃРєРѕР»СЊРєРёРјРё РїРѕРїС‹С‚РєР°РјРё (С„Р°Р№Р»С‹ РјРѕРіСѓС‚ Р±С‹С‚СЊ РєСЂР°С‚РєРѕРІСЂРµРјРµРЅРЅРѕ Р·Р°РЅСЏС‚С‹).
+        /// Р’С‹Р·С‹РІР°С‚СЊ РІРЅРµ UI-РїРѕС‚РѕРєР°: РјРµР¶РґСѓ РїРѕРїС‹С‚РєР°РјРё РїРѕС‚РѕРє Р·Р°СЃС‹РїР°РµС‚.
         /// </summary>
         public static bool ForceDeleteDirectory(string directoryPath, int maxAttempts = 5, int delayMs = 500)
         {
@@ -115,17 +77,7 @@ namespace TankManager.Core.Services
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                Debug.WriteLine($"Попытка {attempt}/{maxAttempts} удаления папки...");
-
-                // Принудительная сборка мусора
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-
-                // Ждём освобождения ресурсов
-                System.Threading.Thread.Sleep(delayMs);
-
-                // Снимаем атрибуты только для чтения
+                // РЎРЅРёРјР°РµРј Р°С‚СЂРёР±СѓС‚С‹ В«С‚РѕР»СЊРєРѕ С‡С‚РµРЅРёРµВ», РёРЅР°С‡Рµ Directory.Delete СѓРїР°РґС‘С‚
                 try
                 {
                     foreach (var file in Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories))
@@ -133,28 +85,32 @@ namespace TankManager.Core.Services
                         File.SetAttributes(file, FileAttributes.Normal);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"РќРµ СѓРґР°Р»РѕСЃСЊ СЃРЅСЏС‚СЊ Р°С‚СЂРёР±СѓС‚С‹ С„Р°Р№Р»РѕРІ: {ex.Message}");
+                }
 
-                // Пытаемся удалить
                 try
                 {
                     Directory.Delete(directoryPath, true);
-                    Debug.WriteLine($"? Папка успешно удалена на попытке {attempt}");
                     return true;
                 }
-                catch (IOException ex)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    Debug.WriteLine($"? Попытка {attempt} не удалась: {ex.Message}");
+                    Debug.WriteLine($"РџРѕРїС‹С‚РєР° {attempt}/{maxAttempts} РЅРµ СѓРґР°Р»Р°СЃСЊ: {ex.Message}");
 
-                    // На последней попытке выводим детальную диагностику
                     if (attempt == maxAttempts)
                     {
                         var blockedFiles = FindLockedFiles(directoryPath);
-                        Debug.WriteLine($"Заблокировано файлов: {blockedFiles.Count}");
+                        Debug.WriteLine($"Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅРЅС‹С… С„Р°Р№Р»РѕРІ: {blockedFiles.Count}");
                         foreach (var file in blockedFiles.Take(10))
                         {
                             Debug.WriteLine($"   - {Path.GetFileName(file)}");
                         }
+                    }
+                    else
+                    {
+                        System.Threading.Thread.Sleep(delayMs);
                     }
                 }
             }

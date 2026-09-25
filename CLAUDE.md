@@ -2,35 +2,89 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Build commands, the KOMPAS-3D dependency, the encoding rules, storage and the update process are in AGENTS.md (imported below). This file only adds what AGENTS.md leaves out.
+Windows-only WPF desktop app (.NET Framework 4.8, C#) that integrates with
+KOMPAS-3D (Russian CAD): reads `.a3d` assemblies via COM, builds a parts/BOM
+view with materials and manufacturing-cost estimates, exports to Excel, and
+syncs saved products to local/server storage.
 
-@AGENTS.md
+## Build
+- `msbuild TankManager.sln` (or Visual Studio). Requires the .NET Framework 4.8
+  Developer Pack. NuGet packages use `PackageReference` (restore with `msbuild -restore`).
+- No test project, no CI, no linter. Verify by building; runtime behaviour
+  needs a running KOMPAS-3D instance.
+- Old-style (non-SDK) `.csproj`: every new `.cs` file must be added as
+  `<Compile Include=...>` and every new `.xaml` as `<Page Include=...>` in
+  `TankManager.csproj`, or it won't be built.
 
-## Build notes
-- `msbuild TankManager.sln /p:Configuration=Debug` (packages are `PackageReference`; run `msbuild /t:Restore` first on a clean checkout).
-- There are no tests. To check a change, build it and run it against a live KOMPAS-3D instance with an `.a3d` assembly open.
+## KOMPAS-3D dependency (critical)
+- The app does NOT start KOMPAS. `KompasContext` attaches via
+  `Marshal.GetActiveObject("KOMPAS.Application.7")`; if KOMPAS isn't running,
+  load/link/preview/laser-cutting features silently no-op.
+- Interop DLLs are referenced from `..\Common\Kompas*.dll` (a SIBLING directory
+  outside this repo). Building requires `..\Common` to exist.
+- COM objects are released manually (`ComObjectManager`,
+  `Marshal.ReleaseComObject`); the `IApplication` from `GetActiveObject` is
+  intentionally never released. Be careful editing `KompasContext` / `PartExtractor`.
 
-## Encoding: current state
-- Checked with `file`: `DrawingPreviewService.cs`, `FileLockDiagnostics.cs`, `MaterialAggregator.cs` and `UpdateService.cs` (all in `Core/Services/`) are Windows-1251 with no BOM.
-- `ProductStorageService.cs` is now valid UTF-8, even though AGENTS.md still lists it as CP1251.
-- Check a file's encoding before you edit it. Don't rely on the list above.
+## Architecture
+- Startup: `App.xaml.cs` (update check, global exception handlers) →
+  `MainWindow` → `MainViewModel` (constructed in the `MainWindow` ctor). MVVM
+  with manual constructor injection (no DI container). Nearly all UI lives in
+  `MainWindow.xaml`; `Views\PricingSettingsDialog` is the only separate view.
+- Load pipeline (`KompasService.LoadDocument` / `LoadActiveDocument`, called
+  from the VM via `Task.Run`): `KompasContext` → `new Product(topPart, context)`
+  → `PartExtractor` walks the assembly into `PartModel`s → `MaterialAggregator`
+  → `AttachLaserCutting`.
+- Laser cutting: `DxfResolver` finds candidate DXF folders near the assembly
+  file and matches DXFs by part marking (sheet-material parts only);
+  `LaserCuttingService` measures cut/engraving length through KOMPAS and adds a
+  `LaserCuttingOperation` to `PartModel.Operations`.
+- Costing: `ManufacturingOperationBase` subclasses (`LaserCutting`, `Bending`,
+  `Rolling`, `Flanging` in `Core\Models\ManufacturingOperations.cs`) implement
+  `CalculateCost(PricingSettings)`. `PricingSettings` is persisted to
+  `pricing_settings.json` next to the exe and edited in `PricingSettingsDialog`.
+  Adding an operation type requires updating the enum, the subclass, and the
+  `ToOperationDto`/`FromOperationDto` mapping in `ProductStorageService`.
+- Storage (`ProductStorageService`): products are saved as JSON DTOs
+  (`ProductDto`/`PartModelDto`/`OperationDto`, `DataContractJsonSerializer`)
+  under `<exe dir>\products\<Name>_<Marking>\product.json` + `images\`. An
+  optional shared server folder (set at runtime, stored in
+  `storage_settings.json` next to the exe) is synced with the local copy.
+  Writes go through `AtomicFile` (temp file + replace) and all mutating storage
+  operations take `_ioLock`. Deleting "everywhere" records a tombstone
+  (`_deleted.json` on the server, `_pending_deleted.json` locally while the server is
+  unreachable) that `SyncFromServer` applies, so deleted products don't come back.
+  Save/sync errors are not swallowed: local failures throw, server failures land in
+  `ProductStorageService.LastServerError`.
+- `FileLogger` writes `%AppData%\TankManager\TankManager.log`. Use `ILogger`, not
+  `Debug.WriteLine` (no output in Release).
+- COM lifetime: `Product` owns its `KompasContext` and disposes it (`Product.Dispose`);
+  `MainViewModel` disposes products that are replaced and not cached. All KOMPAS calls in
+  `KompasService` are serialized by `_kompasLock`. Documents opened hidden via
+  `Documents.Open(..., false, ...)` must be closed (see `KompasContext.CloseIfHidden`).
 
-## Architecture (big picture)
-- **Load pipeline** (`KompasService.LoadDocument` / `LoadActiveDocument`):
-  1. Create a new `KompasContext`, which attaches to the running KOMPAS.
-  2. Build `Product(topPart, context)`.
-  3. `PartExtractor.ExtractParts` walks the `IPart7` tree recursively into a flat `List<PartModel>`.
-  4. Parts with `ProductType.PurchasedPart` also go into `product.StandardParts`.
-  5. `MaterialAggregator.AggregateMaterials` builds the material totals, then `product.NotifyAggregatesChanged()` runs.
-- The `Product` keeps its `KompasContext`, so a live product holds COM references. Every call back into KOMPAS goes through that context, for example `ShowDetailInKompas` (which uses `PartFinder` to find the `IPart7` again from the `PartModel`, then `KompasCameraController`), plus drawing previews and laser cutting.
-- **Two product sources:** products loaded live from KOMPAS, and products restored from JSON by `ProductStorageService`. Restored parts are `PartModelFromStorage`, a `PartModel` subclass that uses `new` to expose setters for restoring from the DTO. Such products have no KOMPAS context. When you add a persisted property to `PartModel`, update the storage DTO/mapping and `PartModelFromStorage` too.
-- **Costing:**
-  - `Core/Models/ManufacturingOperations.cs` defines `ManufacturingOperationBase` and its subclasses: laser cutting, bending, rolling and flanging.
-  - `LaserCuttingService` computes laser cutting from a DXF file found by `DxfResolver`, which looks up a DXF by part marking in folders near the assembly.
-  - Rates come from `PricingSettings`, stored as `pricing_settings.json` next to the exe and edited in `Views/PricingSettingsDialog`.
-- **UI:**
-  - `MainViewModel` (about 1,800 lines) owns nearly all state and commands. It creates `ProductStorageService` and `ExcelService` itself, and caches linked products in `_linkedProductsCache`.
-  - `Views/*Panel.xaml` are UserControls with empty code-behind. They bind to the window's `DataContext`, often through `RelativeSource AncestorType=Window`.
-  - `MainWindow.xaml` is large and holds much of the layout.
-- **Excel export:** `ExcelService` uses ClosedXML.
-- **Logging:** use `ILogger` / `FileLogger`.
+## File encodings
+- All `.cs`/`.xaml` files are UTF-8 with BOM, CRLF (see `.editorconfig`). Never re-save a
+  file in another encoding: Cyrillic text gets destroyed (this already happened once to
+  `ProductStorageService.cs` and was restored from git history).
+
+## Releases / updates
+- AutoUpdater.NET polls
+  `https://raw.githubusercontent.com/Bezdus/TankManager/master/update.xml` on
+  startup. A version bump means updating `Properties/AssemblyInfo.cs`
+  (`AssemblyVersion`/`AssemblyFileVersion`), `update.xml` (also embedded as a
+  Resource), and publishing a matching GitHub release zip
+  (`TankManager-vX.Y.Z.zip`).
+
+## Known limitations
+- Rolling ("вальцовка") cost = part mass × `RollingPricePerKg`; the mass is set by
+  `MainViewModel.RecalculateAllCosts` (`RollingOperation.PartMass`, not persisted). The old
+  `RollingPricePerMm` setting was replaced, so the rolling price must be re-entered once.
+- `FilePath`/`DxfFilePath` from `product.json` may point to network shares; only preview PNG paths
+  are restricted to the local products folder. Treat a writable server folder as trusted.
+- `update.xml` has no `<checksum>`: add SHA-256 of the release zip when publishing a release.
+
+## Conventions
+- UI strings, comments, and commit messages are in Russian; keep new UI text Russian.
+- Commands use CommunityToolkit.Mvvm `RelayCommand` (`MainViewModel`); a local
+  `RelayCommand<T>` in `MainWindow.xaml.cs` handles XAML Expander toggling.

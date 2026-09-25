@@ -17,7 +17,7 @@ namespace TankManager.Views
                 LaserCuttingPricePerMm = settings.LaserCuttingPricePerMm,
                 EngravingPricePerMm = settings.EngravingPricePerMm,
                 BendingPricePerOperation = settings.BendingPricePerOperation,
-                RollingPricePerMm = settings.RollingPricePerMm,
+                RollingPricePerKg = settings.RollingPricePerKg,
                 FlangingPricePerOperation = settings.FlangingPricePerOperation
             };
 

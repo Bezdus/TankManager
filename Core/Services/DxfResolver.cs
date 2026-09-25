@@ -39,8 +39,10 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Находит DXF-файл по обозначению: имя файла должно содержать обозначение (без учёта регистра).
-        /// Папки перебираются в порядке приоритета.
+        /// Находит DXF-файл по обозначению. Обозначение должно входить в имя файла как отдельный токен:
+        /// по краям — начало/конец имени или разделитель (не буква, не цифра, не '.' и не '-'),
+        /// чтобы «АБ.01.001» не находило «АБ.01.0010» или «АБ.01.001.1».
+        /// Точное совпадение имени приоритетнее, затем самое короткое имя. Папки — в порядке приоритета.
         /// </summary>
         public static string FindDxfForMarking(string marking, IEnumerable<string> folders)
         {
@@ -52,25 +54,64 @@ namespace TankManager.Core.Services
                 if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
                     continue;
 
-                IEnumerable<string> files;
+                string[] files;
                 try
                 {
-                    files = Directory.EnumerateFiles(folder, "*.dxf", SearchOption.TopDirectoryOnly);
+                    files = Directory.GetFiles(folder, "*.dxf", SearchOption.TopDirectoryOnly);
                 }
-                catch
+                catch (Exception)
                 {
                     continue;
                 }
 
+                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+
+                string best = null;
+                int bestLength = int.MaxValue;
+
                 foreach (var file in files)
                 {
                     string fileName = Path.GetFileNameWithoutExtension(file);
-                    if (fileName.IndexOf(marking, StringComparison.OrdinalIgnoreCase) >= 0)
+
+                    if (string.Equals(fileName, marking, StringComparison.OrdinalIgnoreCase))
                         return file;
+
+                    if (ContainsToken(fileName, marking) && fileName.Length < bestLength)
+                    {
+                        best = file;
+                        bestLength = fileName.Length;
+                    }
                 }
+
+                if (best != null)
+                    return best;
             }
 
             return null;
+        }
+
+        private static bool ContainsToken(string fileName, string marking)
+        {
+            int start = 0;
+            while (true)
+            {
+                int index = fileName.IndexOf(marking, start, StringComparison.OrdinalIgnoreCase);
+                if (index < 0)
+                    return false;
+
+                int end = index + marking.Length;
+                bool leftOk = index == 0 || IsBoundary(fileName[index - 1]);
+                bool rightOk = end >= fileName.Length || IsBoundary(fileName[end]);
+                if (leftOk && rightOk)
+                    return true;
+
+                start = index + 1;
+            }
+        }
+
+        private static bool IsBoundary(char c)
+        {
+            return !char.IsLetterOrDigit(c) && c != '.' && c != '-';
         }
     }
 }

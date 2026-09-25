@@ -1,4 +1,4 @@
-using System;
+п»їusing System;
 using System.Globalization;
 using System.Windows.Data;
 using TankManager.Core.Models;
@@ -14,13 +14,13 @@ namespace TankManager
                 switch (sortType)
                 {
                     case MaterialSortType.ByName:
-                        return "по названию";
+                        return "РїРѕ РЅР°Р·РІР°РЅРёСЋ";
                     case MaterialSortType.ByMass:
-                        return "по массе";
+                        return "РїРѕ РјР°СЃСЃРµ";
                     case MaterialSortType.ByLength:
-                        return "по длине";
+                        return "РїРѕ РґР»РёРЅРµ";
                     default:
-                        return "сортировка";
+                        return "СЃРѕСЂС‚РёСЂРѕРІРєР°";
                 }
             }
             return value;

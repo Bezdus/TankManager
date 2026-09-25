@@ -120,6 +120,11 @@ namespace TankManager.Core.Models
         /// <param name="settings">Настройки расценок</param>
         public abstract void CalculateCost(PricingSettings settings);
 
+        /// <summary>
+        /// Достаточно ли исходных данных для расчёта стоимости (иначе цена операции занижена)
+        /// </summary>
+        public virtual bool IsCostReliable => true;
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -249,8 +254,15 @@ namespace TankManager.Core.Models
         public override void CalculateCost(PricingSettings settings)
         {
             if (settings == null) return;
-            Cost = Length * settings.RollingPricePerMm;
+            Cost = PartMass * settings.RollingPricePerKg;
         }
+
+        /// <summary>
+        /// Масса детали, кг. Цена вальцовки зависит от массы; значение выставляется при пересчёте стоимости
+        /// </summary>
+        public double PartMass { get; set; }
+
+        public override bool IsCostReliable => PartMass > 0;
 
         /// <summary>
         /// Диаметр вальцовки, мм

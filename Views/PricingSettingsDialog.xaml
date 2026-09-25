@@ -1,4 +1,4 @@
-<Window x:Class="TankManager.Views.PricingSettingsDialog"
+﻿<Window x:Class="TankManager.Views.PricingSettingsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TankManager.Views"
@@ -179,9 +179,9 @@
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Вальцовка (руб/мм)" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Grid.Column="0" Text="Вальцовка (руб/кг)" Style="{StaticResource FieldLabel}"/>
                             <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
-                                     Text="{Binding RollingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"/>
+                                     Text="{Binding RollingPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
                         </Grid>
 
                         <!-- Отбортовка -->

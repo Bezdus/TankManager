@@ -18,6 +18,24 @@ namespace TankManager.Core.Models
             set => base.DetailType = value;
         }
 
+        public new string PartId
+        {
+            get => base.PartId;
+            set => base.PartId = value;
+        }
+
+        public new bool IsBodyBased
+        {
+            get => base.IsBodyBased;
+            set => base.IsBodyBased = value;
+        }
+
+        public new int InstanceIndex
+        {
+            get => base.InstanceIndex;
+            set => base.InstanceIndex = value;
+        }
+
         public new double MetalCost
         {
             get => base.MetalCost;

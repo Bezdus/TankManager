@@ -1,11 +1,11 @@
-using System.Collections.Generic;
+п»їusing System.Collections.Generic;
 using System.Linq;
 using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
 {
     /// <summary>
-    /// Агрегирует материалы из деталей изделия по типам
+    /// РђРіСЂРµРіРёСЂСѓРµС‚ РјР°С‚РµСЂРёР°Р»С‹ РёР· РґРµС‚Р°Р»РµР№ РёР·РґРµР»РёСЏ РїРѕ С‚РёРїР°Рј
     /// </summary>
     public class MaterialAggregator
     {
@@ -17,9 +17,9 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Агрегирует материалы из деталей в соответствующие коллекции продукта
+        /// РђРіСЂРµРіРёСЂСѓРµС‚ РјР°С‚РµСЂРёР°Р»С‹ РёР· РґРµС‚Р°Р»РµР№ РІ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёРµ РєРѕР»Р»РµРєС†РёРё РїСЂРѕРґСѓРєС‚Р°
         /// </summary>
-        /// <param name="product">Продукт для агрегации материалов</param>
+        /// <param name="product">РџСЂРѕРґСѓРєС‚ РґР»СЏ Р°РіСЂРµРіР°С†РёРё РјР°С‚РµСЂРёР°Р»РѕРІ</param>
         public void AggregateMaterials(Product product)
         {
             if (product == null)
@@ -33,7 +33,7 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Группирует листовой прокат по материалу
+        /// Р“СЂСѓРїРїРёСЂСѓРµС‚ Р»РёСЃС‚РѕРІРѕР№ РїСЂРѕРєР°С‚ РїРѕ РјР°С‚РµСЂРёР°Р»Сѓ
         /// </summary>
         private void AggregateSheetMaterials(Product product)
         {
@@ -54,7 +54,7 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Группирует трубный прокат по материалу
+        /// Р“СЂСѓРїРїРёСЂСѓРµС‚ С‚СЂСѓР±РЅС‹Р№ РїСЂРѕРєР°С‚ РїРѕ РјР°С‚РµСЂРёР°Р»Сѓ
         /// </summary>
         private void AggregateTubularProducts(Product product)
         {
@@ -76,7 +76,7 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Группирует прочие материалы по материалу
+        /// Р“СЂСѓРїРїРёСЂСѓРµС‚ РїСЂРѕС‡РёРµ РјР°С‚РµСЂРёР°Р»С‹ РїРѕ РјР°С‚РµСЂРёР°Р»Сѓ
         /// </summary>
         private void AggregateOtherMaterials(Product product)
         {
