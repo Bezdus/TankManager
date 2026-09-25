@@ -644,7 +644,7 @@
 
                     <Button Command="{Binding ExportToExcelCommand}"
                             Style="{StaticResource PanelButtonStyle}"
-                            ToolTip="Сохранить ведомость материалов в Excel файл">
+                            ToolTip="Открыть ведомость материалов в Excel">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE9F9;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
                             <TextBlock Text="Ведомость в Excel"/>

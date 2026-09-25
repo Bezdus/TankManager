@@ -1595,9 +1595,10 @@ namespace TankManager.Core.ViewModels
 
         private void ExportToExcel()
         {
+            Mouse.OverrideCursor = Cursors.Wait;
             try
             {
-                var filePath = _excelService.ExportToExcelFile(
+                _excelService.OpenInExcel(
                     CurrentProduct?.Name,
                     Details,
                     StandardParts,
@@ -1605,16 +1606,18 @@ namespace TankManager.Core.ViewModels
                     TubularProducts,
                     OtherMaterials);
 
-                if (filePath != null)
-                {
-                    StatusMessage = $"Файл сохранён: {filePath}";
-                    ShowSnackbar("Ведомость материалов сохранена в Excel");
-                }
+                StatusMessage = "Ведомость открыта в Excel";
+                ShowSnackbar("Ведомость материалов открыта в Excel");
             }
             catch (Exception ex)
             {
+                _logger.LogError("Ошибка экспорта в Excel", ex);
                 MessageBox.Show($"Ошибка при экспорте в Excel: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
             }
         }
 

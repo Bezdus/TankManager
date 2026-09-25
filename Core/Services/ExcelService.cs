@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
-using ClosedXML.Excel;
 using TankManager.Core.Models;
 
 namespace TankManager.Core.Services
@@ -207,9 +206,9 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Экспортирует все данные изделия в Excel файл
+        /// Открывает ведомость материалов в новой книге Excel (без сохранения файла — пользователь сохраняет сам)
         /// </summary>
-        public string ExportToExcelFile(
+        public void OpenInExcel(
             string productName,
             IEnumerable<PartModel> allDetails,
             IEnumerable<PartModel> standardParts,
@@ -223,166 +222,210 @@ namespace TankManager.Core.Services
             var tubularProductsList = tubularProducts?.ToList() ?? new List<MaterialInfo>();
             var otherMaterialsList = otherMaterials?.ToList() ?? new List<MaterialInfo>();
 
-            if (!allDetailsList.Any() && !standardPartsList.Any() && !sheetMaterialsList.Any() && !tubularProductsList.Any() && !otherMaterialsList.Any())
+            // Название листа, данные (первая строка — заголовок), количество текстовых столбцов слева
+            var sheets = new List<Tuple<string, object[,], int>>();
+            if (allDetailsList.Any())
+                sheets.Add(Tuple.Create("Детали", BuildPartsSheet(allDetailsList), 3));
+            if (standardPartsList.Any())
+                sheets.Add(Tuple.Create("Покупные", BuildPartsSheet(standardPartsList), 3));
+            if (sheetMaterialsList.Any())
+                sheets.Add(Tuple.Create("Листовой прокат", BuildMaterialsSheet(sheetMaterialsList, "Масса (кг)", m => m.TotalMass), 1));
+            if (tubularProductsList.Any())
+                sheets.Add(Tuple.Create("Трубный прокат", BuildMaterialsSheet(tubularProductsList, "Длина (мм)", m => m.TotalLength), 1));
+            if (otherMaterialsList.Any())
+                sheets.Add(Tuple.Create("Прочие материалы", BuildMaterialsSheet(otherMaterialsList, "Масса (кг)", m => m.TotalMass), 1));
+
+            if (sheets.Count == 0)
             {
                 throw new InvalidOperationException("Нет данных для экспорта");
             }
 
-            var safeName = string.Join("_", (productName ?? "Изделие").Split(Path.GetInvalidFileNameChars()));
-            var fileName = $"Ведомость материалов {safeName}.xlsx";
-
-            var dialog = new Microsoft.Win32.SaveFileDialog
+            var excelType = Type.GetTypeFromProgID("Excel.Application");
+            if (excelType == null)
             {
-                FileName = fileName,
-                DefaultExt = ".xlsx",
-                Filter = "Excel файлы (*.xlsx)|*.xlsx"
-            };
-
-            if (dialog.ShowDialog() != true)
-                return null;
-
-            var filePath = dialog.FileName;
-
-            using (var workbook = new XLWorkbook())
-            {
-                // Лист 1: Все детали
-                if (allDetailsList.Any())
-                {
-                    var wsDetails = workbook.Worksheets.Add("Детали");
-                    var groupedDetails = allDetailsList
-                        .GroupBy(p => new { p.Name, p.Marking, p.Material })
-                        .OrderBy(g => g.Key.Name)
-                        .ThenBy(g => g.Key.Marking)
-                        .ToList();
-
-                    wsDetails.Cell(1, 1).Value = "Наименование";
-                    wsDetails.Cell(1, 2).Value = "Обозначение";
-                    wsDetails.Cell(1, 3).Value = "Материал";
-                    wsDetails.Cell(1, 4).Value = "Количество";
-                    wsDetails.Cell(1, 5).Value = "Масса ед. (кг)";
-                    wsDetails.Cell(1, 6).Value = "Масса общ. (кг)";
-                    wsDetails.Cell(1, 7).Value = "Стоимость металла (руб)";
-                    wsDetails.Cell(1, 8).Value = "Стоимость операций (руб)";
-                    wsDetails.Cell(1, 9).Value = "Общая стоимость (руб)";
-                    StyleHeaderRow(wsDetails, 1, 9);
-
-                    for (int i = 0; i < groupedDetails.Count; i++)
-                    {
-                        var g = groupedDetails[i];
-                        int row = i + 2;
-                        int count = g.Count();
-                        wsDetails.Cell(row, 1).Value = g.Key.Name ?? "";
-                        wsDetails.Cell(row, 2).Value = g.Key.Marking ?? "";
-                        wsDetails.Cell(row, 3).Value = g.Key.Material ?? "";
-                        wsDetails.Cell(row, 4).Value = count;
-                        wsDetails.Cell(row, 5).Value = Math.Round(g.First().Mass, 3);
-                        wsDetails.Cell(row, 6).Value = Math.Round(g.Sum(p => p.Mass), 3);
-                        wsDetails.Cell(row, 7).Value = Math.Round(g.Sum(p => p.MetalCost), 2);
-                        wsDetails.Cell(row, 8).Value = Math.Round(g.Sum(p => p.OperationsCost), 2);
-                        wsDetails.Cell(row, 9).Value = Math.Round(g.Sum(p => p.TotalCost), 2);
-                    }
-
-                    wsDetails.Columns().AdjustToContents();
-                }
-
-                // Лист 2: Покупные детали
-                if (standardPartsList.Any())
-                {
-                    var wsStandard = workbook.Worksheets.Add("Покупные");
-                    var groupedParts = standardPartsList
-                        .GroupBy(p => new { p.Name, p.Marking, p.Material })
-                        .OrderBy(g => g.Key.Name)
-                        .ThenBy(g => g.Key.Marking)
-                        .ToList();
-
-                    wsStandard.Cell(1, 1).Value = "Наименование";
-                    wsStandard.Cell(1, 2).Value = "Обозначение";
-                    wsStandard.Cell(1, 3).Value = "Материал";
-                    wsStandard.Cell(1, 4).Value = "Количество";
-                    wsStandard.Cell(1, 5).Value = "Масса ед. (кг)";
-                    wsStandard.Cell(1, 6).Value = "Масса общ. (кг)";
-                    wsStandard.Cell(1, 7).Value = "Стоимость металла (руб)";
-                    wsStandard.Cell(1, 8).Value = "Стоимость операций (руб)";
-                    wsStandard.Cell(1, 9).Value = "Общая стоимость (руб)";
-                    StyleHeaderRow(wsStandard, 1, 9);
-
-                    for (int i = 0; i < groupedParts.Count; i++)
-                    {
-                        var g = groupedParts[i];
-                        int row = i + 2;
-                        int count = g.Count();
-                        wsStandard.Cell(row, 1).Value = g.Key.Name ?? "";
-                        wsStandard.Cell(row, 2).Value = g.Key.Marking ?? "";
-                        wsStandard.Cell(row, 3).Value = g.Key.Material ?? "";
-                        wsStandard.Cell(row, 4).Value = count;
-                        wsStandard.Cell(row, 5).Value = Math.Round(g.First().Mass, 3);
-                        wsStandard.Cell(row, 6).Value = Math.Round(g.Sum(p => p.Mass), 3);
-                        wsStandard.Cell(row, 7).Value = Math.Round(g.Sum(p => p.MetalCost), 2);
-                        wsStandard.Cell(row, 8).Value = Math.Round(g.Sum(p => p.OperationsCost), 2);
-                        wsStandard.Cell(row, 9).Value = Math.Round(g.Sum(p => p.TotalCost), 2);
-                    }
-
-                    wsStandard.Columns().AdjustToContents();
-                }
-
-                // Лист 3: Листовой прокат
-                if (sheetMaterialsList.Any())
-                {
-                    var wsSheet = workbook.Worksheets.Add("Листовой прокат");
-                    wsSheet.Cell(1, 1).Value = "Материал";
-                    wsSheet.Cell(1, 2).Value = "Масса (кг)";
-                    StyleHeaderRow(wsSheet, 1, 2);
-
-                    for (int i = 0; i < sheetMaterialsList.Count; i++)
-                    {
-                        var m = sheetMaterialsList[i];
-                        wsSheet.Cell(i + 2, 1).Value = m.Name ?? "";
-                        wsSheet.Cell(i + 2, 2).Value = Math.Round(m.TotalMass, 2);
-                    }
-
-                    wsSheet.Columns().AdjustToContents();
-                }
-
-                // Лист 4: Трубный прокат
-                if (tubularProductsList.Any())
-                {
-                    var wsTubular = workbook.Worksheets.Add("Трубный прокат");
-                    wsTubular.Cell(1, 1).Value = "Материал";
-                    wsTubular.Cell(1, 2).Value = "Длина (мм)";
-                    StyleHeaderRow(wsTubular, 1, 2);
-
-                    for (int i = 0; i < tubularProductsList.Count; i++)
-                    {
-                        var t = tubularProductsList[i];
-                        wsTubular.Cell(i + 2, 1).Value = t.Name ?? "";
-                        wsTubular.Cell(i + 2, 2).Value = Math.Round(t.TotalLength, 2);
-                    }
-
-                    wsTubular.Columns().AdjustToContents();
-                }
-
-                // Лист 5: Прочие материалы
-                if (otherMaterialsList.Any())
-                {
-                    var wsOther = workbook.Worksheets.Add("Прочие материалы");
-                    wsOther.Cell(1, 1).Value = "Материал";
-                    wsOther.Cell(1, 2).Value = "Масса (кг)";
-                    StyleHeaderRow(wsOther, 1, 2);
-
-                    for (int i = 0; i < otherMaterialsList.Count; i++)
-                    {
-                        var o = otherMaterialsList[i];
-                        wsOther.Cell(i + 2, 1).Value = o.Name ?? "";
-                        wsOther.Cell(i + 2, 2).Value = Math.Round(o.TotalMass, 2);
-                    }
-
-                    wsOther.Columns().AdjustToContents();
-                }
-
-                workbook.SaveAs(filePath);
+                throw new InvalidOperationException("Microsoft Excel не установлен");
             }
 
-            return filePath;
+            var comObjects = new List<object>();
+            dynamic excel = null;
+            dynamic workbook = null;
+            bool shown = false;
+
+            try
+            {
+                excel = Activator.CreateInstance(excelType);
+                excel.ScreenUpdating = false;
+
+                dynamic workbooks = Track(comObjects, excel.Workbooks);
+                workbook = Track(comObjects, workbooks.Add());
+                dynamic worksheets = Track(comObjects, workbook.Worksheets);
+
+                // Новая книга может содержать несколько пустых листов — оставляем один
+                excel.DisplayAlerts = false;
+                while (worksheets.Count > 1)
+                {
+                    dynamic extra = worksheets[worksheets.Count];
+                    extra.Delete();
+                    Release(extra);
+                }
+                excel.DisplayAlerts = true;
+
+                dynamic lastSheet = Track(comObjects, worksheets[1]);
+                for (int i = 0; i < sheets.Count; i++)
+                {
+                    dynamic ws = i == 0 ? lastSheet : Track(comObjects, worksheets.Add(After: lastSheet));
+                    WriteSheet(ws, sheets[i].Item1, sheets[i].Item2, sheets[i].Item3, comObjects);
+                    lastSheet = ws;
+                }
+
+                workbook.Title = $"Ведомость материалов {productName ?? "Изделие"}";
+
+                dynamic firstSheet = Track(comObjects, worksheets[1]);
+                firstSheet.Activate();
+
+                excel.ScreenUpdating = true;
+                excel.Visible = true;
+                excel.UserControl = true;
+                shown = true;
+            }
+            catch
+            {
+                if (excel != null && !shown)
+                {
+                    try
+                    {
+                        if (workbook != null)
+                            workbook.Close(false);
+                        excel.Quit();
+                    }
+                    catch
+                    {
+                        // Excel уже недоступен — закрывать нечего
+                    }
+                }
+                throw;
+            }
+            finally
+            {
+                // Освобождаем COM-ссылки, иначе процесс Excel не завершится после закрытия пользователем
+                for (int i = comObjects.Count - 1; i >= 0; i--)
+                    Release(comObjects[i]);
+                Release(excel);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+        }
+
+        /// <summary>
+        /// Данные листа деталей с группировкой по уникальным деталям
+        /// </summary>
+        private static object[,] BuildPartsSheet(List<PartModel> parts)
+        {
+            var groups = parts
+                .GroupBy(p => new { p.Name, p.Marking, p.Material })
+                .OrderBy(g => g.Key.Name)
+                .ThenBy(g => g.Key.Marking)
+                .ToList();
+
+            string[] header =
+            {
+                "Наименование", "Обозначение", "Материал", "Количество", "Масса ед. (кг)", "Масса общ. (кг)",
+                "Стоимость металла (руб)", "Стоимость операций (руб)", "Общая стоимость (руб)"
+            };
+
+            var data = new object[groups.Count + 1, header.Length];
+            for (int c = 0; c < header.Length; c++)
+                data[0, c] = header[c];
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                var g = groups[i];
+                int row = i + 1;
+                data[row, 0] = g.Key.Name ?? "";
+                data[row, 1] = g.Key.Marking ?? "";
+                data[row, 2] = g.Key.Material ?? "";
+                data[row, 3] = g.Count();
+                data[row, 4] = Math.Round(g.First().Mass, 3);
+                data[row, 5] = Math.Round(g.Sum(p => p.Mass), 3);
+                data[row, 6] = Math.Round(g.Sum(p => p.MetalCost), 2);
+                data[row, 7] = Math.Round(g.Sum(p => p.OperationsCost), 2);
+                data[row, 8] = Math.Round(g.Sum(p => p.TotalCost), 2);
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// Данные листа материалов: наименование и одно числовое значение
+        /// </summary>
+        private static object[,] BuildMaterialsSheet(List<MaterialInfo> materials, string valueHeader, Func<MaterialInfo, double> value)
+        {
+            var data = new object[materials.Count + 1, 2];
+            data[0, 0] = "Материал";
+            data[0, 1] = valueHeader;
+
+            for (int i = 0; i < materials.Count; i++)
+            {
+                data[i + 1, 0] = materials[i].Name ?? "";
+                data[i + 1, 1] = Math.Round(value(materials[i]), 2);
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// Заполняет лист Excel: данные одним блоком, оформление заголовка, ширина столбцов.
+        /// Текстовые столбцы получают формат "@", чтобы Excel не превращал значения в формулы, даты и числа.
+        /// </summary>
+        private static void WriteSheet(dynamic ws, string name, object[,] data, int textColumns, List<object> comObjects)
+        {
+            int rows = data.GetLength(0);
+            int cols = data.GetLength(1);
+
+            ws.Name = name;
+
+            dynamic cells = Track(comObjects, ws.Cells);
+            dynamic topLeft = Track(comObjects, cells[1, 1]);
+            dynamic bottomRight = Track(comObjects, cells[rows, cols]);
+            dynamic textBottomRight = Track(comObjects, cells[rows, textColumns]);
+            dynamic headerRight = Track(comObjects, cells[1, cols]);
+
+            dynamic textRange = Track(comObjects, ws.Range[topLeft, textBottomRight]);
+            textRange.NumberFormat = "@";
+
+            dynamic range = Track(comObjects, ws.Range[topLeft, bottomRight]);
+            range.Value2 = data;
+
+            dynamic header = Track(comObjects, ws.Range[topLeft, headerRight]);
+            dynamic font = Track(comObjects, header.Font);
+            font.Bold = true;
+            font.Color = 0xFFFFFF;
+            dynamic interior = Track(comObjects, header.Interior);
+            interior.Color = 0x505050;
+            header.HorizontalAlignment = -4108; // xlCenter
+
+            dynamic columns = Track(comObjects, range.Columns);
+            columns.AutoFit();
+        }
+
+        private static dynamic Track(List<object> comObjects, object comObject)
+        {
+            if (comObject != null && Marshal.IsComObject(comObject))
+                comObjects.Add(comObject);
+            return comObject;
+        }
+
+        private static void Release(object comObject)
+        {
+            try
+            {
+                if (comObject != null && Marshal.IsComObject(comObject))
+                    Marshal.FinalReleaseComObject(comObject);
+            }
+            catch
+            {
+                // Объект уже освобождён
+            }
         }
 
         /// <summary>
@@ -401,15 +444,6 @@ namespace TankManager.Core.Services
                 text = "'" + text;
 
             return text;
-        }
-
-        private static void StyleHeaderRow(IXLWorksheet ws, int row, int columnCount)
-        {
-            var headerRange = ws.Range(row, 1, row, columnCount);
-            headerRange.Style.Font.Bold = true;
-            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#FF505050");
-            headerRange.Style.Font.FontColor = XLColor.White;
-            headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         }
 
         /// <summary>
