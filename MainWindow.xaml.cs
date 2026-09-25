@@ -339,54 +339,6 @@ namespace TankManager
                 _viewModel.DeleteProductEverywhereCommand?.Execute(null);
             }
         }
-
-        private void DeleteButton_MouseEnter(object sender, MouseEventArgs e)
-        {
-            var button = sender as Button;
-            if (button != null)
-            {
-                button.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(255, 224, 224)); // #FFFFE0E0
-                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(255, 107, 107)); // #FFFF6B6B
-            }
-        }
-
-        private void DeleteButton_MouseLeave(object sender, MouseEventArgs e)
-        {
-            var button = sender as Button;
-            if (button != null)
-            {
-                button.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(255, 255, 255)); // #FFFFFFFF (PrimaryBackground)
-                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(224, 224, 224)); // #FFE0E0E0 (BorderColor)
-            }
-        }
-
-        private void DeleteButtonEverywhere_MouseEnter(object sender, MouseEventArgs e)
-        {
-            var button = sender as Button;
-            if (button != null)
-            {
-                button.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(255, 200, 200)); // более насыщенный красный
-                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(220, 60, 60));
-            }
-        }
-
-        private void DeleteButtonEverywhere_MouseLeave(object sender, MouseEventArgs e)
-        {
-            var button = sender as Button;
-            if (button != null)
-            {
-                button.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(255, 255, 255));
-                button.BorderBrush = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(224, 224, 224));
-            }
-        }
     }
 
     /// <summary>

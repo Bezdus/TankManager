@@ -3,11 +3,34 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TankManager.Views"
         Title="Настройки расценок"
-        Width="520" Height="580"
+        Width="520" Height="640"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
-    <Grid Margin="12">
+        FontFamily="Segoe UI"
+        FontSize="12"
+        Foreground="{StaticResource TextPrimary}"
+        Background="{StaticResource WindowBackground}">
+    <Window.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        </Style>
+
+        <Style x:Key="FieldBox" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+            <Setter Property="Width" Value="140"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -17,130 +40,159 @@
         <!-- Заголовок -->
         <TextBlock Grid.Row="0"
                    Text="Расценки для расчёта стоимости деталей"
-                   FontSize="14" FontWeight="SemiBold"
-                   Margin="0,0,0,12"
-                   Foreground="#FF303030"/>
+                   FontSize="16" FontWeight="SemiBold"
+                   Margin="4,0,0,12"
+                   Foreground="{StaticResource TextPrimary}"/>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <!-- Секция: Металл -->
-                <Border BorderBrush="#FFD0D0D0" BorderThickness="1" CornerRadius="3" Padding="10" Margin="0,0,0,10">
+                <Border Style="{StaticResource CardStyle}" Padding="16,14" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="Металл" FontSize="13" FontWeight="SemiBold"
-                                   Foreground="#FF303030" Margin="0,0,0,8"/>
+                        <TextBlock Text="Металл" Style="{StaticResource CardTitle}"/>
 
                         <!-- Листовой прокат -->
-                        <Grid Margin="0,0,0,6">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Листовой прокат (руб/кг):" VerticalAlignment="Center"
-                                       Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding SheetMetalPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
-                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="Листовой прокат (руб/кг)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
+                                     Text="{Binding SheetMetalPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
                         </Grid>
 
                         <!-- Прочий металл -->
-                        <Grid Margin="0,0,0,10">
+                        <Grid Margin="0,0,0,16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Прочий металл (руб/кг):" VerticalAlignment="Center"
-                                       Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding OtherMetalPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
-                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="Прочий металл (руб/кг)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
+                                     Text="{Binding OtherMetalPricePerKg, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
                         </Grid>
 
                         <!-- Трубный прокат -->
-                        <TextBlock Text="Трубный прокат (руб/м):" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="#FF303030" Margin="0,0,0,6"/>
+                        <TextBlock Text="Трубный прокат (руб/м)" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}" Margin="0,0,0,8"/>
 
-                        <DataGrid x:Name="TubularGrid"
-                                  AutoGenerateColumns="False"
-                                  CanUserAddRows="True"
-                                  CanUserDeleteRows="True"
-                                  MaxHeight="160"
-                                  HeadersVisibility="Column"
-                                  RowHeaderWidth="0"
-                                  Margin="0,0,0,6">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Сортамент (подстрока)" Width="*"
-                                                    Binding="{Binding Size, UpdateSourceTrigger=PropertyChanged}"/>
-                                <DataGridTextColumn Header="Цена (руб/м)" Width="120"
-                                                    Binding="{Binding PricePerMeter, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,6">
+                            <DataGrid x:Name="TubularGrid"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="True"
+                                      CanUserDeleteRows="True"
+                                      MaxHeight="160"
+                                      HeadersVisibility="Column"
+                                      RowHeaderWidth="0"
+                                      BorderThickness="0"
+                                      Background="Transparent"
+                                      RowBackground="{StaticResource PrimaryBackground}"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="{StaticResource BorderColor}"
+                                      Margin="1">
+                                <DataGrid.ColumnHeaderStyle>
+                                    <Style TargetType="DataGridColumnHeader">
+                                        <Setter Property="Background" Value="{StaticResource SecondaryBackground}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                        <Setter Property="FontSize" Value="11"/>
+                                        <Setter Property="Padding" Value="8,6"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                    </Style>
+                                </DataGrid.ColumnHeaderStyle>
+                                <DataGrid.CellStyle>
+                                    <Style TargetType="DataGridCell">
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Padding" Value="6,4"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="DataGridCell">
+                                                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource SelectedBackground}"/>
+                                                <Setter Property="Foreground" Value="{StaticResource SelectedForeground}"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.CellStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Сортамент (подстрока)" Width="*"
+                                                        Binding="{Binding Size, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <DataGridTextColumn Header="Цена (руб/м)" Width="120"
+                                                        Binding="{Binding PricePerMeter, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
                         <TextBlock Text="Подстрока ищется в наименовании материала (например: 104x2)"
-                                   FontSize="10" Foreground="#FF909090" FontStyle="Italic"/>
+                                   FontSize="11" Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Секция: Операции -->
-                <Border BorderBrush="#FFD0D0D0" BorderThickness="1" CornerRadius="3" Padding="10">
+                <Border Style="{StaticResource CardStyle}" Padding="16,14" Margin="0">
                     <StackPanel>
-                        <TextBlock Text="Операции" FontSize="13" FontWeight="SemiBold"
-                                   Foreground="#FF303030" Margin="0,0,0,8"/>
+                        <TextBlock Text="Операции" Style="{StaticResource CardTitle}"/>
 
                         <!-- Лазерная резка -->
-                        <Grid Margin="0,0,0,6">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Резка на лазере (руб/мм):" VerticalAlignment="Center"
-                                       Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding LaserCuttingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"
-                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="Резка на лазере (руб/мм)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
+                                     Text="{Binding LaserCuttingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"/>
                         </Grid>
 
                         <!-- Гравировка -->
-                        <Grid Margin="0,0,0,6">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Гравировка (руб/мм):" VerticalAlignment="Center"
-                                       Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding EngravingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"
-                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="Гравировка (руб/мм)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
+                                     Text="{Binding EngravingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"/>
                         </Grid>
 
                         <!-- Гибка -->
-                        <Grid Margin="0,0,0,6">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Гибка (руб/операция):" VerticalAlignment="Center"
-                                       Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding BendingPricePerOperation, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
-                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="Гибка (руб/операция)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
+                                     Text="{Binding BendingPricePerOperation, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
                         </Grid>
 
                         <!-- Вальцовка -->
-                        <Grid Margin="0,0,0,6">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Вальцовка (руб/мм):" VerticalAlignment="Center"
-                                       Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding RollingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"
-                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="Вальцовка (руб/мм)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
+                                     Text="{Binding RollingPricePerMm, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F4}'}"/>
                         </Grid>
 
                         <!-- Отбортовка -->
-                        <Grid Margin="0,0,0,6">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Отбортовка (руб/операция):" VerticalAlignment="Center"
-                                       Foreground="#FF505050" FontSize="12"/>
-                            <TextBox Grid.Column="1" Text="{Binding FlangingPricePerOperation, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"
-                                     Width="120" HorizontalAlignment="Left" Height="24" VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="Отбортовка (руб/операция)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource FieldBox}"
+                                     Text="{Binding FlangingPricePerOperation, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -148,17 +200,13 @@
         </ScrollViewer>
 
         <!-- Кнопки -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Сохранить" IsDefault="True" Click="SaveButton_Click"
-                    Width="100" Height="30" Margin="0,0,10,0"
-                    Background="#FF0078D4" Foreground="White"
-                    BorderThickness="1" BorderBrush="#FF005A9E"
-                    FontSize="12" FontWeight="SemiBold"
-                    Cursor="Hand"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="Отмена" IsCancel="True" Click="CancelButton_Click"
-                    Width="80" Height="30"
-                    FontSize="12"
-                    Cursor="Hand"/>
+                    Style="{StaticResource SecondaryButton}"
+                    MinWidth="90" Height="32" Margin="0,0,8,0"/>
+            <Button Content="Сохранить" IsDefault="True" Click="SaveButton_Click"
+                    Style="{StaticResource PrimaryButton}"
+                    MinWidth="110" Height="32"/>
         </StackPanel>
     </Grid>
 </Window>

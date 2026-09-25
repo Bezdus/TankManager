@@ -4,14 +4,220 @@
              xmlns:local="clr-namespace:TankManager"
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
-        
+
+        <!-- ===================== Цветовая палитра ===================== -->
+        <SolidColorBrush x:Key="WindowBackground" Color="#FFF3F4F6"/>
+        <SolidColorBrush x:Key="PrimaryBackground" Color="#FFFFFFFF"/>
+        <SolidColorBrush x:Key="SecondaryBackground" Color="#FFF9FAFB"/>
+        <SolidColorBrush x:Key="BorderColor" Color="#FFE5E7EB"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#FF111827"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#FF6B7280"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#FF9CA3AF"/>
+        <SolidColorBrush x:Key="AccentColor" Color="#FF2563EB"/>
+        <SolidColorBrush x:Key="AccentHover" Color="#FF1D4ED8"/>
+        <SolidColorBrush x:Key="AccentSubtle" Color="#FFEFF6FF"/>
+        <SolidColorBrush x:Key="HoverBackground" Color="#FFF3F4F6"/>
+        <SolidColorBrush x:Key="SelectedBackground" Color="#FFDBEAFE"/>
+        <SolidColorBrush x:Key="SelectedForeground" Color="#FF1E3A8A"/>
+        <SolidColorBrush x:Key="Success" Color="#FF16A34A"/>
+        <SolidColorBrush x:Key="SuccessSubtle" Color="#FFF0FDF4"/>
+        <SolidColorBrush x:Key="Warning" Color="#FFD97706"/>
+        <SolidColorBrush x:Key="WarningSubtle" Color="#FFFFFBEB"/>
+        <SolidColorBrush x:Key="Danger" Color="#FFDC2626"/>
+        <SolidColorBrush x:Key="DangerSubtle" Color="#FFFEF2F2"/>
+        <SolidColorBrush x:Key="DarkSurface" Color="#FF111827"/>
+
         <!-- Цветовая палитра для скроллбаров -->
-        <SolidColorBrush x:Key="ScrollBarBackground" Color="#F5F5F5"/>
-        <SolidColorBrush x:Key="ScrollBarThumb" Color="#C0C0C0"/>
-        <SolidColorBrush x:Key="ScrollBarThumbHover" Color="#909090"/>
-        <SolidColorBrush x:Key="ScrollBarThumbPressed" Color="#606060"/>
-        
-        <!-- Стиль для кнопок скроллбара (стрелки вверх/вниз, влево/вправо) -->
+        <SolidColorBrush x:Key="ScrollBarThumb" Color="#FFD1D5DB"/>
+        <SolidColorBrush x:Key="ScrollBarThumbHover" Color="#FF9CA3AF"/>
+        <SolidColorBrush x:Key="ScrollBarThumbPressed" Color="#FF6B7280"/>
+
+        <FontFamily x:Key="IconFont">Segoe MDL2 Assets</FontFamily>
+
+        <DropShadowEffect x:Key="SoftShadow" ShadowDepth="2" Direction="270" BlurRadius="16" Opacity="0.12" Color="#FF000000"/>
+
+        <!-- ===================== Типографика ===================== -->
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="IconText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===================== Карточка ===================== -->
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PrimaryBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="4"/>
+        </Style>
+
+        <!-- ===================== Кнопки ===================== -->
+        <!-- Прозрачная кнопка -->
+        <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Квадратная кнопка-иконка -->
+        <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
+                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Кнопка-иконка для опасных действий -->
+        <Style x:Key="DangerIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource DangerSubtle}"/>
+                    <Setter Property="Foreground" Value="{StaticResource Danger}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Основная (акцентная) кнопка -->
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="Background" Value="{StaticResource AccentColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{StaticResource TextMuted}"/>
+                    <Setter Property="Opacity" Value="0.6"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Вторичная кнопка с рамкой -->
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="Background" Value="{StaticResource PrimaryBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ===================== Поле ввода ===================== -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource PrimaryBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource TextMuted}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===================== Подсказки ===================== -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="{StaticResource DarkSurface}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===================== Скроллбары ===================== -->
+        <!-- Стиль для кнопок скроллбара (стрелки скрыты) -->
         <Style x:Key="ScrollBarButton" TargetType="RepeatButton">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -42,107 +248,44 @@
             </Setter>
         </Style>
 
-        <!-- Стиль для ползунка вертикального скроллбара -->
-        <Style x:Key="VerticalScrollBarThumb" TargetType="Thumb">
+        <!-- Стиль для ползунка скроллбара -->
+        <Style x:Key="ScrollBarThumbStyle" TargetType="Thumb">
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Setter Property="IsTabStop" Value="False"/>
             <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Background" Value="{StaticResource ScrollBarThumb}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
-                        <Border Background="{StaticResource ScrollBarThumb}" 
-                                CornerRadius="4"
-                                Margin="2,0"/>
+                        <Border Background="{TemplateBinding Background}" CornerRadius="3"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="Thumb">
-                                <Border Background="{StaticResource ScrollBarThumbHover}" 
-                                        CornerRadius="4"
-                                        Margin="2,0"/>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
+                    <Setter Property="Background" Value="{StaticResource ScrollBarThumbHover}"/>
                 </Trigger>
                 <Trigger Property="IsDragging" Value="True">
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="Thumb">
-                                <Border Background="{StaticResource ScrollBarThumbPressed}" 
-                                        CornerRadius="4"
-                                        Margin="2,0"/>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Стиль для ползунка горизонтального скроллбара -->
-        <Style x:Key="HorizontalScrollBarThumb" TargetType="Thumb">
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="IsTabStop" Value="False"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Thumb">
-                        <Border Background="{StaticResource ScrollBarThumb}" 
-                                CornerRadius="4"
-                                Margin="0,2"/>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="Thumb">
-                                <Border Background="{StaticResource ScrollBarThumbHover}" 
-                                        CornerRadius="4"
-                                        Margin="0,2"/>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Trigger>
-                <Trigger Property="IsDragging" Value="True">
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="Thumb">
-                                <Border Background="{StaticResource ScrollBarThumbPressed}" 
-                                        CornerRadius="4"
-                                        Margin="0,2"/>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
+                    <Setter Property="Background" Value="{StaticResource ScrollBarThumbPressed}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- Шаблон для вертикального скроллбара -->
         <ControlTemplate x:Key="VerticalScrollBar" TargetType="ScrollBar">
-            <Grid>
+            <Grid Background="Transparent">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                
-                <Border Grid.RowSpan="3" 
-                        Background="{StaticResource ScrollBarBackground}"
-                        CornerRadius="4"
-                        Opacity="0.5"/>
 
-                <RepeatButton Grid.Row="0" 
+                <RepeatButton Grid.Row="0"
                               Style="{StaticResource ScrollBarButton}"
                               Command="ScrollBar.LineUpCommand"/>
-                
-                <Track Grid.Row="1" 
+
+                <Track Grid.Row="1"
                        Name="PART_Track"
                        IsDirectionReversed="True">
                     <Track.DecreaseRepeatButton>
@@ -150,15 +293,15 @@
                                       Command="ScrollBar.PageUpCommand"/>
                     </Track.DecreaseRepeatButton>
                     <Track.Thumb>
-                        <Thumb Style="{StaticResource VerticalScrollBarThumb}"/>
+                        <Thumb Style="{StaticResource ScrollBarThumbStyle}"/>
                     </Track.Thumb>
                     <Track.IncreaseRepeatButton>
                         <RepeatButton Style="{StaticResource ScrollBarPageButton}"
                                       Command="ScrollBar.PageDownCommand"/>
                     </Track.IncreaseRepeatButton>
                 </Track>
-                
-                <RepeatButton Grid.Row="2" 
+
+                <RepeatButton Grid.Row="2"
                               Style="{StaticResource ScrollBarButton}"
                               Command="ScrollBar.LineDownCommand"/>
             </Grid>
@@ -166,23 +309,18 @@
 
         <!-- Шаблон для горизонтального скроллбара -->
         <ControlTemplate x:Key="HorizontalScrollBar" TargetType="ScrollBar">
-            <Grid>
+            <Grid Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
-                <Border Grid.ColumnSpan="3" 
-                        Background="{StaticResource ScrollBarBackground}"
-                        CornerRadius="4"
-                        Opacity="0.5"/>
 
-                <RepeatButton Grid.Column="0" 
+                <RepeatButton Grid.Column="0"
                               Style="{StaticResource ScrollBarButton}"
                               Command="ScrollBar.LineLeftCommand"/>
-                
-                <Track Grid.Column="1" 
+
+                <Track Grid.Column="1"
                        Name="PART_Track"
                        IsDirectionReversed="False">
                     <Track.DecreaseRepeatButton>
@@ -190,15 +328,15 @@
                                       Command="ScrollBar.PageLeftCommand"/>
                     </Track.DecreaseRepeatButton>
                     <Track.Thumb>
-                        <Thumb Style="{StaticResource HorizontalScrollBarThumb}"/>
+                        <Thumb Style="{StaticResource ScrollBarThumbStyle}"/>
                     </Track.Thumb>
                     <Track.IncreaseRepeatButton>
                         <RepeatButton Style="{StaticResource ScrollBarPageButton}"
                                       Command="ScrollBar.PageRightCommand"/>
                     </Track.IncreaseRepeatButton>
                 </Track>
-                
-                <RepeatButton Grid.Column="2" 
+
+                <RepeatButton Grid.Column="2"
                               Style="{StaticResource ScrollBarButton}"
                               Command="ScrollBar.LineRightCommand"/>
             </Grid>
@@ -210,24 +348,24 @@
             <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Style.Triggers>
                 <Trigger Property="Orientation" Value="Vertical">
-                    <Setter Property="Width" Value="10"/>
-                    <Setter Property="MinWidth" Value="10"/>
+                    <Setter Property="Width" Value="6"/>
+                    <Setter Property="MinWidth" Value="6"/>
                     <Setter Property="Template" Value="{StaticResource VerticalScrollBar}"/>
                 </Trigger>
                 <Trigger Property="Orientation" Value="Horizontal">
-                    <Setter Property="Height" Value="10"/>
-                    <Setter Property="MinHeight" Value="10"/>
+                    <Setter Property="Height" Value="6"/>
+                    <Setter Property="MinHeight" Value="6"/>
                     <Setter Property="Template" Value="{StaticResource HorizontalScrollBar}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <!-- Стиль для ScrollViewer (опционально, для настройки отступов) -->
+        <!-- Стиль для ScrollViewer -->
         <Style TargetType="ScrollViewer">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ScrollViewer">
-                        <Grid>
+                        <Grid Background="{TemplateBinding Background}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
@@ -246,7 +384,7 @@
                                        Maximum="{TemplateBinding ScrollableHeight}"
                                        ViewportSize="{TemplateBinding ViewportHeight}"
                                        Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
-                                       Margin="2,0,0,0"/>
+                                       Margin="4,2,2,2"/>
 
                             <ScrollBar Grid.Column="0" Grid.Row="1"
                                        Name="PART_HorizontalScrollBar"
@@ -255,12 +393,12 @@
                                        Maximum="{TemplateBinding ScrollableWidth}"
                                        ViewportSize="{TemplateBinding ViewportWidth}"
                                        Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
-                                       Margin="0,2,0,0"/>
+                                       Margin="2,4,2,2"/>
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-         
+
     </Application.Resources>
 </Application>
