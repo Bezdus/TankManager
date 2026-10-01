@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows;
+using System.Windows.Markup;
 using TankManager.Core.Services;
 
 namespace TankManager
@@ -11,6 +12,12 @@ namespace TankManager
     {
         protected override void OnStartup(StartupEventArgs e)
         {
+            // Привязки WPF форматируют числа по Language элемента (по умолчанию en-US).
+            // Культуру потока не меняем: от неё зависят выгрузка в Excel и сохранение данных.
+            FrameworkElement.LanguageProperty.OverrideMetadata(
+                typeof(FrameworkElement),
+                new FrameworkPropertyMetadata(XmlLanguage.GetLanguage("ru-RU")));
+
             base.OnStartup(e);
             
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;

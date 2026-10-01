@@ -26,6 +26,17 @@
         <SolidColorBrush x:Key="Danger" Color="#FFDC2626"/>
         <SolidColorBrush x:Key="DangerSubtle" Color="#FFFEF2F2"/>
         <SolidColorBrush x:Key="DarkSurface" Color="#FF111827"/>
+        <SolidColorBrush x:Key="WarningHover" Color="#FFFEF3C7"/>
+        <SolidColorBrush x:Key="LoadingScrim" Color="#B3F3F4F6"/>
+        <SolidColorBrush x:Key="PanelScrim" Color="#4D111827"/>
+        <SolidColorBrush x:Key="ModalScrim" Color="#B3111827"/>
+        <SolidColorBrush x:Key="DropZoneBackground" Color="#E6EFF6FF"/>
+
+        <!-- Цвета типов материала (точки-метки в списках и на вкладках) -->
+        <SolidColorBrush x:Key="SheetTypeBrush" Color="#FF2563EB"/>
+        <SolidColorBrush x:Key="TubularTypeBrush" Color="#FF0D9488"/>
+        <SolidColorBrush x:Key="OtherTypeBrush" Color="#FFD97706"/>
+        <SolidColorBrush x:Key="PurchasedTypeBrush" Color="#FF9CA3AF"/>
 
         <!-- Цветовая палитра для скроллбаров -->
         <SolidColorBrush x:Key="ScrollBarThumb" Color="#FFD1D5DB"/>
@@ -189,6 +200,185 @@
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===================== Счётчик-бейдж ===================== -->
+        <Style x:Key="CountBadge" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource HoverBackground}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="MinWidth" Value="18"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="CountBadgeText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===================== Плитки показателей ===================== -->
+        <Style x:Key="StatTile" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SecondaryBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+        </Style>
+
+        <Style x:Key="StatTileAccent" TargetType="Border" BasedOn="{StaticResource StatTile}">
+            <Setter Property="Background" Value="{StaticResource AccentSubtle}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SelectedBackground}"/>
+        </Style>
+
+        <Style x:Key="StatLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="StatValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
+        </Style>
+
+        <Style x:Key="StatValueAccent" TargetType="TextBlock" BasedOn="{StaticResource StatValue}">
+            <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+        </Style>
+
+        <!-- Подзаголовок блока внутри карточки -->
+        <Style x:Key="BlockHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <!-- Цветная точка типа материала: цвет по ProductType из DataContext -->
+        <Style x:Key="TypeDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Fill" Value="{StaticResource OtherTypeBrush}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ProductType}" Value="SheetMaterial">
+                    <Setter Property="Fill" Value="{StaticResource SheetTypeBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ProductType}" Value="TubularProduct">
+                    <Setter Property="Fill" Value="{StaticResource TubularTypeBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ProductType}" Value="PurchasedPart">
+                    <Setter Property="Fill" Value="{StaticResource PurchasedTypeBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ===================== Вкладки ===================== -->
+        <Style x:Key="SegmentTabControl" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Top"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="0,0,0,1"
+                                    Margin="0,0,0,8">
+                                <UniformGrid Rows="1" IsItemsHost="True"/>
+                            </Border>
+                            <ContentPresenter ContentSource="SelectedContent"/>
+                        </DockPanel>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TabItem" x:Key="SegmentTabItem">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Grid x:Name="Root" Background="Transparent">
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Margin="1,0,1,4" Padding="2,6">
+                                <ContentPresenter ContentSource="Header"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
+                            </Border>
+                            <Rectangle x:Name="Underline"
+                                       Height="2"
+                                       VerticalAlignment="Bottom"
+                                       Margin="4,0,4,-1"
+                                       Fill="{StaticResource AccentColor}"
+                                       Visibility="Hidden"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Underline" Property="Visibility" Value="Visible"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===================== Список с пустым состоянием ===================== -->
+        <!-- Текст пустого состояния задаётся через Tag -->
+        <Style x:Key="EmptyAwareListBox" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <Grid Background="{TemplateBinding Background}">
+                            <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="False">
+                                <ItemsPresenter/>
+                            </ScrollViewer>
+                            <StackPanel x:Name="EmptyState"
+                                        Visibility="Collapsed"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Top"
+                                        Margin="8,32,8,0">
+                                <TextBlock Text="&#xE8FD;"
+                                           Style="{StaticResource IconText}"
+                                           FontSize="22"
+                                           Foreground="{StaticResource BorderColor}"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Text="{TemplateBinding Tag}"
+                                           Foreground="{StaticResource TextMuted}"
+                                           FontSize="12"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="EmptyState" Property="Visibility" Value="Visible"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

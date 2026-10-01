@@ -220,21 +220,37 @@ namespace TankManager.Core.Services
                 return result;
 
             IKompasDocument3D parentDocument3D = null;
+            bool ownsParentDocument = false;
             IPropertyKeeper propertyKeeper = null;
 
             try
             {
-                IPart7 parentPart = body.Parent as IPart7;
-                if (parentPart == null)
-                    return result;
+                object parent = body.Parent;
+                IPart7 parentPart = parent as IPart7;
+                string parentFileName = parentPart?.FileName;
 
-                parentDocument3D = Application.Documents.Open(parentPart.FileName, false, true) as IKompasDocument3D;
-                if (parentDocument3D == null)
+                if (parentPart == null)
+                    Logger.LogWarning($"Родитель тела {body.Name} не IPart7 ({parent?.GetType().Name ?? "null"}), свойства читаются из текущего документа");
+                else if (string.IsNullOrEmpty(parentFileName))
+                    Logger.LogWarning($"У родителя тела {body.Name} ({parentPart.Name}) пустой FileName, свойства читаются из текущего документа");
+                else
+                {
+                    parentDocument3D = GetPropertySourceDocument(parentFileName, out ownsParentDocument);
+                    if (parentDocument3D == null)
+                        Logger.LogWarning($"Не удалось получить документ {parentFileName} для тела {body.Name}, свойства читаются из текущего документа");
+                }
+
+                // Запасной источник описаний свойств — загруженный документ сборки (он не закрывается и не освобождается здесь)
+                IKompasDocument3D propertySource = parentDocument3D ?? Document;
+                if (propertySource == null)
                     return result;
 
                 propertyKeeper = body as IPropertyKeeper;
                 if (propertyKeeper == null)
+                {
+                    Logger.LogWarning($"Тело {body.Name} не поддерживает IPropertyKeeper");
                     return result;
+                }
 
                 for (int i = 0; i < propertyNames.Length; i++)
                 {
@@ -244,9 +260,12 @@ namespace TankManager.Core.Services
                     IProperty property = null;
                     try
                     {
-                        property = PropertyManager.GetProperty(parentDocument3D, propertyNames[i]);
+                        property = PropertyManager.GetProperty(propertySource, propertyNames[i]);
                         if (property == null)
+                        {
+                            Logger.LogWarning($"Свойство '{propertyNames[i]}' не найдено в документе {parentFileName} (тело {body.Name})");
                             continue;
+                        }
 
                         propertyKeeper.GetPropertyValue(
                             (KompasAPI7._Property)property,
@@ -255,6 +274,9 @@ namespace TankManager.Core.Services
                             out bool fromSource);
 
                         result[i] = value?.ToString();
+
+                        if (string.IsNullOrWhiteSpace(result[i]))
+                            Logger.LogWarning($"Пустое свойство '{propertyNames[i]}' у тела {body.Name} ({parentFileName}), fromSource={fromSource}, тип={value?.GetType().Name ?? "null"}");
                     }
                     finally
                     {
@@ -266,9 +288,87 @@ namespace TankManager.Core.Services
             }
             finally
             {
-                CloseIfHidden(parentDocument3D);
-                ReleaseComObject(parentDocument3D);
+                if (ownsParentDocument)
+                    CloseIfHidden(parentDocument3D);
+                if (parentDocument3D != null && !ReferenceEquals(parentDocument3D, Document))
+                    ReleaseComObject(parentDocument3D);
                 ReleaseComObjectIfNeeded(propertyKeeper, body);
+            }
+        }
+
+        /// <summary>
+        /// Документ, из которого берутся описания свойств тела: уже открытый в КОМПАС (не закрываем)
+        /// или открытый нами без окна. Подсборку (.a3d), загруженную в текущую сборку, КОМПАС может
+        /// не открыть только на чтение — тогда пробуем обычное открытие.
+        /// </summary>
+        private IKompasDocument3D GetPropertySourceDocument(string filePath, out bool openedByUs)
+        {
+            openedByUs = false;
+
+            if (Document != null && string.Equals(GetPathName(Document), filePath, StringComparison.OrdinalIgnoreCase))
+                return Document;
+
+            try
+            {
+                foreach (object docObj in Application.Documents)
+                {
+                    var doc3D = docObj as IKompasDocument3D;
+                    if (doc3D != null && string.Equals(GetPathName(doc3D), filePath, StringComparison.OrdinalIgnoreCase))
+                        return doc3D;
+
+                    ReleaseComObject(docObj);
+                }
+            }
+            catch (COMException ex)
+            {
+                Logger.LogWarning($"Не удалось перебрать открытые документы КОМПАС: {ex.Message}");
+            }
+
+            foreach (bool readOnly in new[] { true, false })
+            {
+                object opened = null;
+                try
+                {
+                    opened = Application.Documents.Open(filePath, false, readOnly);
+                }
+                catch (COMException ex)
+                {
+                    Logger.LogWarning($"Ошибка открытия {filePath} (readOnly={readOnly}): {ex.Message}");
+                }
+
+                var opened3D = opened as IKompasDocument3D;
+                if (opened3D != null)
+                {
+                    openedByUs = true;
+                    return opened3D;
+                }
+
+                Logger.LogWarning($"Documents.Open вернул {opened?.GetType().Name ?? "null"} для {filePath} (readOnly={readOnly})");
+                if (opened != null)
+                {
+                    try
+                    {
+                        var openedDoc = opened as IKompasDocument;
+                        if (openedDoc != null && !openedDoc.Visible)
+                            openedDoc.Close(DocumentCloseOptions.kdDoNotSaveChanges);
+                    }
+                    catch (COMException) { }
+                    ReleaseComObject(opened);
+                }
+            }
+
+            return null;
+        }
+
+        private static string GetPathName(IKompasDocument3D document)
+        {
+            try
+            {
+                return (document as IKompasDocument)?.PathName;
+            }
+            catch (COMException)
+            {
+                return null;
             }
         }
 

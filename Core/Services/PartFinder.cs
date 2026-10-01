@@ -62,10 +62,12 @@ namespace TankManager.Core.Services
                 return null;
 
             object bodiesVariant = feature.ResultBodies;
-            if (!(bodiesVariant is Array bodiesArray))
+            // Единственное тело КОМПАС возвращает не массивом, а самим IBody7 (как в PartExtractor.ExtractBodies)
+            var bodies = bodiesVariant as Array ?? (bodiesVariant is IBody7 singleBody ? new object[] { singleBody } : null);
+            if (bodies == null)
                 return null;
 
-            foreach (var bodyObj in bodiesArray)
+            foreach (var bodyObj in bodies)
             {
                 if (bodyObj is IBody7 body && MatchesBody(model, body))
                 {

@@ -75,12 +75,24 @@ namespace TankManager.Core.Models
         public double TotalAssemblyCost => Details.Sum(p => p.TotalCost) + StandardParts.Sum(p => p.TotalCost);
 
         /// <summary>
+        /// Суммарная стоимость металла, руб
+        /// </summary>
+        public double TotalMetalCost => Details.Sum(p => p.MetalCost) + StandardParts.Sum(p => p.MetalCost);
+
+        /// <summary>
+        /// Суммарная стоимость операций изготовления, руб
+        /// </summary>
+        public double TotalOperationsCost => Details.Sum(p => p.OperationsCost) + StandardParts.Sum(p => p.OperationsCost);
+
+        /// <summary>
         /// Уведомляет UI об изменении агрегированных свойств (количество, стоимость)
         /// </summary>
         public void NotifyAggregatesChanged()
         {
             OnPropertyChanged(nameof(TotalPartsCount));
             OnPropertyChanged(nameof(TotalAssemblyCost));
+            OnPropertyChanged(nameof(TotalMetalCost));
+            OnPropertyChanged(nameof(TotalOperationsCost));
         }
 
         /// <summary>

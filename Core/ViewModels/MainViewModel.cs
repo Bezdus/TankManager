@@ -39,6 +39,8 @@ namespace TankManager.Core.ViewModels
         private string _searchText;
         private MaterialInfo _selectedSheetMaterial;
         private MaterialInfo _selectedTubularProduct;
+        private MaterialInfo _selectedOtherMaterial;
+        private SnackbarKind _snackbarKind;
         private MaterialSortType _sheetMaterialsSortType = MaterialSortType.ByMass;
         private MaterialSortType _tubularProductsSortType = MaterialSortType.ByLength;
         private MaterialSortType _otherMaterialsSortType = MaterialSortType.ByMass;
@@ -172,7 +174,11 @@ namespace TankManager.Core.ViewModels
             {
                 if (SetProperty(ref _selectedSheetMaterial, value, nameof(SelectedSheetMaterial)))
                 {
-                    if (value != null) _selectedTubularProduct = null;
+                    if (value != null)
+                    {
+                        _selectedTubularProduct = null;
+                        _selectedOtherMaterial = null;
+                    }
                     OnMaterialFilterChanged();
                 }
             }
@@ -185,13 +191,34 @@ namespace TankManager.Core.ViewModels
             {
                 if (SetProperty(ref _selectedTubularProduct, value, nameof(SelectedTubularProduct)))
                 {
-                    if (value != null) _selectedSheetMaterial = null;
+                    if (value != null)
+                    {
+                        _selectedSheetMaterial = null;
+                        _selectedOtherMaterial = null;
+                    }
                     OnMaterialFilterChanged();
                 }
             }
         }
 
-        public MaterialInfo SelectedMaterialFilter => SelectedSheetMaterial ?? SelectedTubularProduct;
+        public MaterialInfo SelectedOtherMaterial
+        {
+            get => _selectedOtherMaterial;
+            set
+            {
+                if (SetProperty(ref _selectedOtherMaterial, value, nameof(SelectedOtherMaterial)))
+                {
+                    if (value != null)
+                    {
+                        _selectedSheetMaterial = null;
+                        _selectedTubularProduct = null;
+                    }
+                    OnMaterialFilterChanged();
+                }
+            }
+        }
+
+        public MaterialInfo SelectedMaterialFilter => SelectedSheetMaterial ?? SelectedTubularProduct ?? SelectedOtherMaterial;
 
         public MaterialSortType SheetMaterialsSortType
         {
@@ -407,6 +434,22 @@ namespace TankManager.Core.ViewModels
             set => SetProperty(ref _snackbarMessage, value, nameof(SnackbarMessage));
         }
 
+        public SnackbarKind SnackbarKind
+        {
+            get => _snackbarKind;
+            set => SetProperty(ref _snackbarKind, value, nameof(SnackbarKind));
+        }
+
+        // Счётчики для заголовков списков
+        public int DetailsVisibleCount => DetailsView?.Cast<object>().Count() ?? 0;
+        public int SheetMaterialsCount => SheetMaterials?.Count ?? 0;
+        public int TubularProductsCount => TubularProducts?.Count ?? 0;
+        public int OtherMaterialsCount => OtherMaterials?.Count ?? 0;
+        public int StandardPartsCount => StandardParts?.Count ?? 0;
+        // Пустой Product() — заглушка до первой загрузки
+        public bool HasProduct => CurrentProduct != null
+            && (!string.IsNullOrEmpty(CurrentProduct.Name) || (Details?.Count ?? 0) > 0);
+
         #endregion
 
         #region Properties - Server Storage
@@ -609,7 +652,7 @@ namespace TankManager.Core.ViewModels
             if (unreliableOperations > 0)
             {
                 _logger.LogWarning($"Стоимость не рассчитана для операций: {unreliableOperations}");
-                ShowSnackbar($"Стоимость не рассчитана для операций: {unreliableOperations} (нет исходных данных)", 6000);
+                ShowSnackbar($"Стоимость не рассчитана для операций: {unreliableOperations} (нет исходных данных)", SnackbarKind.Warning, 6000);
             }
         }
 
@@ -670,7 +713,7 @@ namespace TankManager.Core.ViewModels
                 if (!File.Exists(filePath))
                 {
                     StatusMessage = $"Файл не найден: {Path.GetFileName(filePath)}";
-                    MessageBox.Show($"Файл не найден:\n{filePath}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ShowSnackbar($"Файл не найден: {filePath}", SnackbarKind.Error);
                     return;
                 }
 
@@ -685,15 +728,8 @@ namespace TankManager.Core.ViewModels
                 }
                 else
                 {
-                    MessageBox.Show(
-                        "Не удалось установить связь с КОМПАС.\n\n" +
-                        "Возможные причины:\n" +
-                        "• КОМПАС-3D не запущен\n" +
-                        "• Документ не удалось открыть\n\n" +
-                        "Пожалуйста, запустите КОМПАС-3D и попробуйте снова.",
-                        "Связь с КОМПАС",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+                    ShowSnackbar("Не удалось связаться с КОМПАС: убедитесь, что КОМПАС-3D запущен и документ открывается",
+                        SnackbarKind.Warning, 6000);
                     StatusMessage = "Не удалось связаться с КОМПАС. Убедитесь, что КОМПАС запущен.";
                 }
             }
@@ -701,22 +737,19 @@ namespace TankManager.Core.ViewModels
             {
                 _logger.LogWarning($"Ошибка связывания с КОМПАС: {ex.Message}");
                 
-                string errorMessage = "Не удалось установить связь с КОМПАС.\n\n";
-                
-                if (ex.Message.Contains("Не удалось подключиться к KOMPAS-3D") || 
+                string errorMessage;
+
+                if (ex.Message.Contains("Не удалось подключиться к KOMPAS-3D") ||
                     ex is InvalidOperationException)
                 {
-                    errorMessage += "Возможные причины:\n" +
-                                  "• КОМПАС-3D не запущен\n" +
-                                  "• Нет прав доступа к приложению\n\n" +
-                                  "Пожалуйста, запустите КОМПАС-3D и попробуйте снова.";
+                    errorMessage = "Не удалось связаться с КОМПАС: запустите КОМПАС-3D и попробуйте снова";
                 }
                 else
                 {
-                    errorMessage += $"Ошибка: {ex.Message}";
+                    errorMessage = $"Не удалось связаться с КОМПАС: {ex.Message}";
                 }
-                
-                MessageBox.Show(errorMessage, "Связь с КОМПАС", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                ShowSnackbar(errorMessage, SnackbarKind.Warning, 6000);
                 StatusMessage = $"Ошибка связи с КОМПАС: {ex.Message}";
                 IsLinkedToKompas = false;
                 NotifySaveCommandCanExecuteChanged();
@@ -812,8 +845,11 @@ namespace TankManager.Core.ViewModels
                         }
                     }
 
-                    // Восстанавливаем путь к превью 3D-файла, если существует и актуален
-                    if (!string.IsNullOrEmpty(savedDetail.FilePreviewPngPath) && File.Exists(savedDetail.FilePreviewPngPath))
+                    // Восстанавливаем путь к превью 3D-файла, если существует и актуален.
+                    // Изделиям из библиотек КОМПАС не восстанавливаем: типоразмеры делят FilePath,
+                    // их превью находит по имени файла GenerateLibraryPartPreviewsAsync
+                    if (!detail.IsLibraryPart &&
+                        !string.IsNullOrEmpty(savedDetail.FilePreviewPngPath) && File.Exists(savedDetail.FilePreviewPngPath))
                     {
                         if (string.IsNullOrEmpty(detail.FilePath) || !File.Exists(detail.FilePath) ||
                             File.GetLastWriteTimeUtc(savedDetail.FilePreviewPngPath) >= File.GetLastWriteTimeUtc(detail.FilePath))
@@ -1049,7 +1085,7 @@ namespace TankManager.Core.ViewModels
                 else
                 {
                     StatusMessage = $"Сохранено локально: {fileName}. Сервер: {serverError}";
-                    ShowSnackbar($"Изделие сохранено только локально: {serverError}", 6000);
+                    ShowSnackbar($"Изделие сохранено только локально: {serverError}", SnackbarKind.Warning, 6000);
                 }
 
                 RefreshSavedProducts();
@@ -1074,9 +1110,10 @@ namespace TankManager.Core.ViewModels
             if (string.IsNullOrEmpty(imagesFolder))
                 return;
 
-            // Собираем все детали из Details и StandardParts
+            // Собираем все детали, кроме изделий из библиотек КОМПАС: их превью по вхождению
+            // создаёт GenerateLibraryPartPreviewsAsync (см. PartModel.IsLibraryPart)
             var allParts = (Details ?? Enumerable.Empty<PartModel>())
-                .Concat(StandardParts ?? Enumerable.Empty<PartModel>())
+                .Where(p => !p.IsLibraryPart)
                 .Where(p => !string.IsNullOrEmpty(p.FilePath) && string.IsNullOrEmpty(p.FilePreviewPngPath))
                 .GroupBy(p => p.FilePath)
                 .Select(g => g.First())
@@ -1101,7 +1138,6 @@ namespace TankManager.Core.ViewModels
                     if (!string.IsNullOrEmpty(savedPath))
                     {
                         var sameParts = (Details ?? Enumerable.Empty<PartModel>())
-                            .Concat(StandardParts ?? Enumerable.Empty<PartModel>())
                             .Where(p => p.FilePath == part.FilePath && p != part);
                         
                         foreach (var samePart in sameParts)
@@ -1136,6 +1172,12 @@ namespace TankManager.Core.ViewModels
 
             string imagesFolder = _storageService.GetProductImagesFolder(product);
 
+            await GenerateDrawingPreviewsAsync(product, imagesFolder, token);
+            await GenerateLibraryPartPreviewsAsync(product, imagesFolder, token);
+        }
+
+        private async Task GenerateDrawingPreviewsAsync(Product product, string imagesFolder, CancellationToken token)
+        {
             var detailsToProcess = Details
                 .Where(d => string.IsNullOrEmpty(d.CdfFilePath) && !d.IsBodyBased && !string.IsNullOrEmpty(d.FilePath))
                 .GroupBy(d => d.FilePath)
@@ -1187,6 +1229,78 @@ namespace TankManager.Core.ViewModels
             }
         }
 
+        /// <summary>
+        /// Превью изделий из библиотек КОМПАС по геометрии вхождения. Типоразмеры одного
+        /// шаблона (общий FilePath) различаются наименованием и обозначением.
+        /// </summary>
+        private async Task GenerateLibraryPartPreviewsAsync(Product product, string imagesFolder, CancellationToken token)
+        {
+            if (Details == null || string.IsNullOrEmpty(imagesFolder))
+                return;
+
+            var groups = Details
+                .Where(p => p.IsLibraryPart && !p.IsBodyBased)
+                .GroupBy(p => new { p.FilePath, p.Name, p.Marking })
+                .ToList();
+
+            var partsToProcess = new List<PartModel>();
+            foreach (var group in groups)
+            {
+                // Превью уже есть на диске — КОМПАС не трогаем
+                string cachedPath = Path.Combine(imagesFolder, StandardPartPreviewService.GetPreviewFileName(group.First()));
+                if (File.Exists(cachedPath))
+                {
+                    foreach (var part in group)
+                        part.FilePreviewPngPath = cachedPath;
+                }
+                else
+                {
+                    partsToProcess.Add(group.First());
+                }
+            }
+
+            int processed = 0;
+            int total = partsToProcess.Count;
+
+            foreach (var part in partsToProcess)
+            {
+                if (token.IsCancellationRequested || CurrentProduct != product)
+                    return;
+
+                try
+                {
+                    StatusMessage = $"Генерация превью стд. изделий: {processed + 1}/{total}";
+
+                    await Task.Run(() => _kompasService.LoadStandardPartPreview(part, product, imagesFolder), token);
+
+                    if (!string.IsNullOrEmpty(part.FilePreviewPngPath))
+                    {
+                        foreach (var samePart in Details.Where(p => p != part &&
+                            p.FilePath == part.FilePath && p.Name == part.Name && p.Marking == part.Marking))
+                        {
+                            samePart.FilePreviewPngPath = part.FilePreviewPngPath;
+                        }
+                    }
+
+                    processed++;
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Фоновая генерация превью стд. изделия {part.Name}: {ex.Message}");
+                    processed++;
+                }
+            }
+
+            if (total > 0 && CurrentProduct == product && !token.IsCancellationRequested)
+            {
+                StatusMessage = $"Превью стд. изделий готовы: {processed}/{total}";
+            }
+        }
+
         private async Task DeleteSelectedProductAsync(bool everywhere)
         {
             var info = SelectedSavedProduct;
@@ -1231,7 +1345,7 @@ namespace TankManager.Core.ViewModels
                 if (everywhere && !string.IsNullOrEmpty(_storageService.LastServerError))
                 {
                     StatusMessage += $". {_storageService.LastServerError}";
-                    ShowSnackbar(_storageService.LastServerError, 6000);
+                    ShowSnackbar(_storageService.LastServerError, SnackbarKind.Warning, 6000);
                 }
             }
             catch (Exception ex)
@@ -1364,6 +1478,17 @@ namespace TankManager.Core.ViewModels
             OnPropertyChanged(nameof(SheetMaterialsView));
             OnPropertyChanged(nameof(TubularProductsView));
             OnPropertyChanged(nameof(OtherMaterialsView));
+            NotifyCountsChanged();
+        }
+
+        private void NotifyCountsChanged()
+        {
+            OnPropertyChanged(nameof(DetailsVisibleCount));
+            OnPropertyChanged(nameof(SheetMaterialsCount));
+            OnPropertyChanged(nameof(TubularProductsCount));
+            OnPropertyChanged(nameof(OtherMaterialsCount));
+            OnPropertyChanged(nameof(StandardPartsCount));
+            OnPropertyChanged(nameof(HasProduct));
         }
 
         private ICollectionView CreatePartView(ObservableCollection<PartModel> parts)
@@ -1425,12 +1550,14 @@ namespace TankManager.Core.ViewModels
         {
             DetailsView?.Refresh();
             StandardPartsView?.Refresh();
+            NotifyCountsChanged();
         }
 
         public void ClearMaterialFilter()
         {
             SelectedSheetMaterial = null;
             SelectedTubularProduct = null;
+            SelectedOtherMaterial = null;
         }
 
         #endregion
@@ -1612,8 +1739,7 @@ namespace TankManager.Core.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError("Ошибка экспорта в Excel", ex);
-                MessageBox.Show($"Ошибка при экспорте в Excel: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowSnackbar($"Ошибка при экспорте в Excel: {ex.Message}", SnackbarKind.Error);
             }
             finally
             {
@@ -1625,11 +1751,17 @@ namespace TankManager.Core.ViewModels
 
         #region Helper Methods
 
-        private void ShowSnackbar(string message, int durationMs = 3000)
+        public void ShowSnackbar(string message, SnackbarKind kind = SnackbarKind.Success, int durationMs = 0)
         {
             // Останавливаем предыдущий таймер, если есть
             _snackbarTimer?.Dispose();
 
+            if (durationMs <= 0)
+                durationMs = kind == SnackbarKind.Error ? 6000
+                           : kind == SnackbarKind.Warning ? 5000
+                           : 3000;
+
+            SnackbarKind = kind;
             SnackbarMessage = message;
             IsSnackbarVisible = true;
 
@@ -1686,6 +1818,7 @@ namespace TankManager.Core.ViewModels
             SelectedStandardPart = null;
             SelectedSheetMaterial = null;
             SelectedTubularProduct = null;
+            SelectedOtherMaterial = null;
             CurrentlySelectedPart = null;
             IsProductSelected = false;
         }
@@ -1694,8 +1827,10 @@ namespace TankManager.Core.ViewModels
         {
             OnPropertyChanged(nameof(SelectedSheetMaterial));
             OnPropertyChanged(nameof(SelectedTubularProduct));
+            OnPropertyChanged(nameof(SelectedOtherMaterial));
             OnPropertyChanged(nameof(SelectedMaterialFilter));
             DetailsView?.Refresh();
+            NotifyCountsChanged();
             UpdateCalculations();
         }
 
@@ -1759,7 +1894,7 @@ namespace TankManager.Core.ViewModels
         {
             IsLinkedToKompas = false;
             StatusMessage = "Связь с КОМПАС потеряна. Запустите КОМПАС и нажмите «Связать».";
-            ShowSnackbar("Связь с КОМПАС потеряна", 5000);
+            ShowSnackbar("Связь с КОМПАС потеряна", SnackbarKind.Warning);
             NotifyCopyCommandsCanExecuteChanged();
             NotifySaveCommandCanExecuteChanged();
             NotifyLinkCommandCanExecuteChanged();
@@ -1769,7 +1904,7 @@ namespace TankManager.Core.ViewModels
         private void ShowError(string message, Exception ex)
         {
             StatusMessage = $"Ошибка: {ex.Message}";
-            MessageBox.Show($"{message}: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            ShowSnackbar($"{message}: {ex.Message}", SnackbarKind.Error);
         }
 
         private bool SetProperty<T>(ref T field, T value, params String[] propertyNames)
@@ -1854,5 +1989,16 @@ namespace TankManager.Core.ViewModels
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Вид уведомления SnackBar
+    /// </summary>
+    public enum SnackbarKind
+    {
+        Success,
+        Info,
+        Warning,
+        Error
     }
 }

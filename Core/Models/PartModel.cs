@@ -41,6 +41,11 @@ namespace TankManager.Core.Models
         private double _totalCost;
 
         private static readonly DrawingPreviewService _previewService = new DrawingPreviewService();
+        private static readonly ILogger Logger = new FileLogger();
+
+        // Разделитель строк в наименовании тела КОМПАС: "Наименование@/Материал@/L = 300 мм"
+        private const string NameLineSeparator = "@/";
+        private static readonly Regex LengthInNameRegex = new Regex(@"L\s*=\s*(\d+(?:[.,]\d+)?)", RegexOptions.Compiled);
 
         /// <summary>
         /// Операции изготовления детали
@@ -148,6 +153,15 @@ namespace TankManager.Core.Models
                 }
             }
         }
+
+        /// <summary>
+        /// Изделие из библиотеки КОМПАС (стандартные изделия, Полином): файл — общий шаблон,
+        /// а типоразмер задаётся в сборке, поэтому миниатюра файла не соответствует изделию
+        /// </summary>
+        public bool IsLibraryPart =>
+            !string.IsNullOrEmpty(FilePath) &&
+            FilePath.IndexOf(@"\KOMPAS-3D", StringComparison.OrdinalIgnoreCase) >= 0 &&
+            FilePath.IndexOf(@"\Libs\", StringComparison.OrdinalIgnoreCase) >= 0;
 
         public string CdfFilePath
         {
@@ -315,7 +329,12 @@ namespace TankManager.Core.Models
                 if (!_previewLoaded)
                 {
                     _previewLoaded = true;
-                    _filePreview = TryLoadPreview(FilePath, _filePreviewPngPath);
+                    // Изделия из библиотек КОМПАС ссылаются на общий шаблон: его миниатюра
+                    // показывает не тот типоразмер, поэтому берём только превью вхождения
+                    // (StandardPartPreviewService); в старых сохранениях лежит миниатюра шаблона
+                    _filePreview = IsLibraryPart
+                        ? (StandardPartPreviewService.IsStandardPartPreview(_filePreviewPngPath) ? TryLoadPreview(null, _filePreviewPngPath) : null)
+                        : TryLoadPreview(FilePath, _filePreviewPngPath);
                 }
                 return _filePreview;
             }
@@ -408,6 +427,15 @@ namespace TankManager.Core.Models
                     KompasConstants.MassPropertyName);
 
                 Material = FormatMaterial(properties[0]);
+                if (string.IsNullOrWhiteSpace(Material))
+                {
+                    string materialFromName = TryGetMaterialFromName(Name);
+                    if (!string.IsNullOrEmpty(materialFromName))
+                    {
+                        Material = materialFromName;
+                        Logger.LogWarning($"Материал тела {Name} не найден в свойствах, взят из наименования");
+                    }
+                }
                 Mass = ParseMass(properties[1]);
                 
                 parentPart = body.Parent as IPart7;
@@ -418,7 +446,10 @@ namespace TankManager.Core.Models
                 ProductType = DetermineProductType(DetailType, Material);
 
                 if (ProductType == ProductType.TubularProduct)
-                    Length = GetLength(body, context);
+                {
+                    double length = GetLength(body, context);
+                    Length = length > 0 ? length : TryGetLengthFromName(Name);
+                }
                 else
                     Length = -1;
 
@@ -466,6 +497,12 @@ namespace TankManager.Core.Models
         /// <returns>Путь к сохранённому файлу или null если не удалось сохранить</returns>
         public string SaveFilePreview(string targetDirectory)
         {
+            // Превью изделий из библиотек создаёт KompasService.LoadStandardPartPreview
+            if (IsLibraryPart)
+                return StandardPartPreviewService.IsStandardPartPreview(_filePreviewPngPath) && File.Exists(_filePreviewPngPath)
+                    ? _filePreviewPngPath
+                    : null;
+
             // Если превью уже сохранено в памяти, файл существует и актуален — возвращаем путь
             if (!string.IsNullOrEmpty(_filePreviewPngPath) && File.Exists(_filePreviewPngPath))
             {
@@ -532,6 +569,40 @@ namespace TankManager.Core.Models
             catch
             {
                 return 0;
+            }
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Материал из второй строки наименования тела-профиля ("Труба@/Труба 104х2-AISI 304@/L = 300 мм")
+        /// </summary>
+        private static string TryGetMaterialFromName(string name)
+        {
+            if (string.IsNullOrEmpty(name) || !name.Contains(NameLineSeparator))
+                return null;
+
+            var lines = name.Split(new[] { NameLineSeparator }, StringSplitOptions.None);
+            if (lines.Length < 2)
+                return null;
+
+            string material = FormatMaterial(lines[1]).Trim();
+            return material.Length > 0 ? material : null;
+        }
+
+        /// <summary>
+        /// Длина из строки наименования вида "L = 300 мм"
+        /// </summary>
+        private static double TryGetLengthFromName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return 0;
+
+            foreach (var line in name.Split(new[] { NameLineSeparator }, StringSplitOptions.None))
+            {
+                var match = LengthInNameRegex.Match(line);
+                if (match.Success)
+                    return ParseMass(match.Groups[1].Value);
             }
 
             return 0;

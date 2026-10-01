@@ -369,3 +369,5 @@ FodyWeavers.xsd
 # Copilot snapshots (уже игнорируется через .vs/)
 # но на всякий случай добавим явно
 .vs/CopilotSnapshots/
+# Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ API РљРћРњРџРђРЎ (Р»РѕРєР°Р»СЊРЅР°СЏ)
+ai_docs/

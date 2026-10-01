@@ -7,17 +7,22 @@
         xmlns:models="clr-namespace:TankManager.Core.Models"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
-        Title="Tank Manager v1.1.5"
+        Title="Tank Manager"
         Width="1280" Height="800"
         MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         AllowDrop="True"
         Drop="FileDropZone_Drop"
-        DragEnter="FileDropZone_DragEnter"
+        PreviewDragEnter="FileDropZone_DragEnter"
+        PreviewDragOver="FileDropZone_DragOver"
         FontFamily="Segoe UI"
         FontSize="12"
         Foreground="{StaticResource TextPrimary}"
         Background="{StaticResource WindowBackground}">
+    <Window.InputBindings>
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveProductCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding RefreshFromKompasCommand}"/>
+    </Window.InputBindings>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <local:GroupCountToVisibilityConverter x:Key="GroupCountToVisibilityConverter"/>
@@ -29,6 +34,7 @@
         <local:DoubleNonZeroToVisibilityConverter x:Key="DoubleNonZeroToVisibilityConverter"/>
         <local:GroupItemPropertyConverter x:Key="GroupItemPropertyConverter"/>
         <local:MaterialSortTypeConverter x:Key="MaterialSortTypeConverter"/>
+        <local:ProductTypeConverter x:Key="ProductTypeConverter"/>
 
         <!-- ObjectDataProvider для MaterialSortType enum -->
         <ObjectDataProvider x:Key="SheetMaterialSortOptions" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
@@ -99,15 +105,33 @@
             <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         </Style>
 
-        <Style TargetType="TextBlock" x:Key="PropertyValue">
+        <!-- Значение свойства: read-only TextBox, чтобы текст можно было выделить и скопировать -->
+        <Style TargetType="TextBox" x:Key="PropertyValue">
             <Setter Property="Margin" Value="0,4,0,4"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="IsReadOnlyCaretVisible" Value="False"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="IBeam"/>
+            <Setter Property="SelectionBrush" Value="{StaticResource AccentColor}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Focusable="False"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Hidden"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <Style TargetType="TextBlock" x:Key="TotalValue" BasedOn="{StaticResource PropertyValue}">
+        <Style TargetType="TextBox" x:Key="TotalValue" BasedOn="{StaticResource PropertyValue}">
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
@@ -241,17 +265,27 @@
 
         <!-- Общий шаблон для списка деталей с группировкой -->
         <DataTemplate x:Key="PartItemTemplate">
-            <StackPanel Cursor="Hand">
-                <TextBlock FontSize="12" TextWrapping="Wrap">
-                    <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold"/>
-                    <Run Text="{Binding Marking, Mode=OneWay}"/>
-                </TextBlock>
-                <TextBlock FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis">
-                    <Run Text="{Binding DetailType}"/>
-                    <Run Text="·"/>
-                    <Run Text="{Binding Material}"/>
-                </TextBlock>
-            </StackPanel>
+            <Grid Cursor="Hand">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Ellipse Style="{StaticResource TypeDot}"
+                         VerticalAlignment="Top"
+                         Margin="0,5,8,0"
+                         ToolTip="{Binding ProductType, Converter={StaticResource ProductTypeConverter}}"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock FontSize="12" TextWrapping="Wrap">
+                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold"/>
+                        <Run Text="{Binding Marking, Mode=OneWay}"/>
+                    </TextBlock>
+                    <TextBlock FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis">
+                        <Run Text="{Binding DetailType}"/>
+                        <Run Text="·"/>
+                        <Run Text="{Binding Material}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
         </DataTemplate>
 
         <!-- Стиль для элементов списка -->
@@ -448,7 +482,7 @@
                     </WrapPanel>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
-                               Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"
+                               Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
                                Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
                 </Grid>
             </Border>
@@ -487,7 +521,7 @@
                     </WrapPanel>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
-                               Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"
+                               Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
                                Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
                 </Grid>
             </Border>
@@ -530,7 +564,7 @@
                     </WrapPanel>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
-                               Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"
+                               Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
                                Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
                 </Grid>
             </Border>
@@ -568,7 +602,7 @@
                     </WrapPanel>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
-                               Text="{Binding Cost, StringFormat='{}{0:F2} ₽'}"
+                               Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
                                Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
                 </Grid>
             </Border>
@@ -604,6 +638,7 @@
 
                     <Button x:Name="LoadDocumentButton"
                             Click="LoadDocumentButton_Click"
+                            ToolTip="Загрузить сборку КОМПАС (Ctrl+O)"
                             Style="{StaticResource PanelButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE8E5;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
@@ -617,7 +652,7 @@
                             <Style TargetType="Button" BasedOn="{StaticResource PanelButtonStyle}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsLinkedToKompas}" Value="True">
-                                        <Setter Property="ToolTip" Value="Сохранить текущее изделие"/>
+                                        <Setter Property="ToolTip" Value="Сохранить текущее изделие (Ctrl+S)"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding IsLinkedToKompas}" Value="False">
                                         <Setter Property="ToolTip" Value="Для сохранения необходима связь с КОМПАС"/>
@@ -674,7 +709,7 @@
                                 <Setter Property="Foreground" Value="{StaticResource Warning}"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#FFFEF3C7"/>
+                                        <Setter Property="Background" Value="{StaticResource WarningHover}"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -703,7 +738,7 @@
                                     Style="{StaticResource IconButton}"
                                     Foreground="{StaticResource Success}"
                                     Content="&#xE72C;"
-                                    ToolTip="Обновить данные из КОМПАС"/>
+                                    ToolTip="Обновить данные из КОМПАС (F5)"/>
                         </StackPanel>
                     </Border>
 
@@ -720,13 +755,14 @@
         <!-- Основной контент с выдвижной панелью поверх -->
         <Grid Grid.Row="1">
             <!-- Основной контент -->
-            <Grid Margin="6">
+            <Grid Margin="6"
+                  Visibility="{Binding HasProduct, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1*" MinWidth="250"/>
+                    <ColumnDefinition x:Name="LeftColumn" Width="1*" MinWidth="250"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="2.5*" MinWidth="250"/>
+                    <ColumnDefinition x:Name="CenterColumn" Width="2.5*" MinWidth="250"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="1.5*" MinWidth="300"/>
+                    <ColumnDefinition x:Name="RightColumn" Width="1.5*" MinWidth="340"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ЛЕВАЯ ПАНЕЛЬ: Список всех деталей -->
@@ -737,7 +773,12 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="Все детали" Style="{StaticResource SectionHeaderStyle}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Все детали" Style="{StaticResource SectionHeaderStyle}"/>
+                                <Border Style="{StaticResource CountBadge}" Margin="8,0,0,0">
+                                    <TextBlock Text="{Binding DetailsVisibleCount}" Style="{StaticResource CountBadgeText}"/>
+                                </Border>
+                            </StackPanel>
                             <Button Grid.Column="1"
                                     Content="&#xE8C8;"
                                     Style="{StaticResource CopyButtonStyle}"
@@ -806,7 +847,7 @@
                                     </StackPanel>
 
                                     <TextBlock Grid.Column="2"
-                                               Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F2} кг'}"
+                                               Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:N2} кг'}"
                                                FontSize="12"
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource AccentColor}"
@@ -848,6 +889,8 @@
                                                Foreground="{StaticResource TextMuted}"/>
 
                                     <TextBox Grid.Column="1"
+                                             x:Name="SearchBox"
+                                             ToolTip="Поиск по названию и обозначению (Ctrl+F)"
                                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                              BorderThickness="0"
                                              VerticalAlignment="Center"
@@ -924,10 +967,8 @@
                                      SelectedItem="{Binding SelectedDetail}"
                                      ItemTemplate="{StaticResource PartItemTemplate}"
                                      ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     Background="Transparent"
-                                     BorderThickness="0"
-                                     Padding="0">
+                                     Style="{StaticResource EmptyAwareListBox}"
+                                     Tag="Ничего не найдено">
                                 <ListBox.GroupStyle>
                                     <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
                                 </ListBox.GroupStyle>
@@ -942,102 +983,117 @@
                 <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="16,10">
                     <DockPanel>
                         <Grid DockPanel.Dock="Top" Margin="0,0,0,12" MinHeight="28">
-                            <TextBlock Text="Свойства детали"
+                            <TextBlock Text="Деталь"
                                        Style="{StaticResource SectionHeaderStyle}"
-                                       Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-                            <TextBlock Text="Изделие"
+                                       Visibility="{Binding CurrentlySelectedPart, Converter={StaticResource InverseNullToVisibilityConverter}}"/>
+                            <TextBlock Text="Сводка по изделию"
                                        Style="{StaticResource SectionHeaderStyle}"
-                                       Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                       Visibility="{Binding CurrentlySelectedPart, Converter={StaticResource NullToVisibilityConverter}}"/>
                         </Grid>
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <Grid>
-                                <!-- Превью изделия когда ничего не выбрано -->
-                                <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                                <!-- Сводка изделия (когда деталь не выбрана) -->
+                                <StackPanel Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
+                                    <TextBox Text="{Binding CurrentProduct.Name, Mode=OneWay}"
+                                             Style="{StaticResource PropertyValue}"
+                                             FontSize="18"
+                                             FontWeight="SemiBold"
+                                             Margin="0"/>
+                                    <TextBox Text="{Binding CurrentProduct.Marking, Mode=OneWay}"
+                                             Style="{StaticResource PropertyValue}"
+                                             Foreground="{StaticResource TextSecondary}"
+                                             Margin="0,2,0,14"/>
 
-                                    <StackPanel Grid.Row="0"
-                                                HorizontalAlignment="Center"
-                                                Margin="0,48,0,0"
-                                                Visibility="{Binding DataContext.CurrentProduct.FilePreview, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
-                                        <TextBlock Text="&#xE8FD;" Style="{StaticResource IconText}" FontSize="28" Foreground="{StaticResource BorderColor}" Margin="0,0,0,10"/>
-                                        <TextBlock Text="Выберите деталь из списка"
-                                                   HorizontalAlignment="Center"
-                                                   Foreground="{StaticResource TextMuted}"
-                                                   FontSize="12"/>
-                                    </StackPanel>
+                                    <!-- Ключевые показатели -->
+                                    <UniformGrid Columns="3" Margin="0,0,-8,0">
+                                        <Border Style="{StaticResource StatTile}">
+                                            <StackPanel>
+                                                <TextBlock Text="Масса" Style="{StaticResource StatLabel}"/>
+                                                <TextBlock Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:N2} кг'}"
+                                                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                           Style="{StaticResource StatValue}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource StatTile}">
+                                            <StackPanel>
+                                                <TextBlock Text="Деталей" Style="{StaticResource StatLabel}"/>
+                                                <TextBlock Text="{Binding CurrentProduct.TotalPartsCount, StringFormat='{}{0:N0} шт.'}"
+                                                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                           Style="{StaticResource StatValue}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource StatTileAccent}">
+                                            <StackPanel>
+                                                <TextBlock Text="Итого" Style="{StaticResource StatLabel}"/>
+                                                <TextBlock Text="{Binding CurrentProduct.TotalAssemblyCost, StringFormat='{}{0:N2} ₽'}"
+                                                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                           Style="{StaticResource StatValueAccent}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource StatTile}">
+                                            <StackPanel>
+                                                <TextBlock Text="Металл" Style="{StaticResource StatLabel}"/>
+                                                <TextBlock Text="{Binding CurrentProduct.TotalMetalCost, StringFormat='{}{0:N2} ₽'}"
+                                                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                           Style="{StaticResource StatValue}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource StatTile}">
+                                            <StackPanel>
+                                                <TextBlock Text="Операции" Style="{StaticResource StatLabel}"/>
+                                                <TextBlock Text="{Binding CurrentProduct.TotalOperationsCost, StringFormat='{}{0:N2} ₽'}"
+                                                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                           Style="{StaticResource StatValue}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </UniformGrid>
 
-                                    <!-- Превью файла изделия -->
-                                    <Border Grid.Row="1"
-                                            Style="{StaticResource PreviewBoxStyle}"
-                                            Padding="16"
-                                            VerticalAlignment="Top"
-                                            Visibility="{Binding DataContext.CurrentProduct.FilePreview, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseNullToVisibilityConverter}}">
-                                        <Image Source="{Binding DataContext.CurrentProduct.FilePreview, RelativeSource={RelativeSource AncestorType=Window}}"
-                                               MaxHeight="400"
-                                               Stretch="Uniform"
-                                               StretchDirection="DownOnly"
-                                               HorizontalAlignment="Center"/>
-                                    </Border>
-                                </Grid>
-
-                                <!-- Карточка сводки изделия при выборе баннера -->
-                                <Grid Visibility="{Binding DataContext.IsProductSelected, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                      Background="{StaticResource PrimaryBackground}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                                    <!-- Состав по типам материала (цвета совпадают с метками в списках) -->
+                                    <WrapPanel Margin="0,4,0,14">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                                            <Ellipse Width="8" Height="8" Fill="{StaticResource SheetTypeBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="11">
+                                                <Run Text="Листовой"/> <Run Text="{Binding SheetMaterialsCount, Mode=OneWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                                            <Ellipse Width="8" Height="8" Fill="{StaticResource TubularTypeBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="11">
+                                                <Run Text="Трубный"/> <Run Text="{Binding TubularProductsCount, Mode=OneWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                                            <Ellipse Width="8" Height="8" Fill="{StaticResource OtherTypeBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="11">
+                                                <Run Text="Прочие"/> <Run Text="{Binding OtherMaterialsCount, Mode=OneWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                                            <Ellipse Width="8" Height="8" Fill="{StaticResource PurchasedTypeBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="11">
+                                                <Run Text="Покупные"/> <Run Text="{Binding StandardPartsCount, Mode=OneWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </WrapPanel>
 
                                     <!-- Превью изделия -->
-                                    <Border Grid.Row="0"
-                                            Style="{StaticResource PreviewBoxStyle}"
+                                    <Border Style="{StaticResource PreviewBoxStyle}"
+                                            Padding="16"
                                             Margin="0,0,0,12"
-                                            VerticalAlignment="Top"
                                             Visibility="{Binding CurrentProduct.FilePreview, Converter={StaticResource InverseNullToVisibilityConverter}}">
                                         <Image Source="{Binding CurrentProduct.FilePreview}"
-                                               MaxHeight="250"
+                                               MaxHeight="360"
                                                Stretch="Uniform"
                                                StretchDirection="DownOnly"
                                                HorizontalAlignment="Center"/>
                                     </Border>
 
-                                    <!-- Свойства изделия -->
-                                    <Grid Grid.Row="1">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Название" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentProduct.Name}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Обозначение" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentProduct.Marking}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Масса" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentProduct.Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Деталей" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentProduct.TotalPartsCount, StringFormat='{}{0} шт'}" Style="{StaticResource PropertyValue}"/>
-
-                                        <Rectangle Grid.Row="4" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" Margin="0,8"/>
-
-                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Стоимость" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding CurrentProduct.TotalAssemblyCost, StringFormat='{}{0:N2} ₽'}" Style="{StaticResource TotalValue}"/>
-                                    </Grid>
-                                </Grid>
+                                    <TextBlock Text="Выберите деталь в списке слева, чтобы увидеть её свойства и стоимость"
+                                               Foreground="{StaticResource TextMuted}"
+                                               FontSize="11"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
 
                                 <Grid Visibility="{Binding DataContext.CurrentlySelectedPart, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseNullToVisibilityConverter}}"
                                       DataContext="{Binding CurrentlySelectedPart}">
@@ -1045,10 +1101,37 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
+                                    <!-- Заголовок детали -->
+                                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                                        <TextBox Text="{Binding Name, Mode=OneWay}"
+                                                 Style="{StaticResource PropertyValue}"
+                                                 FontSize="18"
+                                                 FontWeight="SemiBold"
+                                                 Margin="0"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <TextBox Text="{Binding Marking, Mode=OneWay}"
+                                                     Style="{StaticResource PropertyValue}"
+                                                     Foreground="{StaticResource TextSecondary}"
+                                                     Margin="0,0,10,0"/>
+                                            <Border Background="{StaticResource HoverBackground}"
+                                                    CornerRadius="10"
+                                                    Padding="8,2"
+                                                    VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Style="{StaticResource TypeDot}" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="{Binding ProductType, Converter={StaticResource ProductTypeConverter}}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource TextSecondary}"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+
                                     <!-- Превью 3D модели + Чертёж детали (бок о бок) -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                                    <Grid Grid.Row="1" Margin="0,0,0,14">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="4*"/>
                                             <ColumnDefinition Width="6*"/>
@@ -1129,62 +1212,63 @@
                                     </Grid>
 
                                     <!-- Свойства детали -->
-                                    <Grid Grid.Row="1">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="2">
+                                        <TextBlock Text="ОСНОВНОЕ" Style="{StaticResource BlockHeader}"/>
+                                        <Grid Margin="0,0,0,14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Название" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" Style="{StaticResource PropertyValue}"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Материал" Style="{StaticResource PropertyLabel}"/>
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Material, Mode=OneWay}" Style="{StaticResource PropertyValue}"/>
 
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Обозначение" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Marking}" Style="{StaticResource PropertyValue}"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Масса" Style="{StaticResource PropertyLabel}"/>
+                                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Mass, StringFormat='{}{0:N2} кг', Mode=OneWay}" Style="{StaticResource PropertyValue}"/>
 
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Тип детали" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DetailType}" Style="{StaticResource PropertyValue}"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Тип детали" Style="{StaticResource PropertyLabel}"/>
+                                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DetailType, Mode=OneWay}" Style="{StaticResource PropertyValue}"/>
+                                        </Grid>
 
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Тип продукта" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ProductType}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Материал" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Material}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Масса" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Mass, StringFormat='{}{0:F3} кг'}" Style="{StaticResource PropertyValue}"/>
-
-                                        <!-- Разделитель стоимости -->
-                                        <Rectangle Grid.Row="6" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" Margin="0,8"/>
-
-                                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Металл" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding MetalCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Операции" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding OperationsCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource PropertyValue}"/>
-
-                                        <TextBlock Grid.Row="9" Grid.Column="0" Text="Итого" Style="{StaticResource PropertyLabel}"/>
-                                        <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding TotalCost, StringFormat='{}{0:F2} ₽'}" Style="{StaticResource TotalValue}"/>
-                                    </Grid>
+                                        <TextBlock Text="СТОИМОСТЬ" Style="{StaticResource BlockHeader}"/>
+                                        <UniformGrid Columns="3" Margin="0,0,-8,0">
+                                            <Border Style="{StaticResource StatTile}">
+                                                <StackPanel>
+                                                    <TextBlock Text="Металл" Style="{StaticResource StatLabel}"/>
+                                                    <TextBlock Text="{Binding MetalCost, StringFormat='{}{0:N2} ₽'}"
+                                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                               Style="{StaticResource StatValue}"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Style="{StaticResource StatTile}">
+                                                <StackPanel>
+                                                    <TextBlock Text="Операции" Style="{StaticResource StatLabel}"/>
+                                                    <TextBlock Text="{Binding OperationsCost, StringFormat='{}{0:N2} ₽'}"
+                                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                               Style="{StaticResource StatValue}"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Style="{StaticResource StatTileAccent}">
+                                                <StackPanel>
+                                                    <TextBlock Text="Итого" Style="{StaticResource StatLabel}"/>
+                                                    <TextBlock Text="{Binding TotalCost, StringFormat='{}{0:N2} ₽'}"
+                                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                               Style="{StaticResource StatValueAccent}"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </UniformGrid>
+                                    </StackPanel>
 
                                     <!-- Операции изготовления -->
-                                    <StackPanel Grid.Row="2"
-                                                Margin="0,16,0,0"
+                                    <StackPanel Grid.Row="3"
+                                                Margin="0,6,0,0"
                                                 Visibility="{Binding HasOperations, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <TextBlock Text="Операции изготовления"
-                                                   Style="{StaticResource SectionHeaderStyle}"
-                                                   Margin="0,0,0,8"/>
+                                        <TextBlock Text="ОПЕРАЦИИ ИЗГОТОВЛЕНИЯ" Style="{StaticResource BlockHeader}"/>
 
                                         <ItemsControl ItemsSource="{Binding Operations}"
                                                       Background="Transparent"
@@ -1204,239 +1288,289 @@
 
                 <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 
-                <!-- ПРАВАЯ ПАНЕЛЬ: Листовой прокат, Трубный прокат, Стандартные изделия -->
-                <Grid Grid.Column="4">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                <!-- ПРАВАЯ ПАНЕЛЬ: материалы и покупные изделия во вкладках -->
+                <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="8,10">
+                    <TabControl Style="{StaticResource SegmentTabControl}"
+                                ItemContainerStyle="{StaticResource SegmentTabItem}">
 
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Листовой прокат -->
-                    <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource CardStyle}" Padding="8,10">
-                        <DockPanel>
-                            <Grid DockPanel.Dock="Top" Margin="4,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Листовой" Style="{StaticResource SectionHeaderStyle}"/>
-                                <ComboBox Grid.Column="1"
-                                          SelectedValue="{Binding SheetMaterialsSortType, Mode=TwoWay}"
-                                          Style="{StaticResource SortComboBoxStyle}"
-                                          MinWidth="28"
-                                          MaxWidth="110"
-                                          HorizontalAlignment="Right"
-                                          Margin="4,0"
-                                          ToolTip="Выберите тип сортировки">
-                                    <models:MaterialSortType>ByName</models:MaterialSortType>
-                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
-                                    <ComboBox.ItemTemplate>
+                        <!-- Листовой прокат -->
+                        <TabItem ToolTip="Листовой прокат">
+                            <TabItem.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Листовой"/>
+                                    <TextBlock Text="{Binding SheetMaterialsCount}" Margin="4,0,0,0" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </TabItem.Header>
+                            <DockPanel>
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox SelectedValue="{Binding SheetMaterialsSortType, Mode=TwoWay}"
+                                              Style="{StaticResource SortComboBoxStyle}"
+                                              HorizontalAlignment="Left"
+                                              ToolTip="Сортировка">
+                                        <models:MaterialSortType>ByName</models:MaterialSortType>
+                                        <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="1"
+                                            Content="&#xE8C8;"
+                                            Style="{StaticResource CopyButtonStyle}"
+                                            Command="{Binding CopySheetToClipboardCommand}"
+                                            ToolTip="Копировать в Excel"/>
+                                </Grid>
+                                <ListBox ItemsSource="{Binding SheetMaterialsView}"
+                                         SelectedItem="{Binding SelectedSheetMaterial}"
+                                         SelectionMode="Single"
+                                         PreviewMouseDown="SheetMaterialsListBox_PreviewMouseDown"
+                                         Style="{StaticResource EmptyAwareListBox}"
+                                         Tag="Нет листового проката"
+                                         ItemContainerStyle="{StaticResource MaterialListBoxItemStyle}">
+                                    <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                            <Grid Cursor="Hand">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <DockPanel><Ellipse Width="8" Height="8" Fill="{StaticResource SheetTypeBrush}" Margin="0,5,8,0" VerticalAlignment="Top"/><TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/></DockPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding TotalMass, StringFormat='{}{0:N2} кг'}" FontSize="11" Margin="8,0,0,0" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Top" Typography.NumeralAlignment="Tabular"/>
+                                            </Grid>
                                         </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Grid.Column="2"
-                                        Content="&#xE8C8;"
-                                        Style="{StaticResource CopyButtonStyle}"
-                                        Command="{Binding CopySheetToClipboardCommand}"
-                                        ToolTip="Копировать в Excel"/>
-                            </Grid>
-                            <ListBox ItemsSource="{Binding SheetMaterialsView}"
-                                     SelectedItem="{Binding SelectedSheetMaterial}"
-                                     SelectionMode="Single"
-                                     PreviewMouseDown="SheetMaterialsListBox_PreviewMouseDown"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     Background="Transparent"
-                                     BorderThickness="0">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Cursor="Hand">
-                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                            <TextBlock Text="{Binding TotalMass, StringFormat='{}{0:F2} кг'}" FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource TextSecondary}"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialListBoxItemStyle}"/>
-                                </ListBox.ItemContainerStyle>
-                            </ListBox>
-                        </DockPanel>
-                    </Border>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </TabItem>
 
-                    <!-- Трубный прокат -->
-                    <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource CardStyle}" Padding="8,10">
-                        <DockPanel>
-                            <Grid DockPanel.Dock="Top" Margin="4,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Трубный" Style="{StaticResource SectionHeaderStyle}"/>
-                                <ComboBox Grid.Column="1"
-                                          SelectedValue="{Binding TubularProductsSortType, Mode=TwoWay}"
-                                          Style="{StaticResource SortComboBoxStyle}"
-                                          MinWidth="28"
-                                          MaxWidth="110"
-                                          HorizontalAlignment="Right"
-                                          Margin="4,0"
-                                          ToolTip="Выберите тип сортировки">
-                                    <models:MaterialSortType>ByLength</models:MaterialSortType>
-                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
-                                    <models:MaterialSortType>ByName</models:MaterialSortType>
-                                    <ComboBox.ItemTemplate>
+                        <!-- Трубный прокат -->
+                        <TabItem ToolTip="Трубный прокат">
+                            <TabItem.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Трубный"/>
+                                    <TextBlock Text="{Binding TubularProductsCount}" Margin="4,0,0,0" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </TabItem.Header>
+                            <DockPanel>
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox SelectedValue="{Binding TubularProductsSortType, Mode=TwoWay}"
+                                              Style="{StaticResource SortComboBoxStyle}"
+                                              HorizontalAlignment="Left"
+                                              ToolTip="Сортировка">
+                                        <models:MaterialSortType>ByLength</models:MaterialSortType>
+                                        <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                        <models:MaterialSortType>ByName</models:MaterialSortType>
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="1"
+                                            Content="&#xE8C8;"
+                                            Style="{StaticResource CopyButtonStyle}"
+                                            Command="{Binding CopyTubularProductsToClipboardCommand}"
+                                            ToolTip="Копировать в Excel"/>
+                                </Grid>
+                                <ListBox ItemsSource="{Binding TubularProductsView}"
+                                         SelectedItem="{Binding SelectedTubularProduct}"
+                                         SelectionMode="Single"
+                                         PreviewMouseDown="TubularProductsListBox_PreviewMouseDown"
+                                         Style="{StaticResource EmptyAwareListBox}"
+                                         Tag="Нет трубного проката"
+                                         ItemContainerStyle="{StaticResource MaterialListBoxItemStyle}">
+                                    <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                            <Grid Cursor="Hand">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <DockPanel><Ellipse Width="8" Height="8" Fill="{StaticResource TubularTypeBrush}" Margin="0,5,8,0" VerticalAlignment="Top"/><TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/></DockPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding TotalLength, StringFormat='{}{0:N0} мм'}" FontSize="11" Margin="8,0,0,0" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Top" Typography.NumeralAlignment="Tabular"/>
+                                            </Grid>
                                         </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Grid.Column="2"
-                                        Content="&#xE8C8;"
-                                        Style="{StaticResource CopyButtonStyle}"
-                                        Command="{Binding CopyTubularProductsToClipboardCommand}"
-                                        ToolTip="Копировать в Excel"/>
-                            </Grid>
-                            <ListBox ItemsSource="{Binding TubularProductsView}"
-                                     SelectedItem="{Binding SelectedTubularProduct}"
-                                     SelectionMode="Single"
-                                     PreviewMouseDown="TubularProductsListBox_PreviewMouseDown"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     Background="Transparent"
-                                     BorderThickness="0">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Cursor="Hand">
-                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                            <TextBlock Text="{Binding TotalLength, StringFormat='{}{0:F2} мм'}" FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource TextSecondary}"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialListBoxItemStyle}"/>
-                                </ListBox.ItemContainerStyle>
-                            </ListBox>
-                        </DockPanel>
-                    </Border>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </TabItem>
 
-                    <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch" VerticalAlignment="Center" Grid.ColumnSpan="2" Background="Transparent"/>
-
-                    <!-- Прочие материалы -->
-                    <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource CardStyle}" Padding="8,10">
-                        <DockPanel>
-                            <Grid DockPanel.Dock="Top" Margin="4,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Прочие" Style="{StaticResource SectionHeaderStyle}"/>
-                                <ComboBox Grid.Column="1"
-                                          SelectedValue="{Binding OtherMaterialsSortType, Mode=TwoWay}"
-                                          Style="{StaticResource SortComboBoxStyle}"
-                                          MinWidth="28"
-                                          MaxWidth="110"
-                                          HorizontalAlignment="Right"
-                                          Margin="4,0"
-                                          ToolTip="Выберите тип сортировки">
-                                    <models:MaterialSortType>ByName</models:MaterialSortType>
-                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
-                                    <ComboBox.ItemTemplate>
+                        <!-- Прочие материалы -->
+                        <TabItem ToolTip="Прочие материалы">
+                            <TabItem.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Прочие"/>
+                                    <TextBlock Text="{Binding OtherMaterialsCount}" Margin="4,0,0,0" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </TabItem.Header>
+                            <DockPanel>
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox SelectedValue="{Binding OtherMaterialsSortType, Mode=TwoWay}"
+                                              Style="{StaticResource SortComboBoxStyle}"
+                                              HorizontalAlignment="Left"
+                                              ToolTip="Сортировка">
+                                        <models:MaterialSortType>ByName</models:MaterialSortType>
+                                        <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="1"
+                                            Content="&#xE8C8;"
+                                            Style="{StaticResource CopyButtonStyle}"
+                                            Command="{Binding CopyOtherMaterialsToClipboardCommand}"
+                                            ToolTip="Копировать в Excel"/>
+                                </Grid>
+                                <ListBox ItemsSource="{Binding OtherMaterialsView}"
+                                         SelectedItem="{Binding SelectedOtherMaterial}"
+                                         SelectionMode="Single"
+                                         PreviewMouseDown="OtherMaterialsListBox_PreviewMouseDown"
+                                         Style="{StaticResource EmptyAwareListBox}"
+                                         Tag="Нет прочих материалов"
+                                         ItemContainerStyle="{StaticResource MaterialListBoxItemStyle}">
+                                    <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                            <Grid Cursor="Hand">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <DockPanel><Ellipse Width="8" Height="8" Fill="{StaticResource OtherTypeBrush}" Margin="0,5,8,0" VerticalAlignment="Top"/><TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/></DockPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding TotalMass, StringFormat='{}{0:N2} кг'}" FontSize="11" Margin="8,0,0,0" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Top" Typography.NumeralAlignment="Tabular"/>
+                                            </Grid>
                                         </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Grid.Column="2"
-                                        Content="&#xE8C8;"
-                                        Style="{StaticResource CopyButtonStyle}"
-                                        Command="{Binding CopyOtherMaterialsToClipboardCommand}"
-                                        ToolTip="Копировать в Excel"/>
-                            </Grid>
-                            <ListBox ItemsSource="{Binding OtherMaterialsView}"
-                                     SelectedItem="{Binding SelectedTubularProduct}"
-                                     SelectionMode="Single"
-                                     PreviewMouseDown="TubularProductsListBox_PreviewMouseDown"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     Background="Transparent"
-                                     BorderThickness="0">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Cursor="Hand">
-                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                            <TextBlock Text="{Binding TotalMass, StringFormat='{}{0:F2} кг'}" FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource TextSecondary}"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialListBoxItemStyle}"/>
-                                </ListBox.ItemContainerStyle>
-                            </ListBox>
-                        </DockPanel>
-                    </Border>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </TabItem>
 
-                    <!-- Стандартные изделия -->
-                    <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource CardStyle}" Padding="8,10">
-                        <DockPanel>
-                            <Grid DockPanel.Dock="Top" Margin="4,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Покупные" Style="{StaticResource SectionHeaderStyle}"/>
-                                <Button Grid.Column="1"
-                                        Content="&#xE8C8;"
-                                        Style="{StaticResource CopyButtonStyle}"
-                                        Command="{Binding CopyStandartPartsToClipboardCommand}"
-                                        ToolTip="Копировать в Excel"/>
-                            </Grid>
-                            <ListBox ItemsSource="{Binding StandardPartsView}"
-                                     SelectedItem="{Binding SelectedStandardPart}"
-                                     ItemTemplate="{StaticResource PartItemTemplate}"
-                                     ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     Background="Transparent"
-                                     BorderThickness="0">
-                                <ListBox.GroupStyle>
-                                    <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
-                                </ListBox.GroupStyle>
-                            </ListBox>
-                        </DockPanel>
-                    </Border>
-                </Grid>
+                        <!-- Покупные (стандартные) изделия -->
+                        <TabItem ToolTip="Покупные изделия">
+                            <TabItem.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Покупные"/>
+                                    <TextBlock Text="{Binding StandardPartsCount}" Margin="4,0,0,0" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </TabItem.Header>
+                            <DockPanel>
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                                    <Button HorizontalAlignment="Right"
+                                            Content="&#xE8C8;"
+                                            Style="{StaticResource CopyButtonStyle}"
+                                            Command="{Binding CopyStandartPartsToClipboardCommand}"
+                                            ToolTip="Копировать в Excel"/>
+                                </Grid>
+                                <ListBox ItemsSource="{Binding StandardPartsView}"
+                                         SelectedItem="{Binding SelectedStandardPart}"
+                                         ItemTemplate="{StaticResource PartItemTemplate}"
+                                         ItemContainerStyle="{StaticResource PartListBoxItemStyle}"
+                                         Style="{StaticResource EmptyAwareListBox}"
+                                         Tag="Нет покупных изделий">
+                                    <ListBox.GroupStyle>
+                                        <GroupStyle ContainerStyle="{StaticResource GroupedContainerStyle}"/>
+                                    </ListBox.GroupStyle>
+                                </ListBox>
+                            </DockPanel>
+                        </TabItem>
+                    </TabControl>
+                </Border>
+            </Grid>
 
-                <!-- Индикатор загрузки -->
-                <Grid Grid.ColumnSpan="5"
-                      Background="#B3F3F4F6"
-                      Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Border Style="{StaticResource CardStyle}"
-                            Padding="24,18"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Effect="{StaticResource SoftShadow}">
-                        <StackPanel>
-                            <TextBlock Text="Загрузка..." Foreground="{StaticResource TextSecondary}" FontSize="12" HorizontalAlignment="Center"/>
-                            <ProgressBar IsIndeterminate="True"
-                                         Width="200" Height="4"
-                                         Margin="0,12,0,0"
-                                         BorderThickness="0"
-                                         Background="{StaticResource BorderColor}"
-                                         Foreground="{StaticResource AccentColor}"/>
+            <!-- Экран-приветствие, когда изделие не загружено -->
+            <Grid Visibility="{Binding HasProduct, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <Border Style="{StaticResource CardStyle}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="40,32"
+                        MaxWidth="460">
+                    <StackPanel>
+                        <Border Background="{StaticResource AccentSubtle}"
+                                CornerRadius="28"
+                                Width="56" Height="56"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,16">
+                            <TextBlock Text="&#xE7B8;" Style="{StaticResource IconText}" FontSize="24" Foreground="{StaticResource AccentColor}"/>
+                        </Border>
+                        <TextBlock Text="Загрузите сборку КОМПАС"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Перетащите файл .a3d в окно или выберите способ загрузки"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,6,0,20"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Click="LoadFromKompas_Click"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Margin="0,0,8,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE71B;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Из активного КОМПАС"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Click="SelectFile_Click"
+                                    Style="{StaticResource SecondaryButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8E5;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Выбрать файл..."/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
-                    </Border>
-                </Grid>
+                        <TextBlock Text="Сохранённые изделия открываются через меню «Изделия»"
+                                   Foreground="{StaticResource TextMuted}"
+                                   FontSize="11"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,16,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Индикатор загрузки -->
+            <Grid Background="{StaticResource LoadingScrim}"
+                  Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Border Style="{StaticResource CardStyle}"
+                        Padding="24,18"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Effect="{StaticResource SoftShadow}">
+                    <StackPanel>
+                        <TextBlock Text="Загрузка..." FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   FontSize="11"
+                                   MaxWidth="320"
+                                   Margin="0,4,0,0"
+                                   HorizontalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <ProgressBar IsIndeterminate="True"
+                                     Width="240" Height="4"
+                                     Margin="0,12,0,0"
+                                     BorderThickness="0"
+                                     Background="{StaticResource BorderColor}"
+                                     Foreground="{StaticResource AccentColor}"/>
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <!-- Затемнение фона при открытой панели -->
             <Border x:Name="ProductsPanelOverlay"
-                    Background="#4D111827"
+                    Background="{StaticResource PanelScrim}"
                     Visibility="Collapsed"
                     Opacity="0"
                     MouseDown="OverlayBackground_MouseDown"/>
@@ -1734,7 +1868,7 @@
               Visibility="Collapsed"
               Panel.ZIndex="100">
             <!-- Затемнение фона -->
-            <Border Background="#B3111827"
+            <Border Background="{StaticResource ModalScrim}"
                     MouseLeftButtonDown="DrawingPopupOverlay_MouseLeftButtonDown"/>
             <!-- Контент превью -->
             <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -1784,15 +1918,42 @@
             </Grid>
         </Grid>
 
+        <!-- Подсветка при перетаскивании файла -->
+        <Border x:Name="DropOverlay"
+                Grid.Row="0" Grid.RowSpan="3"
+                Panel.ZIndex="90"
+                Visibility="Collapsed"
+                AllowDrop="True"
+                Background="{StaticResource DropZoneBackground}"
+                DragLeave="DropOverlay_DragLeave">
+            <Grid Margin="16" IsHitTestVisible="False">
+                <Rectangle Stroke="{StaticResource AccentColor}"
+                           StrokeThickness="2"
+                           StrokeDashArray="6 4"
+                           RadiusX="12" RadiusY="12"/>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE896;" Style="{StaticResource IconText}" FontSize="36" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
+                    <TextBlock x:Name="DropOverlayText"
+                               Text="Отпустите, чтобы загрузить сборку"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource SelectedForeground}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- SnackBar уведомление -->
         <Border x:Name="SnackbarNotification"
                 Grid.Row="0" Grid.RowSpan="3"
+                Panel.ZIndex="110"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
-                Margin="0,0,0,24"
+                MaxWidth="600"
+                Margin="24,0,24,24"
                 Background="{StaticResource DarkSurface}"
                 CornerRadius="8"
-                Padding="16,10,20,10"
+                Padding="14,10,8,10"
                 Visibility="{Binding IsSnackbarVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                 RenderTransformOrigin="0.5,1">
             <Border.RenderTransform>
@@ -1801,15 +1962,64 @@
             <Border.Effect>
                 <DropShadowEffect ShadowDepth="4" Direction="270" Opacity="0.25" BlurRadius="16"/>
             </Border.Effect>
-            <StackPanel Orientation="Horizontal">
-                <Border Background="{StaticResource Success}" CornerRadius="10" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center">
-                    <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" FontSize="10" Foreground="White"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border CornerRadius="10" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{StaticResource Success}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SnackbarKind}" Value="Info">
+                                    <Setter Property="Background" Value="{StaticResource AccentColor}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding SnackbarKind}" Value="Warning">
+                                    <Setter Property="Background" Value="{StaticResource Warning}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding SnackbarKind}" Value="Error">
+                                    <Setter Property="Background" Value="{StaticResource Danger}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock FontSize="10" Foreground="White">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                                <Setter Property="Text" Value="&#xE73E;"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SnackbarKind}" Value="Info">
+                                        <Setter Property="Text" Value="&#xE946;"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding SnackbarKind}" Value="Warning">
+                                        <Setter Property="Text" Value="&#xE7BA;"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding SnackbarKind}" Value="Error">
+                                        <Setter Property="Text" Value="&#xE711;"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Border>
-                <TextBlock Text="{Binding SnackbarMessage}"
-                          FontSize="12"
-                          Foreground="White"
-                          VerticalAlignment="Center"/>
-            </StackPanel>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SnackbarMessage}"
+                           FontSize="12"
+                           Foreground="White"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="2"
+                        Content="&#xE711;"
+                        Style="{StaticResource IconButton}"
+                        Width="24" Height="24"
+                        FontSize="9"
+                        Margin="12,0,0,0"
+                        Foreground="{StaticResource TextMuted}"
+                        ToolTip="Закрыть"
+                        Click="SnackbarClose_Click"/>
+            </Grid>
         </Border>
     </Grid>
 </Window>

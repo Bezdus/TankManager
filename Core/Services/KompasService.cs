@@ -18,6 +18,7 @@ namespace TankManager.Core.Services
         private readonly ILogger _logger;
         private readonly ComObjectManager _comManager;
         private readonly MaterialAggregator _materialAggregator;
+        private readonly StandardPartPreviewService _standardPartPreviewService;
         private readonly object _kompasLock = new object();
 
         public KompasService() : this(new FileLogger())
@@ -29,6 +30,7 @@ namespace TankManager.Core.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _comManager = new ComObjectManager(_logger);
             _materialAggregator = new MaterialAggregator(_logger);
+            _standardPartPreviewService = new StandardPartPreviewService(_logger);
         }
 
         /// <summary>
@@ -308,6 +310,47 @@ namespace TankManager.Core.Services
             catch (Exception ex)
             {
                 _logger.LogWarning($"Failed to load drawing preview for {detail.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Создаёт превью изделия из библиотеки КОМПАС по геометрии его вхождения в сборку
+        /// </summary>
+        /// <param name="part">Изделие из библиотеки</param>
+        /// <param name="product">Продукт, содержащий изделие</param>
+        /// <param name="imagesFolder">Папка images изделия</param>
+        public void LoadStandardPartPreview(PartModel part, Product product, string imagesFolder)
+        {
+            lock (_kompasLock)
+            {
+                LoadStandardPartPreviewCore(part, product, imagesFolder);
+            }
+        }
+
+        private void LoadStandardPartPreviewCore(PartModel part, Product product, string imagesFolder)
+        {
+            if (part == null || part.IsBodyBased || product?.Context == null || !product.Context.IsDocumentLoaded)
+                return;
+
+            if (string.IsNullOrEmpty(imagesFolder))
+                return;
+
+            try
+            {
+                var targetPart = FindTargetPart(part, product.Context);
+                if (targetPart == null)
+                {
+                    _logger.LogWarning($"Изделие не найдено в сборке: {part.Name}");
+                    return;
+                }
+
+                string pngPath = _standardPartPreviewService.GetOrCreatePreview(targetPart, part, product.Context, imagesFolder);
+                if (!string.IsNullOrEmpty(pngPath))
+                    part.FilePreviewPngPath = pngPath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to create standard part preview for {part.Name}: {ex.Message}");
             }
         }
 

@@ -111,6 +111,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Converters\MaterialSortTypeConverter.cs" />
+    <Compile Include="Converters\ProductTypeConverter.cs" />
     <Compile Include="Converters\NullToVisibilityConverter.cs" />
     <Compile Include="Core\Constants\KompasConstants.cs" />
     <Compile Include="Core\Models\ManufacturingOperations.cs" />
@@ -135,8 +136,10 @@
     <Compile Include="Core\Services\PartExtractor.cs" />
     <Compile Include="Core\Services\PartFinder.cs" />
     <Compile Include="Core\Services\ProductStorageService.cs" />
+    <Compile Include="Core\Services\StandardPartPreviewService.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />
     <Compile Include="Core\Services\UpdateService.cs" />
+    <Compile Include="Core\Services\WindowSettingsService.cs" />
     <Compile Include="Core\ViewModels\MainViewModel.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
