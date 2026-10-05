@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Media.Imaging;
 using KompasAPI7;
@@ -11,9 +12,6 @@ namespace TankManager.Core.Models
     /// </summary>
     public class Product : PartModel
     {
-        private BitmapSource _filePreview;
-        private bool _previewLoaded;
-
         /// <summary>
         /// Контекст KOMPАС, связанный с этим продуктом
         /// </summary>
@@ -67,22 +65,32 @@ namespace TankManager.Core.Models
         /// <summary>
         /// Общее количество деталей в изделии
         /// </summary>
-        public int TotalPartsCount => Details.Count + StandardParts.Count;
+        public int TotalPartsCount => AllParts.Count();
 
         /// <summary>
         /// Суммарная стоимость всех деталей изделия, руб
         /// </summary>
-        public double TotalAssemblyCost => Details.Sum(p => p.TotalCost) + StandardParts.Sum(p => p.TotalCost);
+        public double TotalAssemblyCost => AllParts.Sum(p => p.TotalCost);
 
         /// <summary>
         /// Суммарная стоимость металла, руб
         /// </summary>
-        public double TotalMetalCost => Details.Sum(p => p.MetalCost) + StandardParts.Sum(p => p.MetalCost);
+        public double TotalMetalCost => AllParts.Sum(p => p.MetalCost);
 
         /// <summary>
         /// Суммарная стоимость операций изготовления, руб
         /// </summary>
-        public double TotalOperationsCost => Details.Sum(p => p.OperationsCost) + StandardParts.Sum(p => p.OperationsCost);
+        public double TotalOperationsCost => AllParts.Sum(p => p.OperationsCost);
+
+        /// <summary>
+        /// Все детали без повторов. Покупные детали лежат и в Details, и в StandardParts
+        /// (KompasService.ExtractAllParts); StandardParts добавляем, только если в Details
+        /// покупных нет (сохранения, где покупные хранились отдельно)
+        /// </summary>
+        private IEnumerable<PartModel> AllParts =>
+            Details.Any(p => p.ProductType == ProductType.PurchasedPart)
+                ? Details
+                : Details.Concat(StandardParts);
 
         /// <summary>
         /// Уведомляет UI об изменении агрегированных свойств (количество, стоимость)
@@ -100,45 +108,8 @@ namespace TankManager.Core.Models
         /// </summary>
         public bool IsLinkedToKompas => Context?.IsDocumentLoaded == true && Context.TopPart != null;
 
-        /// <summary>
-        /// Превью файла изделия с ленивой загрузкой
-        /// </summary>
-        public new BitmapSource FilePreview
-        {
-            get
-            {
-                if (!_previewLoaded)
-                {
-                    _previewLoaded = true;
-                    _filePreview = TryLoadPreview(FilePath);
-                }
-                return _filePreview;
-            }
-            set
-            {
-                if (_filePreview != value)
-                {
-                    _filePreview = value;
-                    _previewLoaded = true;
-                    OnPropertyChanged(nameof(FilePreview));
-                }
-            }
-        }
-
-        private static BitmapSource TryLoadPreview(string filePath)
-        {
-            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
-                return null;
-
-            try
-            {
-                return ThumbnailService.GetFileThumbnail(filePath);
-            }
-            catch
-            {
-                return null;
-            }
-        }
+        // Превью изделия — FilePreview базового класса: миниатюра сборки или сохранённый
+        // PNG (FilePreviewPngPath), который видят пользователи без КОМПАС
 
         protected override void Dispose(bool disposing)
         {
@@ -180,8 +151,8 @@ namespace TankManager.Core.Models
             Context = null;
             
             // Освобождаем собственные ресурсы
-            _filePreview = null;
-            _previewLoaded = false;
+            FilePreviewPngPath = null;
+            InvalidateFilePreviewCache();
             InvalidateDrawingPreviewCache();
             NotifyAggregatesChanged();
         }

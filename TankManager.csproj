@@ -92,6 +92,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Core\Services\AppMode.cs" />
     <Compile Include="Core\Services\AtomicFile.cs" />
     <Compile Include="Core\Services\DrawingPreviewService.cs" />
     <Compile Include="Core\Services\DxfResolver.cs" />
@@ -171,6 +172,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="storage_settings.default.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.8">

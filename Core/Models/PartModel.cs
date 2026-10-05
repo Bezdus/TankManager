@@ -293,7 +293,7 @@ namespace TankManager.Core.Models
                 if (!_drawingPreviewLoaded)
                 {
                     _drawingPreviewLoaded = true;
-                    _drawingPreview = _previewService.LoadPreviewImage(_pngFilePath, _cdwFilePath);
+                    _drawingPreview = _previewService.LoadPreviewImage(_pngFilePath, _cdwFilePath, allowStale: AppMode.IsViewer);
                 }
                 return _drawingPreview;
             }
@@ -307,6 +307,16 @@ namespace TankManager.Core.Models
             _drawingPreviewLoaded = false;
             _drawingPreview = null;
             OnPropertyChanged(nameof(DrawingPreview));
+        }
+
+        /// <summary>
+        /// Сбрасывает кэш превью 3D-файла (например, после загрузки изображений с сервера)
+        /// </summary>
+        public void InvalidateFilePreviewCache()
+        {
+            _previewLoaded = false;
+            _filePreview = null;
+            OnPropertyChanged(nameof(FilePreview));
         }
 
         public ProductType ProductType
@@ -665,8 +675,25 @@ namespace TankManager.Core.Models
 
         private static BitmapSource TryLoadPreview(string filePath, string savedPreviewPath = null)
         {
+            bool hasSaved = !string.IsNullOrEmpty(savedPreviewPath) && File.Exists(savedPreviewPath);
+            bool hasSource = !string.IsNullOrEmpty(filePath) && File.Exists(filePath);
+
+            // Сохранённый PNG не старше исходника берём первым: без КОМПАС на компьютере
+            // миниатюра оболочки для файлов КОМПАС — просто иконка
+            if (hasSaved && (!AppMode.IsKompasInstalled || !hasSource ||
+                File.GetLastWriteTimeUtc(savedPreviewPath) >= File.GetLastWriteTimeUtc(filePath)))
+            {
+                try
+                {
+                    var saved = ThumbnailService.LoadPreviewFromFile(savedPreviewPath);
+                    if (saved != null)
+                        return saved;
+                }
+                catch { }
+            }
+
             // Если исходный файл КОМПАС доступен — загружаем из него
-            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            if (hasSource && AppMode.IsKompasInstalled)
             {
                 try
                 {

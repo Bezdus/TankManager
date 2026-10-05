@@ -634,11 +634,14 @@
                         </StackPanel>
                     </Button>
 
-                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="6,0"/>
+                    <!-- Загрузка и сохранение — только в режиме конструктора -->
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="6,0"
+                               Visibility="{Binding IsEngineerMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                     <Button x:Name="LoadDocumentButton"
                             Click="LoadDocumentButton_Click"
                             ToolTip="Загрузить сборку КОМПАС (Ctrl+O)"
+                            Visibility="{Binding IsEngineerMode, Converter={StaticResource BooleanToVisibilityConverter}}"
                             Style="{StaticResource PanelButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE8E5;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
@@ -647,6 +650,7 @@
                     </Button>
 
                     <Button Command="{Binding SaveProductCommand}"
+                            Visibility="{Binding IsEngineerMode, Converter={StaticResource BooleanToVisibilityConverter}}"
                             ToolTipService.ShowOnDisabled="True">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource PanelButtonStyle}">
@@ -699,6 +703,21 @@
                 </WrapPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Режим просмотра: вместо статуса связи с КОМПАС -->
+                    <Border Visibility="{Binding IsViewerMode, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Background="{StaticResource AccentSubtle}"
+                            CornerRadius="6"
+                            Padding="12,6"
+                            ToolTip="Изделия загружаются с сервера и доступны только для чтения. Сборки загружает и сохраняет конструктор.">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE890;" Style="{StaticResource IconText}" FontSize="12"
+                                       Foreground="{StaticResource AccentColor}" Margin="0,0,8,0"/>
+                            <TextBlock Text="Режим просмотра" Foreground="{StaticResource AccentColor}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsEngineerMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!-- Кнопка связи с КОМПАС / индикатор статуса -->
                     <Button Command="{Binding LinkToKompasCommand}"
                             ToolTip="Установить связь с КОМПАС"
@@ -741,6 +760,7 @@
                                     ToolTip="Обновить данные из КОМПАС (F5)"/>
                         </StackPanel>
                     </Border>
+                    </StackPanel>
 
                     <Button Command="{Binding CheckForUpdatesCommand}"
                             Style="{StaticResource IconButton}"
@@ -1154,6 +1174,7 @@
                                                     <!-- Показать в КОМПАС -->
                                                     <Button Command="{Binding DataContext.ShowInKompasCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             IsEnabled="{Binding DataContext.IsLinkedToKompas, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Visibility="{Binding DataContext.IsEngineerMode, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"
                                                             Style="{StaticResource PrimaryButton}"
                                                             HorizontalAlignment="Right"
                                                             Padding="8,3"
@@ -1498,7 +1519,47 @@
                         VerticalAlignment="Center"
                         Padding="40,32"
                         MaxWidth="460">
-                    <StackPanel>
+                    <Grid>
+                    <!-- Режим просмотра: изделия только из списка -->
+                    <StackPanel Visibility="{Binding IsViewerMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border Background="{StaticResource AccentSubtle}"
+                                CornerRadius="28"
+                                Width="56" Height="56"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,16">
+                            <TextBlock Text="&#xE8F1;" Style="{StaticResource IconText}" FontSize="24" Foreground="{StaticResource AccentColor}"/>
+                        </Border>
+                        <TextBlock Text="Выберите изделие"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Изделия, сохранённые конструктором, загружаются с сервера автоматически"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,6,0,20"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Command="{Binding ToggleProductsPanelCommand}"
+                                    Style="{StaticResource PrimaryButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE700;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Список изделий"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding SelectServerStorageFolderCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Margin="8,0,0,0"
+                                    Visibility="{Binding HasServerStorageFolder, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8B7;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Указать папку"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Режим конструктора: загрузка сборки -->
+                    <StackPanel Visibility="{Binding IsEngineerMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Border Background="{StaticResource AccentSubtle}"
                                 CornerRadius="28"
                                 Width="56" Height="56"
@@ -1538,6 +1599,7 @@
                                    HorizontalAlignment="Center"
                                    Margin="0,16,0,0"/>
                     </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
 
@@ -1697,15 +1759,40 @@
                                 <!-- Кнопка синхронизации -->
                                 <Button Grid.Column="1"
                                         Command="{Binding SyncFromServerCommand}"
-                                        Style="{StaticResource SecondaryButton}"
-                                        Padding="10,4"
-                                        ToolTip="Двусторонняя синхронизация: обновляет изделия в обе стороны (локально ↔ сервер)">
+                                        Padding="10,4">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                            <Setter Property="ToolTip" Value="Двусторонняя синхронизация: обновляет изделия в обе стороны (локально ↔ сервер)"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsViewerMode}" Value="True">
+                                                    <Setter Property="ToolTip" Value="Загрузить новые и обновлённые изделия с сервера"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE895;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,6,0"/>
                                         <TextBlock Text="Синхронизировать" FontSize="11"/>
                                     </StackPanel>
                                 </Button>
                             </Grid>
+
+                            <!-- Режим работы -->
+                            <TextBlock Text="Режим работы"
+                                       Style="{StaticResource CaptionText}"
+                                       Margin="0,12,0,6"/>
+                            <ComboBox ItemsSource="{Binding ModeOptions}"
+                                      SelectedValuePath="Key"
+                                      DisplayMemberPath="Value"
+                                      SelectedValue="{Binding ModeSetting}"
+                                      FontSize="11"
+                                      ToolTip="Конструктор загружает сборки из КОМПАС и сохраняет их на сервер; в режиме просмотра изделия только читаются с сервера"/>
+                            <TextBlock Text="Изменение вступит в силу после перезапуска программы"
+                                       FontSize="10"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource Warning}"
+                                       Visibility="{Binding IsModeRestartRequired, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </StackPanel>
                     </Border>
 
@@ -1809,7 +1896,7 @@
                                                 Width="Auto"
                                                 Padding="7,0"
                                                 Margin="2,0,0,0"
-                                                Visibility="{Binding DataContext.HasServerStorageFolder, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                Visibility="{Binding DataContext.CanDeleteFromServer, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
                                                 <TextBlock Text="&#xE753;" FontFamily="{StaticResource IconFont}" Margin="0,0,3,0"/>
                                                 <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}"/>

@@ -32,6 +32,10 @@ namespace TankManager.Core.Services
         private static readonly string SettingsFilePath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "storage_settings.json");
 
+        // Настройки по умолчанию, поставляемые в архиве релиза; обновление не затирает storage_settings.json пользователя
+        private static readonly string DefaultSettingsFilePath =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "storage_settings.default.json");
+
         private const string TombstonesFileName = "_deleted.json";
         private const string PendingTombstonesFileName = "_pending_deleted.json";
         private const int TombstoneRetentionDays = 90;
@@ -46,6 +50,7 @@ namespace TankManager.Core.Services
         private readonly Dictionary<string, ProductMeta> _metaCache =
             new Dictionary<string, ProductMeta>(StringComparer.OrdinalIgnoreCase);
         private string _serverStorageFolder;
+        private AppModeSetting _modeSetting = AppModeSetting.Auto;
         private DateTime _serverCheckedAtUtc = DateTime.MinValue;
         private bool _serverAvailableCached;
 
@@ -72,6 +77,30 @@ namespace TankManager.Core.Services
         /// Проверяет, установлена ли серверная папка
         /// </summary>
         public bool HasServerFolder => !string.IsNullOrEmpty(_serverStorageFolder);
+
+        /// <summary>
+        /// Сохранённая настройка режима работы (применяется при следующем запуске)
+        /// </summary>
+        public AppModeSetting ModeSetting
+        {
+            get => _modeSetting;
+            set
+            {
+                _modeSetting = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Режим просмотра: на сервер ничего не записывается
+        /// </summary>
+        private static bool DownloadOnly => AppMode.IsViewer;
+
+        /// <summary>
+        /// Путь к общим расценкам в серверной папке (null, если папка не задана)
+        /// </summary>
+        public string ServerPricingFilePath =>
+            HasServerFolder ? Path.Combine(_serverStorageFolder, PricingSettings.ServerFileName) : null;
 
         /// <summary>
         /// Проверяет, доступна ли серверная папка
@@ -107,16 +136,23 @@ namespace TankManager.Core.Services
         {
             try
             {
-                if (File.Exists(SettingsFilePath))
+                // Своих настроек ещё нет — берём поставляемые с программой (путь к общей папке изделий)
+                string path = File.Exists(SettingsFilePath) ? SettingsFilePath : DefaultSettingsFilePath;
+
+                if (File.Exists(path))
                 {
                     var serializer = new DataContractJsonSerializer(typeof(StorageSettings));
-                    using (var fileStream = new FileStream(SettingsFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                     using (var memoryStream = new MemoryStream())
                     {
                         fileStream.CopyTo(memoryStream);
                         memoryStream.Position = 0;
                         var settings = (StorageSettings)serializer.ReadObject(memoryStream);
                         _serverStorageFolder = settings?.ServerStorageFolder;
+
+                        AppModeSetting mode;
+                        if (Enum.TryParse(settings?.Mode, true, out mode))
+                            _modeSetting = mode;
                     }
                 }
             }
@@ -130,7 +166,11 @@ namespace TankManager.Core.Services
         {
             try
             {
-                var settings = new StorageSettings { ServerStorageFolder = _serverStorageFolder };
+                var settings = new StorageSettings
+                {
+                    ServerStorageFolder = _serverStorageFolder,
+                    Mode = _modeSetting == AppModeSetting.Auto ? null : _modeSetting.ToString()
+                };
                 var serializer = new DataContractJsonSerializer(typeof(StorageSettings));
 
                 using (var memoryStream = new MemoryStream())
@@ -238,10 +278,12 @@ namespace TankManager.Core.Services
                     }
                 }
 
-                // Фаза 2: Синхронизация ИЗ ЛОКАЛЬНОИ ПАПКИ НА СЕРВЕР
-                var localFolders = Directory.GetDirectories(ProductsDirectory)
-                    .Where(f => !Path.GetFileName(f).StartsWith("_") && !deleted.Contains(Path.GetFileName(f)))
-                    .ToList();
+                // Фаза 2: Синхронизация ИЗ ЛОКАЛЬНОИ ПАПКИ НА СЕРВЕР (в режиме просмотра не выполняется)
+                var localFolders = DownloadOnly
+                    ? new List<string>()
+                    : Directory.GetDirectories(ProductsDirectory)
+                        .Where(f => !Path.GetFileName(f).StartsWith("_") && !deleted.Contains(Path.GetFileName(f)))
+                        .ToList();
 
                 foreach (var localFolder in localFolders)
                 {
@@ -367,7 +409,7 @@ namespace TankManager.Core.Services
                         string localImages = Path.Combine(localFolder, ImagesSubfolder);
                         string serverImages = Path.Combine(serverFolder, ImagesSubfolder);
 
-                        _imageSyncService.SyncImageDirectories(localImages, serverImages);
+                        _imageSyncService.SyncImageDirectories(localImages, serverImages, DownloadOnly);
                     }
                     catch (Exception ex)
                     {
@@ -384,18 +426,19 @@ namespace TankManager.Core.Services
         /// <summary>
         /// Синхронизирует изображения конкретного продукта между локальной папкой и сервером
         /// </summary>
-        public void SyncProductImagesWithServer(Product product)
+        /// <returns>Количество изображений, скачанных с сервера</returns>
+        public int SyncProductImagesWithServer(Product product)
         {
             lock (_ioLock)
             {
-                SyncProductImagesCore(product);
+                return SyncProductImagesCore(product);
             }
         }
 
-        private void SyncProductImagesCore(Product product)
+        private int SyncProductImagesCore(Product product)
         {
             if (!IsServerAvailable || product == null || string.IsNullOrEmpty(product.Name))
-                return;
+                return 0;
 
             try
             {
@@ -403,16 +446,17 @@ namespace TankManager.Core.Services
                 string serverFolder = FindExistingProductFolder(product, _serverStorageFolder);
 
                 if (localFolder == null || serverFolder == null)
-                    return;
+                    return 0;
 
                 string localImages = Path.Combine(localFolder, ImagesSubfolder);
                 string serverImages = Path.Combine(serverFolder, ImagesSubfolder);
 
-                _imageSyncService.SyncImageDirectories(localImages, serverImages);
+                return _imageSyncService.SyncImageDirectories(localImages, serverImages, DownloadOnly);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"Ошибка синхронизации изображений продукта: {ex.Message}");
+                return 0;
             }
         }
 
@@ -446,7 +490,11 @@ namespace TankManager.Core.Services
 
                 string localFilePath = SaveToDirectory(product, ProductsDirectory, customName);
 
-                if (IsServerAvailable)
+                if (DownloadOnly)
+                {
+                    LastServerError = "Режим просмотра: изделие не отправлено на сервер";
+                }
+                else if (IsServerAvailable)
                 {
                     try
                     {
@@ -674,7 +722,7 @@ namespace TankManager.Core.Services
                 LastServerError = null;
                 bool deletedAny = DeleteLocalCore(folderName);
 
-                if (!HasServerFolder)
+                if (!HasServerFolder || DownloadOnly)
                     return deletedAny;
 
                 bool serverDone = false;
@@ -879,7 +927,8 @@ namespace TankManager.Core.Services
             string pendingPath = Path.Combine(ProductsDirectory, PendingTombstonesFileName);
 
             var items = ReadTombstones(serverPath);
-            var pending = ReadTombstones(pendingPath);
+            // В режиме просмотра удаления только применяются к локальной папке, сервер не меняется
+            var pending = DownloadOnly ? new List<TombstoneEntry>() : ReadTombstones(pendingPath);
             bool changed = false;
 
             foreach (var entry in pending)
@@ -923,7 +972,8 @@ namespace TankManager.Core.Services
                 try
                 {
                     DeleteDirectoryRecursive(localFolder);
-                    DeleteDirectoryRecursive(serverFolder);
+                    if (!DownloadOnly)
+                        DeleteDirectoryRecursive(serverFolder);
                 }
                 catch (Exception ex)
                 {
@@ -934,7 +984,7 @@ namespace TankManager.Core.Services
                 keep.Add(entry);
             }
 
-            if (changed)
+            if (changed && !DownloadOnly)
                 WriteTombstones(serverPath, keep);
 
             if (pending.Count > 0)
@@ -1039,6 +1089,9 @@ namespace TankManager.Core.Services
                 Marking = product.Marking,
                 Mass = product.Mass,
                 FilePath = product.FilePath,
+                FilePreviewPngPath = string.IsNullOrEmpty(product.FilePreviewPngPath) || string.IsNullOrEmpty(productFolder)
+                    ? null
+                    : MakeRelativePath(product.FilePreviewPngPath, productFolder),
                 Details = product.Details.Select(d => ToPartDto(d, productFolder)).ToList(),
                 StandardParts = product.StandardParts.Select(d => ToPartDto(d, productFolder)).ToList(),
                 SheetMaterials = product.SheetMaterials.Select(m => ToMaterialDto(m)).ToList(),
@@ -1251,6 +1304,9 @@ namespace TankManager.Core.Services
             product.Mass = dto.Mass;
             product.FilePath = dto.FilePath;
 
+            if (!string.IsNullOrEmpty(dto.FilePreviewPngPath) && !string.IsNullOrEmpty(productFolder))
+                product.FilePreviewPngPath = EnsureInsideProducts(ResolveAbsolutePath(dto.FilePreviewPngPath, productFolder));
+
             foreach (var partDto in dto.Details ?? Enumerable.Empty<PartModelDto>())
             {
                 product.Details.Add(FromPartDto(partDto, productFolder));
@@ -1394,6 +1450,12 @@ namespace TankManager.Core.Services
     {
         [System.Runtime.Serialization.DataMember]
         public string ServerStorageFolder { get; set; }
+
+        /// <summary>
+        /// Режим работы (Engineer/Viewer); отсутствует — определяется автоматически
+        /// </summary>
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public string Mode { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
@@ -1427,6 +1489,12 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public string FilePath { get; set; }
+
+        /// <summary>
+        /// Превью сборки (путь относительно папки изделия)
+        /// </summary>
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public string FilePreviewPngPath { get; set; }
 
         [System.Runtime.Serialization.DataMember]
         public List<PartModelDto> Details { get; set; }

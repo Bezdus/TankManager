@@ -56,6 +56,58 @@ namespace TankManager.Core.ViewModels
         private System.Threading.Timer _snackbarTimer;
         private CancellationTokenSource _backgroundPreviewCts;
         private bool _isProductSelected;
+        private bool _isSyncing;
+        private DateTime _lastSyncUtc = DateTime.MinValue;
+
+        // Автосинхронизация при открытии списка изделий не чаще этого интервала
+        private static readonly TimeSpan AutoSyncInterval = TimeSpan.FromMinutes(2);
+
+        #endregion
+
+        #region Properties - App Mode
+
+        public const string ViewerModeLoadMessage = "Режим просмотра: загрузка сборок из КОМПАС доступна только конструктору";
+
+        /// <summary>
+        /// Режим просмотра (без КОМПАС): только чтение изделий с сервера
+        /// </summary>
+        public bool IsViewerMode => AppMode.IsViewer;
+
+        /// <summary>
+        /// Режим конструктора: загрузка из КОМПАС, сохранение, удаление
+        /// </summary>
+        public bool IsEngineerMode => !AppMode.IsViewer;
+
+        /// <summary>
+        /// Варианты настройки режима для выпадающего списка
+        /// </summary>
+        public IReadOnlyList<KeyValuePair<AppModeSetting, string>> ModeOptions { get; } = new[]
+        {
+            new KeyValuePair<AppModeSetting, string>(AppModeSetting.Auto, "Автоматически (по наличию КОМПАС)"),
+            new KeyValuePair<AppModeSetting, string>(AppModeSetting.Engineer, "Конструктор"),
+            new KeyValuePair<AppModeSetting, string>(AppModeSetting.Viewer, "Просмотр")
+        };
+
+        /// <summary>
+        /// Настройка режима; применяется после перезапуска
+        /// </summary>
+        public AppModeSetting ModeSetting
+        {
+            get => _storageService.ModeSetting;
+            set
+            {
+                if (_storageService.ModeSetting == value) return;
+
+                _storageService.ModeSetting = value;
+                OnPropertyChanged(nameof(ModeSetting));
+                OnPropertyChanged(nameof(IsModeRestartRequired));
+            }
+        }
+
+        /// <summary>
+        /// Настройка режима изменена и вступит в силу после перезапуска
+        /// </summary>
+        public bool IsModeRestartRequired => ModeSetting != AppMode.Setting;
 
         #endregion
 
@@ -104,7 +156,8 @@ namespace TankManager.Core.ViewModels
             private set => SetProperty(ref _isLinkedToKompas, value, nameof(IsLinkedToKompas), nameof(KompasLinkStatus));
         }
 
-        public string KompasLinkStatus => IsLinkedToKompas ? "🔗 Связан с КОМПАС" : "⚠️ Нет связи с КОМПАС";
+        public string KompasLinkStatus => IsViewerMode ? "👁 Режим просмотра"
+            : IsLinkedToKompas ? "🔗 Связан с КОМПАС" : "⚠️ Нет связи с КОМПАС";
 
         #endregion
 
@@ -136,7 +189,13 @@ namespace TankManager.Core.ViewModels
             set
             {
                 if (SetProperty(ref _isProductsPanelOpen, value, nameof(IsProductsPanelOpen)) && value)
+                {
                     RefreshSavedProducts();
+
+                    // Подтягиваем новые изделия с сервера, не дожидаясь ручной синхронизации
+                    if (DateTime.UtcNow - _lastSyncUtc > AutoSyncInterval)
+                        RunSafe(RunServerSyncAsync(interactive: false));
+                }
             }
         }
 
@@ -468,6 +527,7 @@ namespace TankManager.Core.ViewModels
                     OnPropertyChanged(nameof(ServerStorageFolder));
                     OnPropertyChanged(nameof(ServerStorageFolderDisplay));
                     OnPropertyChanged(nameof(HasServerStorageFolder));
+                    OnPropertyChanged(nameof(CanDeleteFromServer));
                     OnPropertyChanged(nameof(IsServerAvailable));
                     ((RelayCommand)ClearServerStorageFolderCommand)?.NotifyCanExecuteChanged();
                     ((RelayCommand)SyncFromServerCommand)?.NotifyCanExecuteChanged();
@@ -497,6 +557,11 @@ namespace TankManager.Core.ViewModels
         /// Указана ли серверная папка
         /// </summary>
         public bool HasServerStorageFolder => _storageService.HasServerFolder;
+
+        /// <summary>
+        /// Показывать «удалить везде»: только конструктору и только при заданной серверной папке
+        /// </summary>
+        public bool CanDeleteFromServer => IsEngineerMode && HasServerStorageFolder;
 
         /// <summary>
         /// Доступна ли серверная папка
@@ -550,6 +615,10 @@ namespace TankManager.Core.ViewModels
         public MainViewModel(IKompasService kompasService)
         {
             _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
+            AppMode.Initialize(_storageService.ModeSetting);
+            _logger.LogInfo($"Режим работы: {(AppMode.IsViewer ? "просмотр" : "конструктор")} (настройка: {AppMode.Setting}, КОМПАС установлен: {AppMode.IsKompasInstalled})");
+
+            // Локальная копия расценок; общие с сервера подтянутся при синхронизации (OnWindowLoaded)
             _pricingSettings = PricingSettings.Load();
             
             SavedProducts = new ObservableCollection<ProductFileInfo>();
@@ -560,13 +629,14 @@ namespace TankManager.Core.ViewModels
 
         private void InitializeCommands()
         {
-            ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => CurrentlySelectedPart != null && IsLinkedToKompas && !IsLoading);
-            LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync(), () => !IsLoading);
+            // Команды КОМПАС, сохранения и удаления с сервера в режиме просмотра недоступны
+            ShowInKompasCommand = new RelayCommand(ShowDetailInKompas, () => IsEngineerMode && CurrentlySelectedPart != null && IsLinkedToKompas && !IsLoading);
+            LoadFromActiveDocumentCommand = new RelayCommand(async () => await LoadFromActiveDocumentAsync(), () => IsEngineerMode && !IsLoading);
             ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
             LoadProductCommand = new RelayCommand<string>(LoadProduct);
-            DeleteProductCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => SelectedSavedProduct != null && !IsLoading);
+            DeleteProductCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => IsEngineerMode && SelectedSavedProduct != null && !IsLoading);
             DeleteProductLocalCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: false), () => SelectedSavedProduct != null && !IsLoading);
-            DeleteProductEverywhereCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => SelectedSavedProduct != null && !IsLoading);
+            DeleteProductEverywhereCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => IsEngineerMode && SelectedSavedProduct != null && !IsLoading);
             ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
             SwitchToProductCommand = new RelayCommand<ProductFileInfo>(SwitchToProduct);
             CopyAllToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyPartsToClipboard, Details), () => Details?.Any() == true);
@@ -576,9 +646,9 @@ namespace TankManager.Core.ViewModels
             CopyOtherMaterialsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, OtherMaterials), () => OtherMaterials?.Any() == true);
             CopyAllDataToClipboardCommand = new RelayCommand(CopyAllDataToClipboard, () => StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
             CheckForUpdatesCommand = new RelayCommand(() => UpdateService.CheckForUpdates(showNoUpdateMessage: true));
-            LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath) && !IsLoading);
-            SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name) && IsLinkedToKompas && !IsLoading);
-            RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath) && !IsLoading);
+            LinkToKompasCommand = new RelayCommand(async () => await LinkToKompasAsync(), () => IsEngineerMode && !IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath) && !IsLoading);
+            SaveProductCommand = new RelayCommand(async () => await SaveProductAsync(), () => IsEngineerMode && CurrentProduct != null && !string.IsNullOrEmpty(CurrentProduct.Name) && IsLinkedToKompas && !IsLoading);
+            RefreshFromKompasCommand = new RelayCommand(async () => await RefreshFromKompasAsync(), () => IsEngineerMode && IsLinkedToKompas && !string.IsNullOrEmpty(CurrentProduct?.FilePath) && !IsLoading);
             SelectServerStorageFolderCommand = new RelayCommand(SelectServerStorageFolder);
             ClearServerStorageFolderCommand = new RelayCommand(ClearServerStorageFolder, () => HasServerStorageFolder);
             SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable && !IsLoading);
@@ -592,15 +662,23 @@ namespace TankManager.Core.ViewModels
 
         private void OpenPricingSettings()
         {
-            var dialog = new TankManager.Views.PricingSettingsDialog(_pricingSettings);
+            // В режиме просмотра расценки общие и только для чтения
+            var dialog = new TankManager.Views.PricingSettingsDialog(_pricingSettings, isReadOnly: IsViewerMode);
             dialog.Owner = Application.Current.MainWindow;
-            if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog() == true && IsEngineerMode)
             {
                 var newSettings = dialog.PricingSettings;
 
                 try
                 {
-                    newSettings.Save();
+                    // Общие расценки лежат в серверной папке, локальная копия — для работы без сети
+                    string serverPath = _storageService.IsServerAvailable ? _storageService.ServerPricingFilePath : null;
+                    string serverError = newSettings.Save(serverPath);
+
+                    if (serverError != null)
+                        ShowSnackbar($"Расценки сохранены только локально: {serverError}", SnackbarKind.Warning, 6000);
+                    else if (serverPath == null && HasServerStorageFolder)
+                        ShowSnackbar("Сервер недоступен: расценки сохранены локально и будут выложены при синхронизации", SnackbarKind.Warning, 6000);
                 }
                 catch (Exception ex)
                 {
@@ -618,7 +696,8 @@ namespace TankManager.Core.ViewModels
         /// <summary>
         /// Пересчитать стоимость всех деталей на основе текущих расценок
         /// </summary>
-        public void RecalculateAllCosts()
+        /// <param name="showWarnings">Показывать предупреждение об операциях без исходных данных</param>
+        public void RecalculateAllCosts(bool showWarnings = true)
         {
             if (_pricingSettings == null) return;
 
@@ -649,7 +728,7 @@ namespace TankManager.Core.ViewModels
 
             CurrentProduct?.NotifyAggregatesChanged();
 
-            if (unreliableOperations > 0)
+            if (unreliableOperations > 0 && showWarnings)
             {
                 _logger.LogWarning($"Стоимость не рассчитана для операций: {unreliableOperations}");
                 ShowSnackbar($"Стоимость не рассчитана для операций: {unreliableOperations} (нет исходных данных)", SnackbarKind.Warning, 6000);
@@ -688,13 +767,17 @@ namespace TankManager.Core.ViewModels
             if (!string.IsNullOrEmpty(filePath) && _linkedProductsCache.TryGetValue(filePath, out var cachedProduct))
             {
                 SetCurrentProduct(cachedProduct, isLinked: true);
+                RecalculateAllCosts(showWarnings: false);
                 StatusMessage = $"{successMessage} (из кэша)";
                 return;
             }
 
             SetCurrentProduct(savedProduct, isLinked: false);
 
-            StatusMessage = $"{successMessage} (без связи с КОМПАС)";
+            // Стоимость в файле посчитана по расценкам на момент сохранения — пересчитываем по текущим общим
+            RecalculateAllCosts(showWarnings: false);
+
+            StatusMessage = IsViewerMode ? successMessage : $"{successMessage} (без связи с КОМПАС)";
             NotifyLinkCommandCanExecuteChanged();
         }
 
@@ -816,6 +899,14 @@ namespace TankManager.Core.ViewModels
                 if (savedProduct?.Details == null)
                     return;
 
+                // Превью сборки, если актуально
+                if (!string.IsNullOrEmpty(savedProduct.FilePreviewPngPath) && File.Exists(savedProduct.FilePreviewPngPath) &&
+                    (string.IsNullOrEmpty(kompasProduct.FilePath) || !File.Exists(kompasProduct.FilePath) ||
+                     File.GetLastWriteTimeUtc(savedProduct.FilePreviewPngPath) >= File.GetLastWriteTimeUtc(kompasProduct.FilePath)))
+                {
+                    kompasProduct.FilePreviewPngPath = savedProduct.FilePreviewPngPath;
+                }
+
                 // Строим словарь сохранённых деталей по FilePath для быстрого поиска
                 var savedByFilePath = new Dictionary<string, PartModel>();
                 foreach (var saved in savedProduct.Details)
@@ -909,6 +1000,12 @@ namespace TankManager.Core.ViewModels
 
             if (string.IsNullOrEmpty(filePath)) return;
 
+            if (IsViewerMode)
+            {
+                ShowSnackbar(ViewerModeLoadMessage, SnackbarKind.Warning);
+                return;
+            }
+
             try
             {
                 IsLoading = true;
@@ -942,6 +1039,12 @@ namespace TankManager.Core.ViewModels
         public async Task LoadFromActiveDocumentAsync()
         {
             if (IsLoading) return;
+
+            if (IsViewerMode)
+            {
+                ShowSnackbar(ViewerModeLoadMessage, SnackbarKind.Warning);
+                return;
+            }
 
             try
             {
@@ -1071,6 +1174,7 @@ namespace TankManager.Core.ViewModels
 
                 // Сохраняем превью 3D-файлов для работы без исходных файлов КОМПАС
                 await SaveAllFilePreviewsAsync(imagesFolder);
+                await Task.Run(() => SaveProductPreview(product, imagesFolder));
 
                 // Запись на диск и в сетевую папку — вне UI-потока
                 var filePath = await Task.Run(() => _storageService.Save(product));
@@ -1099,6 +1203,38 @@ namespace TankManager.Core.ViewModels
             finally
             {
                 IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Сохраняет миниатюру сборки в PNG: без КОМПАС на компьютере её не получить из файла .a3d
+        /// </summary>
+        private void SaveProductPreview(Product product, string imagesFolder)
+        {
+            var sourcePath = product?.FilePath;
+            if (string.IsNullOrEmpty(imagesFolder) || string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
+                return;
+
+            try
+            {
+                // Отдельный префикс: имя сборки может совпадать с именем детали
+                string pngPath = Path.Combine(imagesFolder, ThumbnailService.GeneratePreviewFileName(sourcePath, "product"));
+
+                bool isActual = File.Exists(pngPath) &&
+                    File.GetLastWriteTimeUtc(pngPath) >= File.GetLastWriteTimeUtc(sourcePath);
+
+                if (!isActual)
+                {
+                    var preview = ThumbnailService.GetFileThumbnail(sourcePath);
+                    if (preview == null || !ThumbnailService.SavePreviewToFile(preview, pngPath))
+                        return;
+                }
+
+                product.FilePreviewPngPath = pngPath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Не удалось сохранить превью сборки: {ex.Message}");
             }
         }
 
@@ -1305,6 +1441,9 @@ namespace TankManager.Core.ViewModels
         {
             var info = SelectedSavedProduct;
             if (info == null || IsLoading) return;
+
+            // Удалять с сервера может только конструктор
+            if (everywhere && IsViewerMode) return;
 
             var confirmation = everywhere
                 ? MessageBox.Show(
@@ -1628,41 +1767,94 @@ namespace TankManager.Core.ViewModels
             }
         }
 
-        private async Task SyncFromServerAsync()
+        /// <summary>
+        /// Вызывается после показа окна: в режиме просмотра сразу открывает список изделий
+        /// и в фоне подтягивает изделия и общие расценки с сервера
+        /// </summary>
+        public void OnWindowLoaded()
         {
-            if (IsLoading) return;
-
-            if (!IsServerAvailable)
+            if (IsViewerMode && !HasProduct)
             {
-                StatusMessage = "Серверная папка недоступна";
+                // Открытие панели само запускает синхронизацию
+                IsProductsPanelOpen = true;
+
+                if (!HasServerStorageFolder)
+                    StatusMessage = "Укажите серверную папку с изделиями в панели «Изделия»";
+            }
+
+            RunSafe(RunServerSyncAsync(interactive: false));
+        }
+
+        private Task SyncFromServerAsync() => RunServerSyncAsync(interactive: true);
+
+        /// <summary>
+        /// Синхронизация изделий и общих расценок с сервером.
+        /// Ручная (interactive) блокирует интерфейс и всегда пишет итог в строку состояния;
+        /// фоновая сообщает только об изменениях и ошибках.
+        /// </summary>
+        private async Task RunServerSyncAsync(bool interactive)
+        {
+            if (!HasServerStorageFolder) return;
+            if (interactive && IsLoading) return;
+
+            if (_isSyncing)
+            {
+                if (interactive)
+                    StatusMessage = "Синхронизация уже выполняется...";
                 return;
             }
 
+            _isSyncing = true;
+            _lastSyncUtc = DateTime.UtcNow;
+
             try
             {
-                IsLoading = true;
-                StatusMessage = "Двусторонняя синхронизация...";
-
-                var syncResult = await Task.Run(() => _storageService.SyncFromServer(skipImages: true));
-
-                if (syncResult.Success)
+                if (interactive)
                 {
-                    if (syncResult.NewProducts > 0 || syncResult.UpdatedProducts > 0)
-                    {
-                        StatusMessage = $"Синхронизация завершена: новых {syncResult.NewProducts}, обновлено {syncResult.UpdatedProducts}";
-                    }
-                    else
-                    {
-                        StatusMessage = "Синхронизация: данные актуальны";
-                    }
-                }
-                else
-                {
-                    StatusMessage = $"Синхронизация с ошибками: {string.Join(", ", syncResult.Errors.Take(2))}";
+                    IsLoading = true;
+                    StatusMessage = IsViewerMode ? "Загрузка изделий с сервера..." : "Двусторонняя синхронизация...";
                 }
 
-                // Обновляем список продуктов
-                RefreshSavedProducts();
+                bool downloadOnly = IsViewerMode;
+                string pricingPath = _storageService.ServerPricingFilePath;
+
+                // Сетевые операции (в том числе проверка доступности сервера) — вне UI-потока
+                var result = await Task.Run(() =>
+                {
+                    var sync = _storageService.SyncFromServer(skipImages: true);
+                    var pricing = _storageService.IsServerAvailable
+                        ? PricingSettings.SyncWithServer(pricingPath, downloadOnly)
+                        : null;
+                    return Tuple.Create(sync, pricing);
+                });
+
+                var syncResult = result.Item1;
+                bool hasChanges = syncResult.NewProducts > 0 || syncResult.UpdatedProducts > 0;
+
+                if (!syncResult.Success)
+                {
+                    StatusMessage = IsServerAvailable
+                        ? $"Синхронизация с ошибками: {string.Join(", ", syncResult.Errors.Take(2))}"
+                        : "Сервер недоступен: показаны локальные копии изделий";
+                }
+                else if (hasChanges)
+                {
+                    StatusMessage = $"Синхронизация завершена: новых {syncResult.NewProducts}, обновлено {syncResult.UpdatedProducts}";
+                }
+                else if (interactive)
+                {
+                    StatusMessage = "Синхронизация: данные актуальны";
+                }
+
+                if (result.Item2 != null)
+                {
+                    PricingSettings = result.Item2;
+                    if (HasProduct)
+                        RecalculateAllCosts(showWarnings: false);
+                }
+
+                if (interactive || hasChanges || IsProductsPanelOpen)
+                    RefreshSavedProducts();
             }
             catch (Exception ex)
             {
@@ -1671,7 +1863,12 @@ namespace TankManager.Core.ViewModels
             }
             finally
             {
-                IsLoading = false;
+                _isSyncing = false;
+                if (interactive)
+                    IsLoading = false;
+
+                OnPropertyChanged(nameof(IsServerAvailable));
+                ((RelayCommand)SyncFromServerCommand)?.NotifyCanExecuteChanged();
             }
         }
 
@@ -1680,16 +1877,34 @@ namespace TankManager.Core.ViewModels
         /// </summary>
         private async Task SyncProductImagesInBackgroundAsync(Product product)
         {
-            if (product == null || string.IsNullOrEmpty(product.Name) || !_storageService.IsServerAvailable)
+            if (product == null || string.IsNullOrEmpty(product.Name) || !HasServerStorageFolder)
                 return;
 
             try
             {
-                await Task.Run(() => _storageService.SyncProductImagesWithServer(product));
+                int downloaded = await Task.Run(() => _storageService.SyncProductImagesWithServer(product));
+
+                // Картинки пришли после того, как превью уже запрашивались — перечитываем
+                if (downloaded > 0 && CurrentProduct == product)
+                    InvalidatePreviews(product);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"Ошибка фоновой синхронизации изображений: {ex.Message}");
+            }
+        }
+
+        private static void InvalidatePreviews(Product product)
+        {
+            product.InvalidateFilePreviewCache();
+
+            var parts = (product.Details ?? Enumerable.Empty<PartModel>())
+                .Concat(product.StandardParts ?? Enumerable.Empty<PartModel>());
+
+            foreach (var part in parts)
+            {
+                part.InvalidateFilePreviewCache();
+                part.InvalidateDrawingPreviewCache();
             }
         }
 

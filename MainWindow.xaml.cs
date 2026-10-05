@@ -38,6 +38,8 @@ namespace TankManager
 
             // Подписываемся на изменение видимости SnackBar для запуска анимации
             _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+
+            Loaded += (s, e) => _viewModel.OnWindowLoaded();
         }
 
         #region Заголовок и настройки окна
@@ -214,7 +216,11 @@ namespace TankManager
             if (filePath == null)
                 return;
 
-            if (IsKompasFile(filePath))
+            if (_viewModel.IsViewerMode)
+            {
+                _viewModel.ShowSnackbar(MainViewModel.ViewerModeLoadMessage, SnackbarKind.Warning);
+            }
+            else if (IsKompasFile(filePath))
             {
                 _viewModel.FilePath = filePath;
             }
@@ -230,16 +236,18 @@ namespace TankManager
             if (filePath == null)
                 return;
 
-            DropOverlayText.Text = IsKompasFile(filePath)
-                ? "Отпустите, чтобы загрузить сборку"
-                : "Поддерживаются только файлы КОМПАС (.a3d)";
+            DropOverlayText.Text = _viewModel.IsViewerMode
+                ? MainViewModel.ViewerModeLoadMessage
+                : IsKompasFile(filePath)
+                    ? "Отпустите, чтобы загрузить сборку"
+                    : "Поддерживаются только файлы КОМПАС (.a3d)";
             DropOverlay.Visibility = Visibility.Visible;
         }
 
         private void FileDropZone_DragOver(object sender, DragEventArgs e)
         {
             var filePath = GetDraggedFile(e);
-            e.Effects = filePath != null && IsKompasFile(filePath)
+            e.Effects = filePath != null && IsKompasFile(filePath) && !_viewModel.IsViewerMode
                 ? DragDropEffects.Copy
                 : DragDropEffects.None;
             e.Handled = true;
@@ -386,7 +394,11 @@ namespace TankManager
 
             if (ctrl && e.Key == Key.O)
             {
-                LoadOptionsPopup.IsOpen = true;
+                // В режиме просмотра «открыть» — это список изделий
+                if (_viewModel.IsViewerMode)
+                    _viewModel.IsProductsPanelOpen = true;
+                else
+                    LoadOptionsPopup.IsOpen = true;
                 e.Handled = true;
             }
             else if (ctrl && e.Key == Key.F && _viewModel.HasProduct)

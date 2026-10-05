@@ -97,8 +97,9 @@ namespace TankManager.Core.Services
         /// </summary>
         /// <param name="pngPath">Путь к PNG-файлу</param>
         /// <param name="sourceCdwPath">Путь к исходному файлу чертежа для проверки актуальности</param>
+        /// <param name="allowStale">Показывать устаревший PNG (перегенерировать его без КОМПАС некому)</param>
         /// <returns>Изображение или null, если кэш устарел или файл не существует</returns>
-        public BitmapImage LoadPreviewImage(string pngPath, string sourceCdwPath = null)
+        public BitmapImage LoadPreviewImage(string pngPath, string sourceCdwPath = null, bool allowStale = false)
         {
             if (string.IsNullOrEmpty(pngPath) || !File.Exists(pngPath))
             {
@@ -106,7 +107,7 @@ namespace TankManager.Core.Services
             }
 
             // Если указан исходный файл, проверяем актуальность кэша
-            if (!string.IsNullOrEmpty(sourceCdwPath) && !IsCacheValid(sourceCdwPath, pngPath))
+            if (!allowStale && !string.IsNullOrEmpty(sourceCdwPath) && !IsCacheValid(sourceCdwPath, pngPath))
             {
                 return null;
             }

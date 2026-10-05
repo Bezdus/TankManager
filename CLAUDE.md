@@ -41,8 +41,11 @@ syncs saved products to local/server storage.
   `LaserCuttingOperation` to `PartModel.Operations`.
 - Costing: `ManufacturingOperationBase` subclasses (`LaserCutting`, `Bending`,
   `Rolling`, `Flanging` in `Core\Models\ManufacturingOperations.cs`) implement
-  `CalculateCost(PricingSettings)`. `PricingSettings` is persisted to
-  `pricing_settings.json` next to the exe and edited in `PricingSettingsDialog`.
+  `CalculateCost(PricingSettings)`. `PricingSettings` are shared: the master copy is
+  `<server folder>\_pricing_settings.json`, `pricing_settings.json` next to the exe is the
+  offline cache (`PricingSettings.SyncWithServer`; equal mtimes = cache in sync). They are
+  edited in `PricingSettingsDialog`, which is read-only in viewer mode. Stored products
+  are re-costed with the current prices on open (`LoadAndLinkProduct`).
   Adding an operation type requires updating the enum, the subclass, and the
   `ToOperationDto`/`FromOperationDto` mapping in `ProductStorageService`.
 - Storage (`ProductStorageService`): products are saved as JSON DTOs
@@ -56,6 +59,16 @@ syncs saved products to local/server storage.
   unreachable) that `SyncFromServer` applies, so deleted products don't come back.
   Save/sync errors are not swallowed: local failures throw, server failures land in
   `ProductStorageService.LastServerError`.
+  Without its own `storage_settings.json` the app reads `storage_settings.default.json`
+  (shipped in the release zip, holds the shared server folder path).
+- App modes (`Core\Services\AppMode.cs`): engineer (KOMPAS load/save/delete) and viewer
+  (procurement etc. without KOMPAS: read-only, products come from the server). Decided once
+  at startup in `MainViewModel` ctor: setting `Mode` in `storage_settings.json`
+  (Auto/Engineer/Viewer, switch in the products panel, applies after restart); Auto =
+  viewer when `KOMPAS.Application.7` isn't registered. Viewer never writes to the server:
+  `ProductStorageService` checks `DownloadOnly` (sync phase 2, tombstones, image sync,
+  Save/Delete). KOMPAS-only UI is bound to `IsEngineerMode`. Sync also runs in the
+  background on startup and when the products panel opens (`RunServerSyncAsync`).
 - `FileLogger` writes `%AppData%\TankManager\TankManager.log`. Use `ILogger`, not
   `Debug.WriteLine` (no output in Release).
 - COM lifetime: `Product` owns its `KompasContext` and disposes it (`Product.Dispose`);
@@ -88,3 +101,29 @@ syncs saved products to local/server storage.
 - UI strings, comments, and commit messages are in Russian; keep new UI text Russian.
 - Commands use CommunityToolkit.Mvvm `RelayCommand` (`MainViewModel`); a local
   `RelayCommand<T>` in `MainWindow.xaml.cs` handles XAML Expander toggling.
+
+
+## KOMPAS SDK documentation
+
+The KOMPAS-3D SDK COM API v7 docs (~1300 Markdown files, in Russian) live in `ai_docs/` at the repo root. They are **generated** by `python tools/build_ai_docs.py` from the raw HTML help of SDK v23 in `KOMPAS_SDK_ru-RU/` (14 000 pages; its table of contents `js/hmcontent.js` drives the structure). Both folders are **gitignored**, so either may be absent on a fresh clone — if `ai_docs/` is missing but the raw help is there, run the generator; if both are missing, say so rather than guessing API names. Don't hand-edit generated files: fix the generator and rerun it. Only `README.md` and `guides/csharp_setup.md`, `events_v7.md`, `automation.md` are hand-written (the generator leaves them alone; the C# snippets in them were compiled against `KompasMCP/libs/`). Consult the docs before writing any KOMPAS API code:
+
+| Path | Contents |
+|------|----------|
+| `ai_docs/README.md` | Where the files come from, how to search, ProgIDs, document types, the main object chains. Read first (5 KB). |
+| `ai_docs/SUMMARY.md` | Index (~1650 lines, 120 KB), interfaces grouped by help section (*Документ 3D / Компоненты* …); sections *Интерфейсы COM v7*, *Интерфейсы событий*, *Перечисления и константы*, *Руководства*. Keyword search starts here. |
+| `ai_docs/api/` | 785 files, one per v7 interface. Each holds the hierarchy, notes, and **every property/method inline** as `### Name - description` under `## Свойства` / `## Методы`, with Automation + COM syntax. |
+| `ai_docs/enums/` | 478 enumerations and constants — all v7 enums plus the v5-era constants pages, e.g. `obj3dtype.md` (`ksObj3dTypeEnum` with the matching API7 interface per code), `kslengthunitsenum.md`. |
+| `ai_docs/events/` | 39 event interfaces (API7 and API5 sections — `ksDocument3DNotify`, `ksDocumentFileNotify` live in the latter) plus who the event source is. |
+| `ai_docs/guides/` | New in v23, compiling libraries, help for applications; hand-written `csharp_setup.md` and `events_v7.md` are the ones that matter here. |
+
+Links to parts of the help that are not converted (API5, export functions, parameter structures) point straight into `KOMPAS_SDK_ru-RU/*.html`.
+
+### How to search it
+
+`SUMMARY.md` is too big to read whole — use `Grep`, never `Read` it end to end.
+
+1. `Grep` a keyword in `ai_docs/SUMMARY.md` (Latin, e.g. `Circle`, `Extrusion`, or Russian, e.g. `Эскиз`) to find the interface and its `api/<name>.md` link. File names are the lowercase help page names (`ipart7.md`, `ksobj3dtypeenum` lives in `obj3dtype.md` — grep the heading, not the file name).
+2. Open that `api/` file. Read the **Примечание** block near the top: it states required calls and how to obtain the object (e.g. "call `IDrawingObject::Update` after setting parameters"). Follow the **Иерархия** list to find inherited members — `ICircle` has no `Update`, it comes from `IDrawingObject`. Entries marked «Дополнительно:» are extra interfaces reached by a cast (QueryInterface): `IView` → `IDrawingContainer`, `IPart7` → `IModelContainer`.
+3. To find one member without reading a big file, `Grep -n "^### Update"` in the interface file, then `Read` with `offset`/`limit`.
+4. For an enum value, `Grep` the constant name across `ai_docs/enums/`. If unsure which enum a parameter takes, the member's section names the type and links to it.
+5. There is no `samples/` folder. For usage examples look at `guides/csharp_setup.md` and the existing services (`SketchService`, `OperationService`, `GeometryService`).

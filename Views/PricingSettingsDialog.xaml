@@ -38,11 +38,16 @@
         </Grid.RowDefinitions>
 
         <!-- Заголовок -->
-        <TextBlock Grid.Row="0"
-                   Text="Расценки для расчёта стоимости деталей"
-                   FontSize="16" FontWeight="SemiBold"
-                   Margin="4,0,0,12"
-                   Foreground="{StaticResource TextPrimary}"/>
+        <StackPanel Grid.Row="0" Margin="4,0,0,12">
+            <TextBlock Text="Расценки для расчёта стоимости деталей"
+                       FontSize="16" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimary}"/>
+            <TextBlock x:Name="ReadOnlyNote"
+                       Text="Режим просмотра: расценки общие для всех и меняются конструктором"
+                       FontSize="11" Margin="0,4,0,0"
+                       Foreground="{StaticResource TextMuted}"
+                       Visibility="Collapsed"/>
+        </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
@@ -201,10 +206,10 @@
 
         <!-- Кнопки -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="Отмена" IsCancel="True" Click="CancelButton_Click"
+            <Button x:Name="CancelButton" Content="Отмена" IsCancel="True" Click="CancelButton_Click"
                     Style="{StaticResource SecondaryButton}"
                     MinWidth="90" Height="32" Margin="0,0,8,0"/>
-            <Button Content="Сохранить" IsDefault="True" Click="SaveButton_Click"
+            <Button x:Name="SaveButton" Content="Сохранить" IsDefault="True" Click="SaveButton_Click"
                     Style="{StaticResource PrimaryButton}"
                     MinWidth="110" Height="32"/>
         </StackPanel>

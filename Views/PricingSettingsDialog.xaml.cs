@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using TankManager.Core.Models;
 
 namespace TankManager.Views
@@ -7,7 +8,7 @@ namespace TankManager.Views
     {
         public PricingSettings PricingSettings { get; private set; }
 
-        public PricingSettingsDialog(PricingSettings settings)
+        public PricingSettingsDialog(PricingSettings settings, bool isReadOnly = false)
         {
             InitializeComponent();
             PricingSettings = new PricingSettings
@@ -32,6 +33,39 @@ namespace TankManager.Views
 
             DataContext = PricingSettings;
             TubularGrid.ItemsSource = PricingSettings.TubularPricing;
+
+            if (isReadOnly)
+                MakeReadOnly();
+        }
+
+        /// <summary>
+        /// Только просмотр: расценки общие, меняет их конструктор
+        /// </summary>
+        private void MakeReadOnly()
+        {
+            Title = "Расценки (просмотр)";
+            ReadOnlyNote.Visibility = Visibility.Visible;
+            SaveButton.Visibility = Visibility.Collapsed;
+            CancelButton.Content = "Закрыть";
+            CancelButton.IsDefault = true;
+            CancelButton.Margin = new Thickness(0);
+
+            TubularGrid.IsReadOnly = true;
+            TubularGrid.CanUserAddRows = false;
+            TubularGrid.CanUserDeleteRows = false;
+            SetTextBoxesReadOnly(this);
+        }
+
+        private static void SetTextBoxesReadOnly(DependencyObject parent)
+        {
+            foreach (var child in LogicalTreeHelper.GetChildren(parent))
+            {
+                if (child is TextBox textBox)
+                    textBox.IsReadOnly = true;
+
+                if (child is DependencyObject dependencyObject)
+                    SetTextBoxesReadOnly(dependencyObject);
+            }
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)

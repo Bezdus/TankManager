@@ -13,24 +13,40 @@ namespace TankManager.Core.Services
         /// Двусторонняя синхронизация изображений между двумя директориями.
         /// Более новые файлы перезаписывают старые.
         /// </summary>
-        public void SyncImageDirectories(string dir1, string dir2)
+        /// <param name="localDir">Локальная папка изображений</param>
+        /// <param name="serverDir">Серверная папка изображений</param>
+        /// <param name="downloadOnly">Только с сервера в локальную папку (режим просмотра)</param>
+        /// <returns>Количество файлов, скачанных с сервера в локальную папку</returns>
+        public int SyncImageDirectories(string localDir, string serverDir, bool downloadOnly = false)
         {
-            if (string.IsNullOrEmpty(dir1) || string.IsNullOrEmpty(dir2))
-                return;
-            if (!Directory.Exists(dir1) && !Directory.Exists(dir2))
-                return;
+            if (string.IsNullOrEmpty(localDir) || string.IsNullOrEmpty(serverDir))
+                return 0;
 
-            Directory.CreateDirectory(dir1);
-            Directory.CreateDirectory(dir2);
+            if (downloadOnly)
+            {
+                if (!Directory.Exists(serverDir))
+                    return 0;
 
-            SyncOneWay(dir1, dir2);
-            SyncOneWay(dir2, dir1);
+                Directory.CreateDirectory(localDir);
+                return SyncOneWay(serverDir, localDir);
+            }
+
+            if (!Directory.Exists(localDir) && !Directory.Exists(serverDir))
+                return 0;
+
+            Directory.CreateDirectory(localDir);
+            Directory.CreateDirectory(serverDir);
+
+            SyncOneWay(localDir, serverDir);
+            return SyncOneWay(serverDir, localDir);
         }
 
-        private void SyncOneWay(string sourceDir, string destDir)
+        private int SyncOneWay(string sourceDir, string destDir)
         {
+            int copied = 0;
+
             if (!Directory.Exists(sourceDir))
-                return;
+                return copied;
 
             foreach (var sourceFile in Directory.GetFiles(sourceDir))
             {
@@ -42,6 +58,7 @@ namespace TankManager.Core.Services
                     if (!File.Exists(destFile))
                     {
                         File.Copy(sourceFile, destFile, false);
+                        copied++;
                     }
                     else
                     {
@@ -50,6 +67,7 @@ namespace TankManager.Core.Services
                         if (sourceTime > destTime)
                         {
                             File.Copy(sourceFile, destFile, true);
+                            copied++;
                         }
                     }
                 }
@@ -58,6 +76,8 @@ namespace TankManager.Core.Services
                     Debug.WriteLine($"Ошибка синхронизации изображения {Path.GetFileName(sourceFile)}: {ex.Message}");
                 }
             }
+
+            return copied;
         }
 
         /// <summary>

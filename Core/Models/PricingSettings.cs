@@ -224,22 +224,96 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
-        /// Загрузить настройки из файла
+        /// Имя файла общих расценок в серверной папке изделий
         /// </summary>
-        public static PricingSettings Load()
+        public const string ServerFileName = "_pricing_settings.json";
+
+        /// <summary>
+        /// Загрузить расценки: общие с сервера (с обновлением локальной копии),
+        /// а если сервер недоступен — локальную копию
+        /// </summary>
+        /// <param name="serverFilePath">Путь к общим расценкам на сервере (может быть null)</param>
+        public static PricingSettings Load(string serverFilePath = null)
+        {
+            if (!string.IsNullOrEmpty(serverFilePath))
+            {
+                try
+                {
+                    if (File.Exists(serverFilePath))
+                    {
+                        byte[] data = File.ReadAllBytes(serverFilePath);
+                        var fromServer = Deserialize(data);
+                        if (fromServer != null)
+                        {
+                            // Локальная копия нужна для работы без сети. Дата как у серверной:
+                            // по ней SyncWithServer понимает, что локальных изменений нет
+                            try
+                            {
+                                AtomicFile.WriteAllBytes(SettingsPath, data);
+                                File.SetLastWriteTimeUtc(SettingsPath, File.GetLastWriteTimeUtc(serverFilePath));
+                            }
+                            catch (Exception ex) { Logger.LogWarning($"Не удалось обновить локальную копию расценок: {ex.Message}"); }
+
+                            return fromServer;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Не удалось прочитать общие расценки {serverFilePath}: {ex.Message}");
+                }
+            }
+
+            return LoadLocal();
+        }
+
+        /// <summary>
+        /// Согласовать расценки с сервером и загрузить актуальные.
+        /// Конструктор выкладывает локальную копию, если она новее серверной (или на сервере файла нет);
+        /// в режиме просмотра расценки только читаются с сервера.
+        /// </summary>
+        /// <param name="serverFilePath">Путь к общим расценкам на сервере (null — только локальные)</param>
+        /// <param name="downloadOnly">Не записывать на сервер</param>
+        public static PricingSettings SyncWithServer(string serverFilePath, bool downloadOnly)
+        {
+            if (string.IsNullOrEmpty(serverFilePath))
+                return LoadLocal();
+
+            if (!downloadOnly && File.Exists(SettingsPath))
+            {
+                try
+                {
+                    bool serverExists = File.Exists(serverFilePath);
+                    if (!serverExists || File.GetLastWriteTimeUtc(SettingsPath) > File.GetLastWriteTimeUtc(serverFilePath))
+                    {
+                        // Повреждённую локальную копию на сервер не выкладываем
+                        var local = Deserialize(File.ReadAllBytes(SettingsPath));
+                        if (local != null)
+                        {
+                            local.Save(serverFilePath);
+                            return local;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Не удалось выложить расценки на сервер: {ex.Message}");
+                }
+            }
+
+            return Load(serverFilePath);
+        }
+
+        private static PricingSettings LoadLocal()
         {
             if (!File.Exists(SettingsPath))
                 return new PricingSettings();
 
             try
             {
-                using (var stream = new FileStream(SettingsPath, FileMode.Open, FileAccess.Read))
-                {
-                    var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
-                    var loaded = (PricingSettings)serializer.ReadObject(stream);
-                    if (loaded != null)
-                        return loaded;
-                }
+                var loaded = Deserialize(File.ReadAllBytes(SettingsPath));
+                if (loaded != null)
+                    return loaded;
             }
             catch (Exception ex)
             {
@@ -253,17 +327,54 @@ namespace TankManager.Core.Models
             return new PricingSettings();
         }
 
-        /// <summary>
-        /// Сохранить настройки в файл (атомарно). При ошибке бросает исключение.
-        /// </summary>
-        public void Save()
+        private static PricingSettings Deserialize(byte[] data)
         {
+            using (var stream = new MemoryStream(data))
+            {
+                var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
+                return (PricingSettings)serializer.ReadObject(stream);
+            }
+        }
+
+        /// <summary>
+        /// Сохранить расценки (атомарно) локально и, если указан путь, на сервер.
+        /// Ошибка локальной записи бросает исключение; ошибка сервера возвращается строкой.
+        /// </summary>
+        /// <returns>Текст ошибки записи на сервер или null</returns>
+        public string Save(string serverFilePath = null)
+        {
+            byte[] data;
             var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
             using (var stream = new MemoryStream())
             {
                 serializer.WriteObject(stream, this);
-                AtomicFile.WriteAllBytes(SettingsPath, stream.ToArray());
+                data = stream.ToArray();
             }
+
+            string serverError = null;
+            if (!string.IsNullOrEmpty(serverFilePath))
+            {
+                try
+                {
+                    AtomicFile.WriteAllBytes(serverFilePath, data);
+                }
+                catch (Exception ex)
+                {
+                    serverError = ex.Message;
+                    Logger.LogError("Не удалось сохранить общие расценки на сервер", ex);
+                }
+            }
+
+            AtomicFile.WriteAllBytes(SettingsPath, data);
+
+            // Одинаковая дата — признак того, что локальная копия совпадает с серверной (см. SyncWithServer)
+            if (!string.IsNullOrEmpty(serverFilePath) && serverError == null)
+            {
+                try { File.SetLastWriteTimeUtc(SettingsPath, File.GetLastWriteTimeUtc(serverFilePath)); }
+                catch (Exception ex) { Logger.LogWarning($"Не удалось выставить дату локальной копии расценок: {ex.Message}"); }
+            }
+
+            return serverError;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
