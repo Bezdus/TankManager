@@ -6,13 +6,13 @@
     <Application.Resources>
 
         <!-- ===================== Цветовая палитра ===================== -->
-        <SolidColorBrush x:Key="WindowBackground" Color="#FFF3F4F6"/>
+        <SolidColorBrush x:Key="WindowBackground" Color="#FFEBEDF0"/>
         <SolidColorBrush x:Key="PrimaryBackground" Color="#FFFFFFFF"/>
-        <SolidColorBrush x:Key="SecondaryBackground" Color="#FFF9FAFB"/>
-        <SolidColorBrush x:Key="BorderColor" Color="#FFE5E7EB"/>
+        <SolidColorBrush x:Key="SecondaryBackground" Color="#FFF1F3F5"/>
+        <SolidColorBrush x:Key="BorderColor" Color="#FFDCDFE4"/>
         <SolidColorBrush x:Key="TextPrimary" Color="#FF111827"/>
-        <SolidColorBrush x:Key="TextSecondary" Color="#FF6B7280"/>
-        <SolidColorBrush x:Key="TextMuted" Color="#FF9CA3AF"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#FF4B5563"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#FF6B7280"/>
         <SolidColorBrush x:Key="AccentColor" Color="#FF2563EB"/>
         <SolidColorBrush x:Key="AccentHover" Color="#FF1D4ED8"/>
         <SolidColorBrush x:Key="AccentSubtle" Color="#FFEFF6FF"/>
@@ -27,13 +27,13 @@
         <SolidColorBrush x:Key="DangerSubtle" Color="#FFFEF2F2"/>
         <SolidColorBrush x:Key="DarkSurface" Color="#FF111827"/>
         <SolidColorBrush x:Key="WarningHover" Color="#FFFEF3C7"/>
-        <SolidColorBrush x:Key="LoadingScrim" Color="#B3F3F4F6"/>
+        <SolidColorBrush x:Key="LoadingScrim" Color="#B3EBEDF0"/>
         <SolidColorBrush x:Key="PanelScrim" Color="#4D111827"/>
         <SolidColorBrush x:Key="ModalScrim" Color="#B3111827"/>
         <SolidColorBrush x:Key="DropZoneBackground" Color="#E6EFF6FF"/>
 
         <!-- Цвета типов материала (точки-метки в списках и на вкладках) -->
-        <SolidColorBrush x:Key="SheetTypeBrush" Color="#FF2563EB"/>
+        <SolidColorBrush x:Key="SheetTypeBrush" Color="#FF6366F1"/>
         <SolidColorBrush x:Key="TubularTypeBrush" Color="#FF0D9488"/>
         <SolidColorBrush x:Key="OtherTypeBrush" Color="#FFD97706"/>
         <SolidColorBrush x:Key="PurchasedTypeBrush" Color="#FF9CA3AF"/>

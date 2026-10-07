@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 
 namespace TankManager.Core.Models
@@ -26,7 +26,28 @@ namespace TankManager.Core.Models
         /// <summary>
         /// Отбортовка
         /// </summary>
-        Flanging
+        Flanging,
+
+        /// <summary>
+        /// Прочая операция, заданная пользователем (сварка, зачистка, покраска...)
+        /// </summary>
+        Custom
+    }
+
+    /// <summary>
+    /// Откуда взялась операция
+    /// </summary>
+    public enum OperationOrigin
+    {
+        /// <summary>
+        /// Определена автоматически по модели КОМПАС
+        /// </summary>
+        Kompas,
+
+        /// <summary>
+        /// Добавлена пользователем вручную
+        /// </summary>
+        Manual
     }
 
     /// <summary>
@@ -38,11 +59,35 @@ namespace TankManager.Core.Models
         private double _cost;
         private double _timeMinutes;
         private double _materialThickness;
+        private OperationOrigin _origin;
+        private int _quantity = 1;
+        private bool _isExcluded;
+        private bool _hasManualCost;
+        private double _manualCost;
+        private bool _isEdited;
 
         /// <summary>
         /// Тип операции
         /// </summary>
         public ManufacturingOperationType Type { get; }
+
+        /// <summary>
+        /// Название типа операции для интерфейса
+        /// </summary>
+        public string TypeTitle
+        {
+            get
+            {
+                switch (Type)
+                {
+                    case ManufacturingOperationType.LaserCutting: return "Резка на лазере";
+                    case ManufacturingOperationType.Bending: return "Гибка";
+                    case ManufacturingOperationType.Rolling: return "Вальцовка";
+                    case ManufacturingOperationType.Flanging: return "Отбортовка";
+                    default: return "Прочая операция";
+                }
+            }
+        }
 
         /// <summary>
         /// Название операции
@@ -108,6 +153,117 @@ namespace TankManager.Core.Models
             }
         }
 
+        /// <summary>
+        /// Определена по модели КОМПАС или добавлена вручную
+        /// </summary>
+        public OperationOrigin Origin
+        {
+            get { return _origin; }
+            set
+            {
+                if (_origin != value)
+                {
+                    _origin = value;
+                    OnPropertyChanged(nameof(Origin));
+                    OnPropertyChanged(nameof(IsManual));
+                    OnPropertyChanged(nameof(IsModified));
+                }
+            }
+        }
+
+        public bool IsManual => Origin == OperationOrigin.Manual;
+
+        /// <summary>
+        /// Количество (например, число гибов); стоимость единицы умножается на него
+        /// </summary>
+        public int Quantity
+        {
+            get { return _quantity; }
+            set
+            {
+                if (value < 0) value = 0;
+                if (_quantity != value)
+                {
+                    _quantity = value;
+                    OnPropertyChanged(nameof(Quantity));
+                    OnPropertyChanged(nameof(IsModified));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Операция из КОМПАС, исключённая пользователем из расчёта. Не удаляется, чтобы правка
+        /// пережила обновление данных из КОМПАС
+        /// </summary>
+        public bool IsExcluded
+        {
+            get { return _isExcluded; }
+            set
+            {
+                if (_isExcluded != value)
+                {
+                    _isExcluded = value;
+                    OnPropertyChanged(nameof(IsExcluded));
+                    OnPropertyChanged(nameof(IsModified));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Стоимость задана вручную и не пересчитывается по расценкам
+        /// </summary>
+        public bool HasManualCost
+        {
+            get { return _hasManualCost; }
+            set
+            {
+                if (_hasManualCost != value)
+                {
+                    _hasManualCost = value;
+                    OnPropertyChanged(nameof(HasManualCost));
+                    OnPropertyChanged(nameof(IsModified));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Стоимость, заданная вручную, руб (действует при HasManualCost)
+        /// </summary>
+        public double ManualCost
+        {
+            get { return _manualCost; }
+            set
+            {
+                if (Math.Abs(_manualCost - value) > 0.0001)
+                {
+                    _manualCost = value;
+                    OnPropertyChanged(nameof(ManualCost));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Пользователь изменил параметры операции, определённые по модели КОМПАС
+        /// </summary>
+        public bool IsEdited
+        {
+            get { return _isEdited; }
+            set
+            {
+                if (_isEdited != value)
+                {
+                    _isEdited = value;
+                    OnPropertyChanged(nameof(IsEdited));
+                    OnPropertyChanged(nameof(IsModified));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Операция отличается от определённой по КОМПАС (есть ручные правки)
+        /// </summary>
+        public bool IsModified => IsManual || IsExcluded || HasManualCost || IsEdited || Quantity != 1;
+
         protected ManufacturingOperationBase(ManufacturingOperationType type)
         {
             Type = type;
@@ -115,15 +271,61 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
-        /// Рассчитать стоимость операции на основе расценок
+        /// Рассчитать стоимость операции на основе расценок (с учётом ручных правок)
         /// </summary>
         /// <param name="settings">Настройки расценок</param>
-        public abstract void CalculateCost(PricingSettings settings);
+        public void CalculateCost(PricingSettings settings)
+        {
+            if (IsExcluded)
+            {
+                Cost = 0;
+                return;
+            }
+
+            if (HasManualCost)
+            {
+                Cost = ManualCost;
+                return;
+            }
+
+            if (settings == null) return;
+            Cost = CalculateUnitCost(settings) * Quantity;
+        }
+
+        /// <summary>
+        /// Стоимость одной операции по расценкам
+        /// </summary>
+        protected abstract double CalculateUnitCost(PricingSettings settings);
 
         /// <summary>
         /// Достаточно ли исходных данных для расчёта стоимости (иначе цена операции занижена)
         /// </summary>
-        public virtual bool IsCostReliable => true;
+        public bool IsCostReliable => IsExcluded || HasManualCost || IsUnitCostReliable;
+
+        /// <summary>
+        /// Достаточно ли исходных данных для расчёта по расценкам
+        /// </summary>
+        protected virtual bool IsUnitCostReliable => true;
+
+        /// <summary>
+        /// Копия операции без подписчиков PropertyChanged
+        /// </summary>
+        public ManufacturingOperationBase Clone()
+        {
+            var clone = (ManufacturingOperationBase)MemberwiseClone();
+            clone.PropertyChanged = null;
+            return clone;
+        }
+
+        /// <summary>
+        /// Скопировать параметры операции (геометрию), не трогая признаки ручных правок
+        /// </summary>
+        public virtual void CopyParametersFrom(ManufacturingOperationBase source)
+        {
+            if (source == null) return;
+            TimeMinutes = source.TimeMinutes;
+            MaterialThickness = source.MaterialThickness;
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -146,10 +348,22 @@ namespace TankManager.Core.Models
         {
         }
 
-        public override void CalculateCost(PricingSettings settings)
+        protected override double CalculateUnitCost(PricingSettings settings)
         {
-            if (settings == null) return;
-            Cost = CutLength * settings.LaserCuttingPricePerMm + EngravingLength * settings.EngravingPricePerMm;
+            // Цена реза зависит от толщины листа (MaterialThickness выставляется при пересчёте стоимости)
+            // Длина реза в мм, цена в руб/м
+            return CutLength / 1000.0 * settings.GetLaserCuttingPricePerMeter(MaterialThickness)
+                + EngravingLength * settings.EngravingPricePerMm;
+        }
+
+        public override void CopyParametersFrom(ManufacturingOperationBase source)
+        {
+            base.CopyParametersFrom(source);
+            if (source is LaserCuttingOperation laser)
+            {
+                CutLength = laser.CutLength;
+                EngravingLength = laser.EngravingLength;
+            }
         }
 
         /// <summary>
@@ -198,10 +412,19 @@ namespace TankManager.Core.Models
         {
         }
 
-        public override void CalculateCost(PricingSettings settings)
+        protected override double CalculateUnitCost(PricingSettings settings)
         {
-            if (settings == null) return;
-            Cost = settings.BendingPricePerOperation;
+            return settings.BendingPricePerOperation;
+        }
+
+        public override void CopyParametersFrom(ManufacturingOperationBase source)
+        {
+            base.CopyParametersFrom(source);
+            if (source is BendingOperation bend)
+            {
+                BendAngle = bend.BendAngle;
+                BendLength = bend.BendLength;
+            }
         }
 
         /// <summary>
@@ -251,10 +474,20 @@ namespace TankManager.Core.Models
         {
         }
 
-        public override void CalculateCost(PricingSettings settings)
+        protected override double CalculateUnitCost(PricingSettings settings)
         {
-            if (settings == null) return;
-            Cost = PartMass * settings.RollingPricePerKg;
+            return PartMass * settings.RollingPricePerKg;
+        }
+
+        public override void CopyParametersFrom(ManufacturingOperationBase source)
+        {
+            base.CopyParametersFrom(source);
+            if (source is RollingOperation roll)
+            {
+                RollDiameter = roll.RollDiameter;
+                Radius = roll.Radius;
+                Length = roll.Length;
+            }
         }
 
         /// <summary>
@@ -262,7 +495,7 @@ namespace TankManager.Core.Models
         /// </summary>
         public double PartMass { get; set; }
 
-        public override bool IsCostReliable => PartMass > 0;
+        protected override bool IsUnitCostReliable => PartMass > 0;
 
         /// <summary>
         /// Диаметр вальцовки, мм
@@ -326,10 +559,19 @@ namespace TankManager.Core.Models
         {
         }
 
-        public override void CalculateCost(PricingSettings settings)
+        protected override double CalculateUnitCost(PricingSettings settings)
         {
-            if (settings == null) return;
-            Cost = settings.FlangingPricePerOperation;
+            return settings.FlangingPricePerOperation;
+        }
+
+        public override void CopyParametersFrom(ManufacturingOperationBase source)
+        {
+            base.CopyParametersFrom(source);
+            if (source is FlangingOperation flange)
+            {
+                Diameter = flange.Diameter;
+                Radius = flange.Radius;
+            }
         }
 
         /// <summary>
@@ -360,6 +602,53 @@ namespace TankManager.Core.Models
                 {
                     _radius = value;
                     OnPropertyChanged(nameof(Radius));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Прочая операция, заданная пользователем: название и цена за единицу
+    /// </summary>
+    public class CustomOperation : ManufacturingOperationBase
+    {
+        private double _unitPrice;
+
+        public CustomOperation()
+            : base(ManufacturingOperationType.Custom)
+        {
+            Origin = OperationOrigin.Manual;
+        }
+
+        protected override double CalculateUnitCost(PricingSettings settings)
+        {
+            return UnitPrice;
+        }
+
+        protected override bool IsUnitCostReliable => UnitPrice > 0;
+
+        public override void CopyParametersFrom(ManufacturingOperationBase source)
+        {
+            base.CopyParametersFrom(source);
+            if (source is CustomOperation custom)
+            {
+                Name = custom.Name;
+                UnitPrice = custom.UnitPrice;
+            }
+        }
+
+        /// <summary>
+        /// Цена за единицу, руб
+        /// </summary>
+        public double UnitPrice
+        {
+            get { return _unitPrice; }
+            set
+            {
+                if (Math.Abs(_unitPrice - value) > 0.0001)
+                {
+                    _unitPrice = value;
+                    OnPropertyChanged(nameof(UnitPrice));
                 }
             }
         }

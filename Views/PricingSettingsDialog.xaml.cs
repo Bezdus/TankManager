@@ -1,5 +1,7 @@
+﻿using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using TankManager.Core.Models;
 
 namespace TankManager.Views
@@ -15,14 +17,14 @@ namespace TankManager.Views
             {
                 SheetMetalPricePerKg = settings.SheetMetalPricePerKg,
                 OtherMetalPricePerKg = settings.OtherMetalPricePerKg,
-                LaserCuttingPricePerMm = settings.LaserCuttingPricePerMm,
+                LaserCuttingPricePerMeter = settings.LaserCuttingPricePerMeter,
                 EngravingPricePerMm = settings.EngravingPricePerMm,
                 BendingPricePerOperation = settings.BendingPricePerOperation,
                 RollingPricePerKg = settings.RollingPricePerKg,
                 FlangingPricePerOperation = settings.FlangingPricePerOperation
             };
 
-            foreach (var entry in settings.TubularPricing)
+            foreach (var entry in settings.TubularPricing ?? Enumerable.Empty<TubularPricingEntry>())
             {
                 PricingSettings.TubularPricing.Add(new TubularPricingEntry
                 {
@@ -31,8 +33,18 @@ namespace TankManager.Views
                 });
             }
 
+            foreach (var entry in settings.LaserCuttingPricing ?? Enumerable.Empty<LaserCuttingPricingEntry>())
+            {
+                PricingSettings.LaserCuttingPricing.Add(new LaserCuttingPricingEntry
+                {
+                    Thickness = entry.Thickness,
+                    PricePerMeter = entry.PricePerMeter
+                });
+            }
+
             DataContext = PricingSettings;
             TubularGrid.ItemsSource = PricingSettings.TubularPricing;
+            LaserGrid.ItemsSource = PricingSettings.LaserCuttingPricing;
 
             if (isReadOnly)
                 MakeReadOnly();
@@ -53,6 +65,9 @@ namespace TankManager.Views
             TubularGrid.IsReadOnly = true;
             TubularGrid.CanUserAddRows = false;
             TubularGrid.CanUserDeleteRows = false;
+            LaserGrid.IsReadOnly = true;
+            LaserGrid.CanUserAddRows = false;
+            LaserGrid.CanUserDeleteRows = false;
             SetTextBoxesReadOnly(this);
         }
 
@@ -70,9 +85,29 @@ namespace TankManager.Views
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            NumberInput.CommitFocusedTextBox();
+
+            foreach (var grid in new[] { TubularGrid, LaserGrid })
+            {
+                grid.CommitEdit(DataGridEditingUnit.Cell, true);
+                grid.CommitEdit(DataGridEditingUnit.Row, true);
+            }
+
+            if (NumberInput.HasValidationErrors(this))
+            {
+                NumberInput.ShowValidationWarning(this);
+                return;
+            }
+
             DialogResult = true;
             Close();
         }
+
+        private void NumberBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+            => NumberInput.OnGotKeyboardFocus(sender);
+
+        private void NumberBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+            => NumberInput.OnPreviewMouseLeftButtonDown(sender, e);
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {

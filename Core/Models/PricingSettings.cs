@@ -55,6 +55,57 @@ namespace TankManager.Core.Models
     }
 
     /// <summary>
+    /// Цена лазерной резки для листа определённой толщины
+    /// </summary>
+    [DataContract]
+    public class LaserCuttingPricingEntry : INotifyPropertyChanged
+    {
+        private double _thickness;
+        private double _pricePerMeter;
+
+        /// <summary>
+        /// Толщина листа, мм
+        /// </summary>
+        [DataMember]
+        public double Thickness
+        {
+            get => _thickness;
+            set
+            {
+                if (Math.Abs(_thickness - value) > 0.0001)
+                {
+                    _thickness = value;
+                    OnPropertyChanged(nameof(Thickness));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Цена резки, руб/м
+        /// </summary>
+        [DataMember]
+        public double PricePerMeter
+        {
+            get => _pricePerMeter;
+            set
+            {
+                if (Math.Abs(_pricePerMeter - value) > 0.0001)
+                {
+                    _pricePerMeter = value;
+                    OnPropertyChanged(nameof(PricePerMeter));
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    /// <summary>
     /// Настройки расценок для расчёта стоимости деталей
     /// </summary>
     [DataContract]
@@ -67,8 +118,12 @@ namespace TankManager.Core.Models
 
         private double _sheetMetalPricePerKg;
         private double _otherMetalPricePerKg;
-        private double _laserCuttingPricePerMm;
+        private double _laserCuttingPricePerMeter;
         private double _engravingPricePerMm;
+
+        // Цена резки из файлов старых версий (руб/мм); переводится в LaserCuttingPricePerMeter при чтении
+        [DataMember(Name = "LaserCuttingPricePerMm", EmitDefaultValue = false)]
+        private double _legacyLaserCuttingPricePerMm;
         private double _bendingPricePerOperation;
         private double _rollingPricePerKg;
         private double _flangingPricePerOperation;
@@ -115,21 +170,28 @@ namespace TankManager.Core.Models
             = new ObservableCollection<TubularPricingEntry>();
 
         /// <summary>
-        /// Цена лазерной резки, руб/мм
+        /// Цена лазерной резки по умолчанию (для толщин, которых нет в LaserCuttingPricing), руб/м
         /// </summary>
         [DataMember]
-        public double LaserCuttingPricePerMm
+        public double LaserCuttingPricePerMeter
         {
-            get => _laserCuttingPricePerMm;
+            get => _laserCuttingPricePerMeter;
             set
             {
-                if (Math.Abs(_laserCuttingPricePerMm - value) > 0.0001)
+                if (Math.Abs(_laserCuttingPricePerMeter - value) > 0.0001)
                 {
-                    _laserCuttingPricePerMm = value;
-                    OnPropertyChanged(nameof(LaserCuttingPricePerMm));
+                    _laserCuttingPricePerMeter = value;
+                    OnPropertyChanged(nameof(LaserCuttingPricePerMeter));
                 }
             }
         }
+
+        /// <summary>
+        /// Цены лазерной резки по толщине листа
+        /// </summary>
+        [DataMember]
+        public ObservableCollection<LaserCuttingPricingEntry> LaserCuttingPricing { get; set; }
+            = new ObservableCollection<LaserCuttingPricingEntry>();
 
         /// <summary>
         /// Цена гравировки, руб/мм
@@ -221,6 +283,41 @@ namespace TankManager.Core.Models
             }
 
             return best != null ? best.PricePerMeter : 0;
+        }
+
+        /// <summary>
+        /// Цена резки за метр для листа заданной толщины: из таблицы по точной толщине,
+        /// иначе цена по умолчанию
+        /// </summary>
+        public double GetLaserCuttingPricePerMeter(double thickness)
+        {
+            if (thickness > 0 && LaserCuttingPricing != null)
+            {
+                foreach (var entry in LaserCuttingPricing)
+                {
+                    if (Math.Abs(entry.Thickness - thickness) < 0.001)
+                        return entry.PricePerMeter;
+                }
+            }
+
+            return LaserCuttingPricePerMeter;
+        }
+
+        /// <summary>
+        /// Приведение файлов старых версий: DataContractJsonSerializer не выполняет инициализаторы
+        /// полей (коллекции остались бы null), цена резки раньше хранилась в руб/мм
+        /// </summary>
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext context)
+        {
+            if (TubularPricing == null)
+                TubularPricing = new ObservableCollection<TubularPricingEntry>();
+            if (LaserCuttingPricing == null)
+                LaserCuttingPricing = new ObservableCollection<LaserCuttingPricingEntry>();
+
+            if (_legacyLaserCuttingPricePerMm > 0 && _laserCuttingPricePerMeter <= 0)
+                _laserCuttingPricePerMeter = _legacyLaserCuttingPricePerMm * 1000;
+            _legacyLaserCuttingPricePerMm = 0;
         }
 
         /// <summary>

@@ -12,7 +12,9 @@ namespace TankManager.Core.Services
         /// <summary>Конструктор: загрузка сборок из КОМПАС, сохранение, удаление</summary>
         Engineer,
         /// <summary>Просмотр: только чтение изделий с сервера</summary>
-        Viewer
+        Viewer,
+        /// <summary>Технолог: как просмотр, но можно править операции изготовления деталей</summary>
+        Technologist
     }
 
     /// <summary>
@@ -34,6 +36,17 @@ namespace TankManager.Core.Services
         public static bool IsViewer { get; private set; }
 
         /// <summary>
+        /// Режим технолога: без КОМПАС, изделия только читаются (<see cref="IsViewer"/> = true),
+        /// но операции деталей можно править; правки пишутся в отдельный файл и на сервер
+        /// </summary>
+        public static bool IsTechnologist { get; private set; }
+
+        /// <summary>
+        /// Можно ли править операции изготовления (конструктор или технолог)
+        /// </summary>
+        public static bool CanEditOperations => !IsViewer || IsTechnologist;
+
+        /// <summary>
         /// Зарегистрирован ли КОМПАС-3D в системе
         /// </summary>
         public static bool IsKompasInstalled { get; private set; }
@@ -42,6 +55,7 @@ namespace TankManager.Core.Services
         {
             Setting = setting;
             IsKompasInstalled = DetectKompas();
+            IsTechnologist = false;
 
             switch (setting)
             {
@@ -50,6 +64,10 @@ namespace TankManager.Core.Services
                     break;
                 case AppModeSetting.Viewer:
                     IsViewer = true;
+                    break;
+                case AppModeSetting.Technologist:
+                    IsViewer = true;
+                    IsTechnologist = true;
                     break;
                 default:
                     IsViewer = !IsKompasInstalled;

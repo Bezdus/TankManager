@@ -47,6 +47,10 @@ namespace TankManager.Core.Models
         private const string NameLineSeparator = "@/";
         private static readonly Regex LengthInNameRegex = new Regex(@"L\s*=\s*(\d+(?:[.,]\d+)?)", RegexOptions.Compiled);
 
+        // Толщина листа: первое число после «Лист»/«Полоса»/«Рулон» до обозначения стандарта
+        private static readonly Regex SheetStandardRegex = new Regex(@"ГОСТ|\bТУ\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex SheetThicknessRegex = new Regex(@"(?:лист|полоса|рулон)\D*?(\d+(?:[.,]\d+)?)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         /// <summary>
         /// Операции изготовления детали
         /// </summary>
@@ -114,6 +118,11 @@ namespace TankManager.Core.Models
                 }
             }
         }
+
+        /// <summary>
+        /// Толщина листа из наименования материала, мм (0 — не удалось определить)
+        /// </summary>
+        public double SheetThickness => ParseSheetThickness(Material);
 
         public double Mass
         {
@@ -715,6 +724,30 @@ namespace TankManager.Core.Models
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Толщина листа из строки материала («Лист Б-ПН-О-3 ГОСТ…» → 3, «Полоса 4х40 ГОСТ…» → 4), мм.
+        /// Принимает и исходную строку КОМПАС с $d. 0 — толщина не найдена
+        /// </summary>
+        public static double ParseSheetThickness(string material)
+        {
+            if (string.IsNullOrWhiteSpace(material))
+                return 0;
+
+            string text = FormatMaterial(material);
+
+            // Числа после обозначения стандарта (номер ГОСТ, марка стали) толщиной не являются
+            var standard = SheetStandardRegex.Match(text);
+            if (standard.Success)
+                text = text.Substring(0, standard.Index);
+
+            var match = SheetThicknessRegex.Match(text);
+            if (!match.Success)
+                return 0;
+
+            return double.TryParse(match.Groups[1].Value.Replace(',', '.'), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out double thickness) ? thickness : 0;
         }
 
         private static string FormatMaterial(string material)

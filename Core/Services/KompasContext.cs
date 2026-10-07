@@ -435,7 +435,7 @@ namespace TankManager.Core.Services
 
                 if (operations.Count > 0)
                 {
-                    double thickness = ParseMaterialThickness(part.Material);
+                    double thickness = PartModel.ParseSheetThickness(part.Material);
                     foreach (var op in operations)
                         op.MaterialThickness = thickness;
                 }
@@ -531,24 +531,6 @@ namespace TankManager.Core.Services
                     }
                     break;
             }
-        }
-
-        /// <summary>
-        /// Извлекает толщину материала из строки материала KOMPAS ($d<число>)
-        /// </summary>
-        private double ParseMaterialThickness(string material)
-        {
-            if (string.IsNullOrWhiteSpace(material))
-                return 0;
-
-            var match = Regex.Match(material, @"\$d(\d+\.?\d*)");
-            if (match.Success)
-                return double.TryParse(match.Groups[1].Value,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out double thickness) ? thickness : 0;
-
-            return 0;
         }
 
         /// <summary>

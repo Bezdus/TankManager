@@ -423,9 +423,16 @@
         <!-- Операции изготовления: общие стили -->
         <Style x:Key="OperationCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource SecondaryBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="10,8"/>
             <Setter Property="Margin" Value="0,0,0,4"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsExcluded}" Value="True">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="OperationTitle" TargetType="TextBlock">
@@ -449,6 +456,36 @@
             <Setter Property="Margin" Value="12,0,0,0"/>
         </Style>
 
+        <!-- Метки ручных правок операции (рядом с названием) -->
+        <Style x:Key="OperationMark" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Margin" Value="6,0,0,2"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+        </Style>
+
+        <DataTemplate x:Key="OperationMarksTemplate">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Quantity, StringFormat='×{0}'}" FontWeight="SemiBold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource OperationMark}">
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Quantity}" Value="1">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="вручную" Style="{StaticResource OperationMark}" Foreground="{StaticResource AccentColor}"
+                           Visibility="{Binding IsManual, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <TextBlock Text="цена задана" Style="{StaticResource OperationMark}" Foreground="{StaticResource Warning}"
+                           Visibility="{Binding HasManualCost, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <TextBlock Text="исключена" Style="{StaticResource OperationMark}" Foreground="{StaticResource Danger}"
+                           Visibility="{Binding IsExcluded, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </StackPanel>
+        </DataTemplate>
+
         <!-- DataTemplates для операций изготовления -->
         <DataTemplate DataType="{x:Type models:BendingOperation}">
             <Border Style="{StaticResource OperationCardStyle}">
@@ -462,7 +499,10 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Гибка" Style="{StaticResource OperationTitle}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Гибка" Style="{StaticResource OperationTitle}"/>
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource OperationMarksTemplate}" Focusable="False"/>
+                    </StackPanel>
                     <WrapPanel Grid.Row="1">
                         <TextBlock Style="{StaticResource OperationParam}">
                             <Run Text="Угол: "/><Run Text="{Binding BendAngle, StringFormat='{}{0:F1}°'}"/>
@@ -500,7 +540,10 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Отбортовка" Style="{StaticResource OperationTitle}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Отбортовка" Style="{StaticResource OperationTitle}"/>
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource OperationMarksTemplate}" Focusable="False"/>
+                    </StackPanel>
                     <WrapPanel Grid.Row="1">
                         <TextBlock Style="{StaticResource OperationParam}"
                                    Visibility="{Binding Radius, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
@@ -539,7 +582,10 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Вальцовка" Style="{StaticResource OperationTitle}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Вальцовка" Style="{StaticResource OperationTitle}"/>
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource OperationMarksTemplate}" Focusable="False"/>
+                    </StackPanel>
                     <WrapPanel Grid.Row="1">
                         <TextBlock Style="{StaticResource OperationParam}"
                                    Visibility="{Binding Length, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
@@ -582,7 +628,10 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Резка на лазере" Style="{StaticResource OperationTitle}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Резка на лазере" Style="{StaticResource OperationTitle}"/>
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource OperationMarksTemplate}" Focusable="False"/>
+                    </StackPanel>
                     <WrapPanel Grid.Row="1">
                         <TextBlock Style="{StaticResource OperationParam}">
                             <Run Text="Рез: "/><Run Text="{Binding CutLength, StringFormat='{}{0:F1} мм'}"/>
@@ -598,6 +647,35 @@
                         <TextBlock Style="{StaticResource OperationParam}"
                                    Visibility="{Binding TimeMinutes, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}">
                             <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
+                        </TextBlock>
+                    </WrapPanel>
+                    <TextBlock Grid.Column="1" Grid.RowSpan="2"
+                               Style="{StaticResource OperationCost}"
+                               Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
+                               Visibility="{Binding Cost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type models:CustomOperation}">
+            <Border Style="{StaticResource OperationCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource OperationTitle}"/>
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource OperationMarksTemplate}" Focusable="False"/>
+                    </StackPanel>
+                    <WrapPanel Grid.Row="1">
+                        <TextBlock Style="{StaticResource OperationParam}">
+                            <Run Text="Цена за шт.: "/><Run Text="{Binding UnitPrice, Mode=OneWay, StringFormat='{}{0:N2} ₽'}"/>
                         </TextBlock>
                     </WrapPanel>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
@@ -703,18 +781,32 @@
                 </WrapPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Режим просмотра: вместо статуса связи с КОМПАС -->
-                    <Border Visibility="{Binding IsViewerMode, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            Background="{StaticResource AccentSubtle}"
-                            CornerRadius="6"
-                            Padding="12,6"
-                            ToolTip="Изделия загружаются с сервера и доступны только для чтения. Сборки загружает и сохраняет конструктор.">
+                    <!-- Текущий режим работы; по клику — выбор режима -->
+                    <Button x:Name="ModeButton"
+                            Click="ModeButton_Click"
+                            ToolTip="{Binding ModeBannerToolTip}"
+                            Padding="12,5"
+                            Margin="0,0,8,0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Setter Property="Background" Value="{StaticResource AccentSubtle}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource SelectedBackground}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE890;" Style="{StaticResource IconText}" FontSize="12"
-                                       Foreground="{StaticResource AccentColor}" Margin="0,0,8,0"/>
-                            <TextBlock Text="Режим просмотра" Foreground="{StaticResource AccentColor}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ModeIcon}" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding ModeBannerText}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <Ellipse Width="6" Height="6" Fill="{StaticResource Warning}" Margin="6,0,0,0" VerticalAlignment="Center"
+                                     ToolTip="Режим изменится после перезапуска программы"
+                                     Visibility="{Binding IsModeRestartRequired, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Text="&#xE70D;" Style="{StaticResource IconText}" FontSize="9" Margin="8,0,0,0"/>
                         </StackPanel>
-                    </Border>
+                    </Button>
 
                     <StackPanel Orientation="Horizontal"
                                 Visibility="{Binding IsEngineerMode, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -1287,9 +1379,34 @@
 
                                     <!-- Операции изготовления -->
                                     <StackPanel Grid.Row="3"
-                                                Margin="0,6,0,0"
-                                                Visibility="{Binding HasOperations, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <TextBlock Text="ОПЕРАЦИИ ИЗГОТОВЛЕНИЯ" Style="{StaticResource BlockHeader}"/>
+                                                Margin="0,6,0,0">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasOperations}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding DataContext.CanEditOperations, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right"
+                                                    Content="Изменить"
+                                                    ToolTip="Добавить или исключить операции, изменить параметры, задать цену вручную"
+                                                    Command="{Binding DataContext.EditOperationsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    Visibility="{Binding DataContext.CanEditOperations, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                    Style="{StaticResource GhostButton}"
+                                                    FontSize="11" Padding="8,2" Margin="0,0,0,4"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="ОПЕРАЦИИ ИЗГОТОВЛЕНИЯ" Style="{StaticResource BlockHeader}" VerticalAlignment="Center"/>
+                                        </DockPanel>
+                                        <TextBlock Text="Операций нет"
+                                                   FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4"
+                                                   Visibility="{Binding HasOperations, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
 
                                         <ItemsControl ItemsSource="{Binding Operations}"
                                                       Background="Transparent"
@@ -1776,23 +1893,6 @@
                                     </StackPanel>
                                 </Button>
                             </Grid>
-
-                            <!-- Режим работы -->
-                            <TextBlock Text="Режим работы"
-                                       Style="{StaticResource CaptionText}"
-                                       Margin="0,12,0,6"/>
-                            <ComboBox ItemsSource="{Binding ModeOptions}"
-                                      SelectedValuePath="Key"
-                                      DisplayMemberPath="Value"
-                                      SelectedValue="{Binding ModeSetting}"
-                                      FontSize="11"
-                                      ToolTip="Конструктор загружает сборки из КОМПАС и сохраняет их на сервер; в режиме просмотра изделия только читаются с сервера"/>
-                            <TextBlock Text="Изменение вступит в силу после перезапуска программы"
-                                       FontSize="10"
-                                       Margin="0,4,0,0"
-                                       TextWrapping="Wrap"
-                                       Foreground="{StaticResource Warning}"
-                                       Visibility="{Binding IsModeRestartRequired, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </StackPanel>
                     </Border>
 
@@ -1940,6 +2040,83 @@
                             <TextBlock Text="Выбрать файл..."/>
                         </StackPanel>
                     </Button>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Всплывающая панель выбора режима работы -->
+        <Popup x:Name="ModePopup"
+               PlacementTarget="{Binding ElementName=ModeButton}"
+               Placement="Bottom"
+               HorizontalOffset="-8"
+               StaysOpen="False"
+               AllowsTransparency="True">
+            <Border Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12,10"
+                    Margin="8,4,8,12"
+                    Width="300"
+                    Effect="{StaticResource SoftShadow}">
+                <StackPanel>
+                    <TextBlock Text="Режим работы"
+                               Style="{StaticResource CaptionText}"
+                               Margin="0,0,0,6"/>
+                    <ListBox ItemsSource="{Binding ModeOptions}"
+                             SelectedValuePath="Key"
+                             SelectedValue="{Binding ModeSetting}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="10,7"/>
+                                <Setter Property="Margin" Value="0,1"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Bd"
+                                                    Background="{TemplateBinding Background}"
+                                                    Padding="{TemplateBinding Padding}"
+                                                    CornerRadius="6">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBackground}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectedBackground}"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource SelectedForeground}"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Value}"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="Конструктор загружает сборки из КОМПАС и сохраняет их на сервер; технолог правит операции изготовления; в режиме просмотра изделия только читаются с сервера."
+                               FontSize="10"
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMuted}"/>
+                    <TextBlock Text="Изменение вступит в силу после перезапуска программы"
+                               FontSize="10"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource Warning}"
+                               Visibility="{Binding IsModeRestartRequired, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </StackPanel>
             </Border>
         </Popup>

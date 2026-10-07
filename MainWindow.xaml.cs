@@ -47,7 +47,7 @@ namespace TankManager
         private void UpdateTitle()
         {
             var version = Assembly.GetExecutingAssembly().GetName().Version;
-            var title = $"Tank Manager v{version.Major}.{version.Minor}.{version.Build}";
+            var title = $"Tank Manager v{version.Major}.{version.Minor}.{version.Build} [{_viewModel.ModeBannerText}]";
 
             var productName = _viewModel.CurrentProduct?.Name;
             if (!string.IsNullOrWhiteSpace(productName))
@@ -184,6 +184,11 @@ namespace TankManager
         private void LoadDocumentButton_Click(object sender, RoutedEventArgs e)
         {
             LoadOptionsPopup.IsOpen = true;
+        }
+
+        private void ModeButton_Click(object sender, RoutedEventArgs e)
+        {
+            ModePopup.IsOpen = true;
         }
 
         private async void LoadFromKompas_Click(object sender, RoutedEventArgs e)

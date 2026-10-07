@@ -98,8 +98,16 @@
     <Compile Include="Core\Services\DxfResolver.cs" />
     <Compile Include="Core\Services\FileLockDiagnostics.cs" />
     <Compile Include="Core\Services\ImageSyncService.cs" />
+    <Compile Include="Core\Services\OperationEditsMerger.cs" />
+    <Compile Include="Core\Services\ProductStorageService.OperationEdits.cs" />
+    <Compile Include="Views\NumberInput.cs" />
+    <Compile Include="Views\OperationsEditorDialog.xaml.cs" />
     <Compile Include="Views\PricingSettingsDialog.xaml.cs" />
     <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\OperationsEditorDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -111,6 +119,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Converters\DecimalTextConverter.cs" />
     <Compile Include="Converters\MaterialSortTypeConverter.cs" />
     <Compile Include="Converters\ProductTypeConverter.cs" />
     <Compile Include="Converters\NullToVisibilityConverter.cs" />

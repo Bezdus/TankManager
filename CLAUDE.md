@@ -46,8 +46,23 @@ syncs saved products to local/server storage.
   offline cache (`PricingSettings.SyncWithServer`; equal mtimes = cache in sync). They are
   edited in `PricingSettingsDialog`, which is read-only in viewer mode. Stored products
   are re-costed with the current prices on open (`LoadAndLinkProduct`).
+  Laser cutting price (руб/м; cut length is in mm) depends on sheet thickness: `PricingSettings.LaserCuttingPricing`
+  (exact thickness → price, otherwise `LaserCuttingPricePerMeter`; the old руб/мм value
+  `LaserCuttingPricePerMm` is converted ×1000 on load); the thickness is parsed from the
+  material string (`PartModel.ParseSheetThickness`) and set on the operation in `RecalculateAllCosts`
+  and `OperationsEditorDialog` (not persisted).
   Adding an operation type requires updating the enum, the subclass, and the
   `ToOperationDto`/`FromOperationDto` mapping in `ProductStorageService`.
+  Subclasses implement only `CalculateUnitCost`; the base `CalculateCost` applies the manual edits
+  made in `Views\OperationsEditorDialog` (engineer or technologist, applied to all instances of the part):
+  `Origin` (Kompas/Manual), `Quantity`, `IsExcluded` (KOMPAS operations are excluded, never deleted),
+  `HasManualCost`/`ManualCost`, `IsEdited`. `CustomOperation` = user-defined name + price per unit.
+  Edits are saved immediately, separately from `product.json`, to `operations.json` in the product folder
+  (`ProductStorageService.OperationEdits.cs`): one entry per part key `Name|Marking|FilePath` holding all
+  operations of the part (empty list = edits reset), merged per part by `ModifiedUtcTicks` between local and
+  server (`SyncOperationEditsFolder`; `CopyProductFolder` skips this file). `Load` and KOMPAS loads
+  (`RestoreFromSaved`) apply it with `OperationEditsMerger.ReplaceEdits` (replaces edits stored in
+  `product.json`; KOMPAS operations matched by type + ordinal).
 - Storage (`ProductStorageService`): products are saved as JSON DTOs
   (`ProductDto`/`PartModelDto`/`OperationDto`, `DataContractJsonSerializer`)
   under `<exe dir>\products\<Name>_<Marking>\product.json` + `images\`. An
@@ -61,10 +76,12 @@ syncs saved products to local/server storage.
   `ProductStorageService.LastServerError`.
   Without its own `storage_settings.json` the app reads `storage_settings.default.json`
   (shipped in the release zip, holds the shared server folder path).
-- App modes (`Core\Services\AppMode.cs`): engineer (KOMPAS load/save/delete) and viewer
-  (procurement etc. without KOMPAS: read-only, products come from the server). Decided once
+- App modes (`Core\Services\AppMode.cs`): engineer (KOMPAS load/save/delete), viewer
+  (procurement etc. without KOMPAS: read-only, products come from the server) and technologist
+  (viewer + editing operations: `IsViewer` and `IsTechnologist` are both true, `CanEditOperations`;
+  only `operations.json` is written to the server, pricing stays read-only). Decided once
   at startup in `MainViewModel` ctor: setting `Mode` in `storage_settings.json`
-  (Auto/Engineer/Viewer, switch in the products panel, applies after restart); Auto =
+  (Auto/Engineer/Viewer/Technologist, switched via the mode chip in the top toolbar (`ModeButton` → `ModePopup`; the current mode is also in the window title), applies after restart); Auto =
   viewer when `KOMPAS.Application.7` isn't registered. Viewer never writes to the server:
   `ProductStorageService` checks `DownloadOnly` (sync phase 2, tombstones, image sync,
   Save/Delete). KOMPAS-only UI is bound to `IsEngineerMode`. Sync also runs in the

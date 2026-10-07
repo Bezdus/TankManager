@@ -79,12 +79,40 @@ namespace TankManager.Core.ViewModels
         public bool IsEngineerMode => !AppMode.IsViewer;
 
         /// <summary>
+        /// Режим технолога (без КОМПАС): как просмотр, но можно править операции деталей
+        /// </summary>
+        public bool IsTechnologistMode => AppMode.IsTechnologist;
+
+        /// <summary>
+        /// Доступна ли правка операций изготовления (конструктор или технолог)
+        /// </summary>
+        public bool CanEditOperations => AppMode.CanEditOperations;
+
+        public string ModeBannerText => IsTechnologistMode ? "Технолог"
+            : IsViewerMode ? "Просмотр"
+            : "Конструктор";
+
+        public string ModeBannerToolTip => IsTechnologistMode
+            ? "Режим технолога: изделия загружаются с сервера и доступны только для чтения, кроме операций изготовления: их можно править (кнопка «Изменить» в карточке детали). Сборки загружает и сохраняет конструктор."
+            : IsViewerMode
+            ? "Режим просмотра: изделия загружаются с сервера и доступны только для чтения. Сборки загружает и сохраняет конструктор."
+            : "Режим конструктора: загрузка сборок из КОМПАС, сохранение и удаление изделий на сервере.";
+
+        /// <summary>
+        /// Значок текущего режима (Segoe MDL2 Assets)
+        /// </summary>
+        public string ModeIcon => IsTechnologistMode ? ""
+            : IsViewerMode ? ""
+            : "";
+
+        /// <summary>
         /// Варианты настройки режима для выпадающего списка
         /// </summary>
         public IReadOnlyList<KeyValuePair<AppModeSetting, string>> ModeOptions { get; } = new[]
         {
             new KeyValuePair<AppModeSetting, string>(AppModeSetting.Auto, "Автоматически (по наличию КОМПАС)"),
             new KeyValuePair<AppModeSetting, string>(AppModeSetting.Engineer, "Конструктор"),
+            new KeyValuePair<AppModeSetting, string>(AppModeSetting.Technologist, "Технолог (правка операций)"),
             new KeyValuePair<AppModeSetting, string>(AppModeSetting.Viewer, "Просмотр")
         };
 
@@ -156,7 +184,8 @@ namespace TankManager.Core.ViewModels
             private set => SetProperty(ref _isLinkedToKompas, value, nameof(IsLinkedToKompas), nameof(KompasLinkStatus));
         }
 
-        public string KompasLinkStatus => IsViewerMode ? "👁 Режим просмотра"
+        public string KompasLinkStatus => IsTechnologistMode ? "🛠 Режим технолога"
+            : IsViewerMode ? "👁 Режим просмотра"
             : IsLinkedToKompas ? "🔗 Связан с КОМПАС" : "⚠️ Нет связи с КОМПАС";
 
         #endregion
@@ -375,7 +404,10 @@ namespace TankManager.Core.ViewModels
             private set
             {
                 if (SetProperty(ref _currentlySelectedPart, value, nameof(CurrentlySelectedPart)))
+                {
                     ((RelayCommand)ShowInKompasCommand)?.NotifyCanExecuteChanged();
+                    ((RelayCommand)EditOperationsCommand)?.NotifyCanExecuteChanged();
+                }
             }
         }
 
@@ -605,6 +637,7 @@ namespace TankManager.Core.ViewModels
         public ICommand SyncFromServerCommand { get; private set; }
         public ICommand ExportToExcelCommand { get; private set; }
         public ICommand OpenPricingSettingsCommand { get; private set; }
+        public ICommand EditOperationsCommand { get; private set; }
 
         #endregion
 
@@ -616,7 +649,7 @@ namespace TankManager.Core.ViewModels
         {
             _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
             AppMode.Initialize(_storageService.ModeSetting);
-            _logger.LogInfo($"Режим работы: {(AppMode.IsViewer ? "просмотр" : "конструктор")} (настройка: {AppMode.Setting}, КОМПАС установлен: {AppMode.IsKompasInstalled})");
+            _logger.LogInfo($"Режим работы: {(AppMode.IsTechnologist ? "технолог" : AppMode.IsViewer ? "просмотр" : "конструктор")} (настройка: {AppMode.Setting}, КОМПАС установлен: {AppMode.IsKompasInstalled})");
 
             // Локальная копия расценок; общие с сервера подтянутся при синхронизации (OnWindowLoaded)
             _pricingSettings = PricingSettings.Load();
@@ -654,6 +687,8 @@ namespace TankManager.Core.ViewModels
             SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable && !IsLoading);
             ExportToExcelCommand = new RelayCommand(ExportToExcel, () => Details?.Any() == true || StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
             OpenPricingSettingsCommand = new RelayCommand(OpenPricingSettings);
+            // Правки сохраняются сразу в отдельный файл (operations.json), связь с КОМПАС не нужна
+            EditOperationsCommand = new RelayCommand(async () => await EditOperationsAsync(), () => CanEditOperations && CurrentlySelectedPart != null && !IsLoading);
         }
 
         #endregion
@@ -694,6 +729,66 @@ namespace TankManager.Core.ViewModels
         }
 
         /// <summary>
+        /// Ручная правка операций выбранной детали; применяется ко всем её экземплярам в сборке
+        /// </summary>
+        private async Task EditOperationsAsync()
+        {
+            var part = CurrentlySelectedPart;
+            if (part == null || CurrentProduct == null) return;
+
+            string key = OperationEditsMerger.GetPartKey(part);
+            var sameParts = (Details ?? Enumerable.Empty<PartModel>())
+                .Concat(StandardParts ?? Enumerable.Empty<PartModel>())
+                .Where(p => string.Equals(OperationEditsMerger.GetPartKey(p), key, StringComparison.OrdinalIgnoreCase))
+                .Distinct()
+                .ToList();
+            if (!sameParts.Contains(part))
+                sameParts.Add(part);
+
+            var dialog = new TankManager.Views.OperationsEditorDialog(part, _pricingSettings, sameParts.Count);
+            dialog.Owner = Application.Current.MainWindow;
+            if (dialog.ShowDialog() != true)
+                return;
+
+            foreach (var target in sameParts)
+            {
+                target.Operations.Clear();
+                foreach (var op in dialog.Operations)
+                    target.Operations.Add(op.Clone());
+
+                // У деталей из тел подписка на Operations не пересчитывает стоимость сама
+                target.RecalculateOperationsCost();
+            }
+
+            RecalculateAllCosts();
+
+            // Правки пишутся сразу, отдельно от product.json: их может делать технолог без права
+            // сохранять изделие, и пересохранение изделия конструктором их не затирает
+            var product = CurrentProduct;
+            var operations = dialog.Operations.Select(op => op.Clone()).ToList();
+            try
+            {
+                string serverError = await Task.Run(() => _storageService.SaveOperationEdits(product, part, operations));
+                if (serverError == null)
+                {
+                    StatusMessage = $"Операции детали «{part.Name}» сохранены";
+                    ShowSnackbar($"Операции детали «{part.Name}» сохранены");
+                }
+                else
+                {
+                    StatusMessage = $"Операции детали «{part.Name}» сохранены только локально: {serverError}";
+                    ShowSnackbar($"Операции сохранены только локально: {serverError}", SnackbarKind.Warning, 6000);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Ошибка сохранения правок операций", ex);
+                StatusMessage = $"Ошибка сохранения операций: {ex.Message}";
+                MessageBox.Show($"Правки операций применены, но не сохранены:\n{ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
         /// Пересчитать стоимость всех деталей на основе текущих расценок
         /// </summary>
         /// <param name="showWarnings">Показывать предупреждение об операциях без исходных данных</param>
@@ -717,6 +812,9 @@ namespace TankManager.Core.ViewModels
                     var rolling = op as RollingOperation;
                     if (rolling != null)
                         rolling.PartMass = part.Mass;
+
+                    if (op is LaserCuttingOperation laser)
+                        laser.MaterialThickness = part.SheetThickness;
 
                     op.CalculateCost(_pricingSettings);
                     if (!op.IsCostReliable)
@@ -766,6 +864,8 @@ namespace TankManager.Core.ViewModels
 
             if (!string.IsNullOrEmpty(filePath) && _linkedProductsCache.TryGetValue(filePath, out var cachedProduct))
             {
+                // Правки операций могли прийти с сервера (от технолога) после того, как изделие попало в кэш
+                _storageService.ApplyOperationEdits(cachedProduct);
                 SetCurrentProduct(cachedProduct, isLinked: true);
                 RecalculateAllCosts(showWarnings: false);
                 StatusMessage = $"{successMessage} (из кэша)";
@@ -804,7 +904,7 @@ namespace TankManager.Core.ViewModels
                 if (linkedProduct != null)
                 {
                     CacheProduct(filePath, linkedProduct);
-                    RestoreImagePathsFromSaved(linkedProduct);
+                    RestoreFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
                     RecalculateAllCosts();
                     StatusMessage = $"Связано с КОМПАС: {CurrentProduct.Name}";
@@ -865,7 +965,7 @@ namespace TankManager.Core.ViewModels
                 if (refreshedProduct != null)
                 {
                     CacheProduct(filePath, refreshedProduct);
-                    RestoreImagePathsFromSaved(refreshedProduct);
+                    RestoreFromSaved(refreshedProduct);
                     SetCurrentProduct(refreshedProduct, isLinked: true);
                     RecalculateAllCosts();
                     StatusMessage = $"Данные обновлены: {CurrentProduct.Name}, деталей: {Details?.Count ?? 0}";
@@ -884,21 +984,55 @@ namespace TankManager.Core.ViewModels
         }
 
         /// <summary>
-        /// Восстанавливает пути к изображениям из ранее сохранённого продукта.
-        /// Позволяет избежать повторных COM-вызовов при связывании/обновлении из КОМПАС,
-        /// когда PNG-файлы уже существуют на диске и актуальны.
+        /// Переносит на только что прочитанный из КОМПАС продукт данные из прежней версии:
+        /// ручные правки операций и пути к изображениям
         /// </summary>
-        private void RestoreImagePathsFromSaved(Product kompasProduct)
+        private void RestoreFromSaved(Product kompasProduct)
         {
             if (kompasProduct?.Details == null)
                 return;
 
+            Product savedProduct = null;
             try
             {
-                var savedProduct = _storageService.TryLoadSavedProduct(kompasProduct);
-                if (savedProduct?.Details == null)
-                    return;
+                savedProduct = _storageService.TryLoadSavedProduct(kompasProduct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Ошибка чтения сохранённого изделия: {ex.Message}");
+            }
 
+            RestoreOperationEdits(kompasProduct);
+            RestoreImagePathsFromSaved(kompasProduct, savedProduct);
+        }
+
+        /// <summary>
+        /// Ручные правки операций хранятся в operations.json папки изделия (их пишут конструктор и технолог)
+        /// </summary>
+        private void RestoreOperationEdits(Product kompasProduct)
+        {
+            try
+            {
+                _storageService.ApplyOperationEdits(kompasProduct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Ошибка переноса правок операций: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Восстанавливает пути к изображениям из ранее сохранённого продукта.
+        /// Позволяет избежать повторных COM-вызовов при связывании/обновлении из КОМПАС,
+        /// когда PNG-файлы уже существуют на диске и актуальны.
+        /// </summary>
+        private void RestoreImagePathsFromSaved(Product kompasProduct, Product savedProduct)
+        {
+            if (savedProduct?.Details == null)
+                return;
+
+            try
+            {
                 // Превью сборки, если актуально
                 if (!string.IsNullOrEmpty(savedProduct.FilePreviewPngPath) && File.Exists(savedProduct.FilePreviewPngPath) &&
                     (string.IsNullOrEmpty(kompasProduct.FilePath) || !File.Exists(kompasProduct.FilePath) ||
@@ -977,7 +1111,7 @@ namespace TankManager.Core.ViewModels
                 if (linkedProduct != null)
                 {
                     CacheProduct(filePath, linkedProduct);
-                    RestoreImagePathsFromSaved(linkedProduct);
+                    RestoreFromSaved(linkedProduct);
                     SetCurrentProduct(linkedProduct, isLinked: true);
                     RecalculateAllCosts();
                 }
@@ -1013,7 +1147,7 @@ namespace TankManager.Core.ViewModels
 
                 var product = await Task.Run(() => _kompasService.LoadDocument(filePath));
                 CacheProduct(filePath, product);
-                RestoreImagePathsFromSaved(product);
+                RestoreFromSaved(product);
                 CurrentProduct = product;
                 IsLinkedToKompas = true;
 
@@ -1056,7 +1190,7 @@ namespace TankManager.Core.ViewModels
                 if (!string.IsNullOrEmpty(product.FilePath))
                     CacheProduct(product.FilePath, product);
 
-                RestoreImagePathsFromSaved(product);
+                RestoreFromSaved(product);
                 CurrentProduct = product;
                 IsLinkedToKompas = true;
 
@@ -2020,6 +2154,7 @@ namespace TankManager.Core.ViewModels
         private void NotifySaveCommandCanExecuteChanged()
         {
             ((RelayCommand)SaveProductCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)EditOperationsCommand)?.NotifyCanExecuteChanged();
         }
 
         private void NotifyRefreshCommandCanExecuteChanged()
@@ -2070,6 +2205,7 @@ namespace TankManager.Core.ViewModels
             ((RelayCommand)DeleteProductCommand)?.NotifyCanExecuteChanged();
             ((RelayCommand)DeleteProductLocalCommand)?.NotifyCanExecuteChanged();
             ((RelayCommand)DeleteProductEverywhereCommand)?.NotifyCanExecuteChanged();
+            ((RelayCommand)EditOperationsCommand)?.NotifyCanExecuteChanged();
         }
 
         /// <summary>

@@ -24,7 +24,7 @@ namespace TankManager.Core.Services
     /// <summary>
     /// Сервис для сохранения и загрузки Product в локальную базу с синхронизацией с сервером
     /// </summary>
-    public class ProductStorageService
+    public partial class ProductStorageService
     {
         private static readonly string ProductsDirectory =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "products");
@@ -330,6 +330,9 @@ namespace TankManager.Core.Services
                     }
                 }
 
+                // Фаза 2б: правки операций (их пишет и технолог, у которого фаза 2 не выполняется)
+                SyncAllOperationEdits(deleted);
+
                 // Фаза 3: Синхронизация изображений на уровне отдельных файлов
                 if (!skipImages)
                     SyncAllProductImages();
@@ -358,6 +361,10 @@ namespace TankManager.Core.Services
                 string extension = Path.GetExtension(fileName);
                 if (string.Equals(extension, ".bak", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(extension, ".tmp", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Правки операций не копируются целиком, а сливаются по деталям (SyncOperationEditsFolder)
+                if (string.Equals(fileName, OperationEditsFileName, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 string destFile = Path.Combine(destFolder, fileName);
@@ -498,7 +505,10 @@ namespace TankManager.Core.Services
                 {
                     try
                     {
-                        SaveToDirectory(product, _serverStorageFolder, customName);
+                        string serverFilePath = SaveToDirectory(product, _serverStorageFolder, customName);
+
+                        // Правки операций, сделанные до первого сохранения изделия на сервер
+                        SyncOperationEditsFolder(Path.GetDirectoryName(localFilePath), Path.GetDirectoryName(serverFilePath), upload: true);
                     }
                     catch (Exception ex)
                     {
@@ -628,12 +638,14 @@ namespace TankManager.Core.Services
             string folderPath = Path.Combine(ProductsDirectory, folderName);
             string filePath = Path.Combine(folderPath, ProductJsonFileName);
 
-            if (File.Exists(filePath))
-            {
-                return LoadFromFile(filePath, folderPath);
-            }
+            if (!File.Exists(filePath))
+                return null;
 
-            return null;
+            var product = LoadFromFile(filePath, folderPath);
+            if (product != null)
+                ApplyOperationEdits(product, folderPath);
+
+            return product;
         }
 
         /// <summary>
@@ -1156,10 +1168,21 @@ namespace TankManager.Core.Services
             var dto = new OperationDto
             {
                 Type = (int)op.Type,
-                Cost = op.Cost
+                Cost = op.Cost,
+                Name = op.Name,
+                Quantity = op.Quantity,
+                Origin = (int)op.Origin,
+                IsExcluded = op.IsExcluded,
+                IsEdited = op.IsEdited,
+                HasManualCost = op.HasManualCost,
+                ManualCost = op.ManualCost
             };
 
-            if (op is LaserCuttingOperation laser)
+            if (op is CustomOperation custom)
+            {
+                dto.UnitPrice = custom.UnitPrice;
+            }
+            else if (op is LaserCuttingOperation laser)
             {
                 dto.CutLength = laser.CutLength;
                 dto.EngravingLength = laser.EngravingLength;
@@ -1230,10 +1253,27 @@ namespace TankManager.Core.Services
                         Radius = dto.Radius
                     };
                     break;
+                case ManufacturingOperationType.Custom:
+                    result = new CustomOperation
+                    {
+                        UnitPrice = dto.UnitPrice
+                    };
+                    break;
             }
 
-            if (result != null)
-                result.Cost = dto.Cost;
+            if (result == null)
+                return null;
+
+            result.Cost = dto.Cost;
+            if (!string.IsNullOrEmpty(dto.Name))
+                result.Name = dto.Name;
+            // В файлах до появления ручной правки количества нет — это одна операция
+            result.Quantity = dto.Quantity > 0 ? dto.Quantity : 1;
+            result.Origin = type == ManufacturingOperationType.Custom ? OperationOrigin.Manual : (OperationOrigin)dto.Origin;
+            result.IsExcluded = dto.IsExcluded;
+            result.IsEdited = dto.IsEdited;
+            result.HasManualCost = dto.HasManualCost;
+            result.ManualCost = dto.ManualCost;
 
             return result;
         }
@@ -1618,6 +1658,32 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public double Diameter { get; set; }
+
+        // Ручные правки операций (в старых файлах отсутствуют — значения по умолчанию)
+
+        [System.Runtime.Serialization.DataMember]
+        public string Name { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public int Quantity { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double UnitPrice { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public int Origin { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public bool IsExcluded { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public bool IsEdited { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public bool HasManualCost { get; set; }
+
+        [System.Runtime.Serialization.DataMember]
+        public double ManualCost { get; set; }
     }
 
     #endregion
