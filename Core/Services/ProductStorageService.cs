@@ -1259,7 +1259,11 @@ namespace TankManager.Core.Services
                 IsExcluded = op.IsExcluded,
                 IsEdited = op.IsEdited,
                 HasManualCost = op.HasManualCost,
-                ManualCost = op.ManualCost
+                ManualCost = op.ManualCost,
+                ChangeKind = (int)op.ChangeKind,
+                ChangedByLogin = op.ChangedByLogin,
+                ChangedBy = op.ChangedBy,
+                ChangedUtcTicks = op.ChangedUtcTicks
             };
 
             if (op is CustomOperation custom)
@@ -1358,6 +1362,9 @@ namespace TankManager.Core.Services
             result.IsEdited = dto.IsEdited;
             result.HasManualCost = dto.HasManualCost;
             result.ManualCost = dto.ManualCost;
+
+            if (Enum.IsDefined(typeof(OperationChangeKind), dto.ChangeKind) && dto.ChangeKind != (int)OperationChangeKind.None)
+                result.SetChange((OperationChangeKind)dto.ChangeKind, dto.ChangedByLogin, dto.ChangedBy, dto.ChangedUtcTicks);
 
             return result;
         }
@@ -1801,6 +1808,20 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public double ManualCost { get; set; }
+
+        // Кто последним правил операцию (в старых файлах отсутствует)
+
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public int ChangeKind { get; set; }
+
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public string ChangedByLogin { get; set; }
+
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public string ChangedBy { get; set; }
+
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public long ChangedUtcTicks { get; set; }
     }
 
     #endregion

@@ -22,7 +22,8 @@ namespace TankManager.Core.Services
         /// Сохраняет правки операций детали локально и на сервер. Ошибка локальной записи пробрасывается,
         /// ошибка сервера возвращается текстом (null — всё записано)
         /// </summary>
-        public string SaveOperationEdits(Product product, PartModel part, IEnumerable<ManufacturingOperationBase> operations)
+        public string SaveOperationEdits(Product product, PartModel part, IEnumerable<ManufacturingOperationBase> operations,
+            string removedNote = null)
         {
             if (product == null || part == null || string.IsNullOrEmpty(product.Name))
                 return null;
@@ -39,6 +40,7 @@ namespace TankManager.Core.Services
                 ModifiedUtcTicks = DateTime.UtcNow.Ticks,
                 ModifiedBy = CurrentUser.Login,
                 ModifiedByName = CurrentUser.Name,
+                RemovedNote = removedNote,
                 Operations = ops.Any(op => op.IsModified)
                     ? ops.Select(ToOperationDto).ToList()
                     : new List<OperationDto>()
@@ -113,7 +115,8 @@ namespace TankManager.Core.Services
                     int lost = OperationEditsMerger.ReplaceEdits(part, operations);
                     part.SetOperationsModified(
                         string.IsNullOrWhiteSpace(entry.ModifiedByName) ? entry.ModifiedBy : entry.ModifiedByName,
-                        entry.ModifiedUtcTicks > 0 ? new DateTime(entry.ModifiedUtcTicks, DateTimeKind.Utc) : (DateTime?)null);
+                        entry.ModifiedUtcTicks > 0 ? new DateTime(entry.ModifiedUtcTicks, DateTimeKind.Utc) : (DateTime?)null,
+                        entry.RemovedNote);
                     if (lost > 0 && reported.Add(key))
                         _logger.LogWarning($"Правки операций детали {part.Name} {part.Marking}: {lost} шт. не применены — операции больше нет в модели КОМПАС");
                 }
@@ -272,6 +275,12 @@ namespace TankManager.Core.Services
 
         [DataMember(EmitDefaultValue = false)]
         public string ModifiedByName { get; set; }
+
+        /// <summary>
+        /// «Удалил операцию «Сварка»», если при этой правке операции удаляли (их подписать уже негде)
+        /// </summary>
+        [DataMember(EmitDefaultValue = false)]
+        public string RemovedNote { get; set; }
 
         /// <summary>
         /// Все операции детали после правки; пустой список — правки сброшены

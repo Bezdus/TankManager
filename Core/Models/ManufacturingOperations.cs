@@ -51,6 +51,20 @@ namespace TankManager.Core.Models
     }
 
     /// <summary>
+    /// Что сделал сотрудник с операцией при последней правке
+    /// </summary>
+    public enum OperationChangeKind
+    {
+        None,
+        /// <summary>Добавил вручную</summary>
+        Added,
+        /// <summary>Изменил параметры, количество или цену</summary>
+        Edited,
+        /// <summary>Исключил из расчёта</summary>
+        Excluded
+    }
+
+    /// <summary>
     /// Базовый класс операции изготовления детали
     /// </summary>
     public abstract class ManufacturingOperationBase : INotifyPropertyChanged
@@ -306,6 +320,85 @@ namespace TankManager.Core.Models
         /// Достаточно ли исходных данных для расчёта по расценкам
         /// </summary>
         protected virtual bool IsUnitCostReliable => true;
+
+        #region Кто изменил операцию
+
+        /// <summary>
+        /// Идентификатор экземпляра в пределах сеанса: копии (Clone) его сохраняют, поэтому
+        /// по нему сопоставляются операции до и после правки в окне операций (не сохраняется)
+        /// </summary>
+        public Guid InstanceId { get; private set; } = Guid.NewGuid();
+
+        /// <summary>
+        /// Последняя ручная правка операции: что сделано
+        /// </summary>
+        public OperationChangeKind ChangeKind { get; private set; }
+
+        /// <summary>
+        /// Логин сотрудника, сделавшего последнюю правку
+        /// </summary>
+        public string ChangedByLogin { get; private set; }
+
+        /// <summary>
+        /// ФИО (или логин) сотрудника, сделавшего последнюю правку
+        /// </summary>
+        public string ChangedBy { get; private set; }
+
+        public long ChangedUtcTicks { get; private set; }
+
+        /// <summary>
+        /// «Добавил: ФИО, дата» для карточки операции (null — правок нет или они сделаны до появления подписи)
+        /// </summary>
+        public string ChangeInfo
+        {
+            get
+            {
+                if (ChangeKind == OperationChangeKind.None || string.IsNullOrEmpty(ChangedBy))
+                    return null;
+
+                string action;
+                switch (ChangeKind)
+                {
+                    case OperationChangeKind.Added: action = "Добавил"; break;
+                    case OperationChangeKind.Excluded: action = "Исключил"; break;
+                    default: action = "Изменил"; break;
+                }
+
+                return ChangedUtcTicks > 0
+                    ? $"{action}: {ChangedBy}, {new DateTime(ChangedUtcTicks, DateTimeKind.Utc).ToLocalTime():dd.MM.yyyy HH:mm}"
+                    : $"{action}: {ChangedBy}";
+            }
+        }
+
+        /// <summary>
+        /// Подписать правку операции
+        /// </summary>
+        public void SetChange(OperationChangeKind kind, string login, string name, long utcTicks)
+        {
+            ChangeKind = kind;
+            ChangedByLogin = kind == OperationChangeKind.None ? null : login;
+            ChangedBy = kind == OperationChangeKind.None ? null : (string.IsNullOrWhiteSpace(name) ? login : name);
+            ChangedUtcTicks = kind == OperationChangeKind.None ? 0 : utcTicks;
+            OnPropertyChanged(nameof(ChangeKind));
+            OnPropertyChanged(nameof(ChangedBy));
+            OnPropertyChanged(nameof(ChangeInfo));
+        }
+
+        public void CopyChangeFrom(ManufacturingOperationBase source)
+        {
+            if (source == null) return;
+            ChangeKind = source.ChangeKind;
+            ChangedByLogin = source.ChangedByLogin;
+            ChangedBy = source.ChangedBy;
+            ChangedUtcTicks = source.ChangedUtcTicks;
+            OnPropertyChanged(nameof(ChangeKind));
+            OnPropertyChanged(nameof(ChangedBy));
+            OnPropertyChanged(nameof(ChangeInfo));
+        }
+
+        public void ClearChange() => SetChange(OperationChangeKind.None, null, null, 0);
+
+        #endregion
 
         /// <summary>
         /// Копия операции без подписчиков PropertyChanged

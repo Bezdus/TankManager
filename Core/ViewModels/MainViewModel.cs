@@ -869,6 +869,20 @@ namespace TankManager.Core.ViewModels
             // Для журнала: операции до правки
             var operationsBefore = part.Operations.Select(op => op.Clone()).ToList();
 
+            // Каждая изменённая операция подписывается: кто добавил, изменил или исключил
+            OperationEditsMerger.StampChanges(operationsBefore, dialog.Operations,
+                CurrentUser.Login, CurrentUser.Name, DateTime.UtcNow.Ticks);
+
+            // Удалённые операции подписать негде — о них пишется строка под операциями детали
+            var keptIds = new HashSet<Guid>(dialog.Operations.Select(op => op.InstanceId));
+            var removedNames = operationsBefore
+                .Where(op => !keptIds.Contains(op.InstanceId))
+                .Select(op => string.IsNullOrWhiteSpace(op.Name) ? op.TypeTitle : op.Name)
+                .ToList();
+            string removedNote = removedNames.Count == 0 ? null
+                : removedNames.Count == 1 ? $"Удалил операцию «{removedNames[0]}»"
+                : $"Удалил операции: {string.Join(", ", removedNames.Select(n => $"«{n}»"))}";
+
             foreach (var target in sameParts)
             {
                 target.Operations.Clear();
@@ -888,10 +902,10 @@ namespace TankManager.Core.ViewModels
             string changes = ChangeDescriber.DescribeOperations(operationsBefore, part.Operations);
             try
             {
-                string serverError = await Task.Run(() => _storageService.SaveOperationEdits(product, part, operations));
+                string serverError = await Task.Run(() => _storageService.SaveOperationEdits(product, part, operations, removedNote));
 
                 foreach (var target in sameParts)
-                    target.SetOperationsModified(CurrentUser.DisplayName, DateTime.UtcNow);
+                    target.SetOperationsModified(CurrentUser.DisplayName, DateTime.UtcNow, removedNote);
 
                 if (changes != null)
                     _storageService.Audit.Record(AuditAction.OperationsEdited, product.Name, product.Marking,

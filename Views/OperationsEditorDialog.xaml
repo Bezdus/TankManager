@@ -117,6 +117,8 @@
                                 Visibility="{Binding IsExcluded, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="исключена из расчёта" FontSize="10" Foreground="{StaticResource Danger}"/>
                         </Border>
+                        <TextBlock Text="{Binding ChangeInfo}" FontSize="10" Margin="10,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
 
                     <ContentControl Grid.Row="1" Content="{Binding}" Focusable="False"/>

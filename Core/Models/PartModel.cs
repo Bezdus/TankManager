@@ -387,6 +387,7 @@ namespace TankManager.Core.Models
 
         private string _operationsModifiedBy;
         private DateTime? _operationsModifiedUtc;
+        private string _operationsRemovedNote;
 
         /// <summary>
         /// Кто последним правил операции детали (из operations.json, не сохраняется в product.json)
@@ -398,16 +399,30 @@ namespace TankManager.Core.Models
         /// <summary>
         /// «Операции изменил: ФИО, дата» для карточки детали (null — правок не было)
         /// </summary>
-        public string OperationsModifiedInfo => string.IsNullOrEmpty(_operationsModifiedBy)
-            ? null
-            : _operationsModifiedUtc.HasValue
-                ? $"Операции изменил: {_operationsModifiedBy}, {_operationsModifiedUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
-                : $"Операции изменил: {_operationsModifiedBy}";
+        public string OperationsModifiedInfo
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_operationsModifiedBy))
+                    return null;
 
-        public void SetOperationsModified(string by, DateTime? utc)
+                // Удалённой операции в списке уже нет — о ней говорит строка под операциями
+                string action = string.IsNullOrEmpty(_operationsRemovedNote)
+                    ? "Последняя правка операций"
+                    : _operationsRemovedNote;
+
+                return _operationsModifiedUtc.HasValue
+                    ? $"{action}: {_operationsModifiedBy}, {_operationsModifiedUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
+                    : $"{action}: {_operationsModifiedBy}";
+            }
+        }
+
+        /// <param name="removedNote">«Удалил операцию «Сварка»» — если при последней правке операции удаляли</param>
+        public void SetOperationsModified(string by, DateTime? utc, string removedNote = null)
         {
             _operationsModifiedBy = by;
             _operationsModifiedUtc = utc;
+            _operationsRemovedNote = removedNote;
             OnPropertyChanged(nameof(OperationsModifiedBy));
             OnPropertyChanged(nameof(OperationsModifiedUtc));
             OnPropertyChanged(nameof(OperationsModifiedInfo));

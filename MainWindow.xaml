@@ -456,6 +456,14 @@
             <Setter Property="Margin" Value="12,0,0,0"/>
         </Style>
 
+        <!-- Кто добавил, изменил или исключил операцию -->
+        <Style x:Key="OperationChange" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
         <!-- Метки ручных правок операции (рядом с названием) -->
         <Style x:Key="OperationMark" TargetType="TextBlock">
             <Setter Property="FontSize" Value="10"/>
@@ -497,6 +505,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Orientation="Horizontal">
@@ -520,6 +529,9 @@
                             <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
                         </TextBlock>
                     </WrapPanel>
+                    <TextBlock Grid.Row="2" Style="{StaticResource OperationChange}"
+                               Text="{Binding ChangeInfo}"
+                               Visibility="{Binding ChangeInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
                                Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
@@ -536,6 +548,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -562,6 +575,9 @@
                             <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
                         </TextBlock>
                     </WrapPanel>
+                    <TextBlock Grid.Row="2" Style="{StaticResource OperationChange}"
+                               Text="{Binding ChangeInfo}"
+                               Visibility="{Binding ChangeInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
                                Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
@@ -578,6 +594,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -608,6 +625,9 @@
                             <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
                         </TextBlock>
                     </WrapPanel>
+                    <TextBlock Grid.Row="2" Style="{StaticResource OperationChange}"
+                               Text="{Binding ChangeInfo}"
+                               Visibility="{Binding ChangeInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
                                Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
@@ -624,6 +644,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -649,6 +670,9 @@
                             <Run Text="Время: "/><Run Text="{Binding TimeMinutes, StringFormat='{}{0:F1} мин'}"/>
                         </TextBlock>
                     </WrapPanel>
+                    <TextBlock Grid.Row="2" Style="{StaticResource OperationChange}"
+                               Text="{Binding ChangeInfo}"
+                               Visibility="{Binding ChangeInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
                                Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"
@@ -667,6 +691,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Orientation="Horizontal">
@@ -678,6 +703,9 @@
                             <Run Text="Цена за шт.: "/><Run Text="{Binding UnitPrice, Mode=OneWay, StringFormat='{}{0:N2} ₽'}"/>
                         </TextBlock>
                     </WrapPanel>
+                    <TextBlock Grid.Row="2" Style="{StaticResource OperationChange}"
+                               Text="{Binding ChangeInfo}"
+                               Visibility="{Binding ChangeInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2"
                                Style="{StaticResource OperationCost}"
                                Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}"

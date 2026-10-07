@@ -96,7 +96,10 @@ syncs saved products to local/server storage.
   `Admins` of `storage_settings.json` / `storage_settings.default.json` are always admin + engineer;
   admins edit the list in `Views\UsersDialog` (saved by re-reading and merging per login).
 - Change tracking: `product.json` (`SavedBy`/`SavedByName`/`SavedUtcTicks`, set in `Save`),
-  `operations.json` (`ModifiedBy`/`ModifiedByName`, shown via `PartModel.OperationsModifiedInfo`),
+  `operations.json` (`ModifiedBy`/`ModifiedByName`/`RemovedNote`, shown via `PartModel.OperationsModifiedInfo`),
+  each operation (`ChangeKind` Added/Edited/Excluded + `ChangedBy*` in `OperationDto`, shown as
+  `ChangeInfo` on the operation card; stamped by `OperationEditsMerger.StampChanges`, which matches
+  before/after by the session-only `InstanceId` and clears the stamp when the op is back to KOMPAS values),
   pricing (`ModifiedBy*`, set in `OpenPricingSettings`), tombstones (`DeletedBy`). Audit log
   (`Core\Services\AuditLog.cs`): one append-only file per user and month
   `products\_audit\<login>_<yyyy-MM>.jsonl`, copied to `<server folder>\_audit` (`UploadPending`, also
