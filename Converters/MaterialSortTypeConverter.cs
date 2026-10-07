@@ -19,6 +19,12 @@ namespace TankManager
                         return "по массе";
                     case MaterialSortType.ByLength:
                         return "по длине";
+                    case MaterialSortType.ByCost:
+                        return "по стоимости";
+                    case MaterialSortType.ByDate:
+                        return "по дате";
+                    case MaterialSortType.ByAssemblyOrder:
+                        return "как в сборке";
                     default:
                         return "сортировка";
                 }

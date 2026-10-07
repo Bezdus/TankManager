@@ -62,9 +62,11 @@ namespace TankManager
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            // ConverterParameter=Inverse — видно, когда не ноль
+            bool inverse = parameter as string == "Inverse";
             if (value is int count)
             {
-                return count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                return (count == 0) != inverse ? Visibility.Visible : Visibility.Collapsed;
             }
             return Visibility.Collapsed;
         }
@@ -178,6 +180,28 @@ namespace TankManager
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Суммарная стоимость деталей группы CollectionViewGroup («1 234 ₽», пусто при нуле).
+    /// Второе значение мультибиндинга — счётчик пересчётов, чтобы сумма обновлялась после пересчёта цен
+    /// </summary>
+    public class GroupTotalCostConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            var group = values?.Length > 0 ? values[0] as CollectionViewGroup : null;
+            if (group == null)
+                return string.Empty;
+
+            double total = group.Items.OfType<TankManager.Core.Models.PartModel>().Sum(p => p.TotalCost);
+            return total > 0.005 ? total.ToString("N0", culture) + " ₽" : string.Empty;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }

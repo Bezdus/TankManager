@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TankManager"
         xmlns:models="clr-namespace:TankManager.Core.Models"
+        xmlns:vm="clr-namespace:TankManager.Core.ViewModels"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="Tank Manager"
@@ -35,6 +36,7 @@
         <local:GroupItemPropertyConverter x:Key="GroupItemPropertyConverter"/>
         <local:MaterialSortTypeConverter x:Key="MaterialSortTypeConverter"/>
         <local:ProductTypeConverter x:Key="ProductTypeConverter"/>
+        <local:GroupTotalCostConverter x:Key="GroupTotalCostConverter"/>
 
         <!-- ObjectDataProvider для MaterialSortType enum -->
         <ObjectDataProvider x:Key="SheetMaterialSortOptions" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
@@ -269,11 +271,21 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Ellipse Style="{StaticResource TypeDot}"
                          VerticalAlignment="Top"
                          Margin="0,5,8,0"
                          ToolTip="{Binding ProductType, Converter={StaticResource ProductTypeConverter}}"/>
+                <TextBlock Grid.Column="2"
+                           Text="{Binding TotalCost, StringFormat='{}{0:N0} ₽'}"
+                           Visibility="{Binding TotalCost, Converter={StaticResource DoubleNonZeroToVisibilityConverter}}"
+                           ToolTip="Стоимость детали: металл + операции"
+                           FontSize="11"
+                           Margin="8,1,0,0"
+                           VerticalAlignment="Top"
+                           Foreground="{StaticResource TextSecondary}"
+                           Typography.NumeralAlignment="Tabular"/>
                 <StackPanel Grid.Column="1">
                     <TextBlock FontSize="12" TextWrapping="Wrap">
                         <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold"/>
@@ -403,9 +415,22 @@
                                             </TextBlock>
                                         </StackPanel>
 
-                                        <Border Grid.Column="1" Background="{StaticResource AccentSubtle}" CornerRadius="10" Padding="8,2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}"/>
-                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right">
+                                            <Border Background="{StaticResource AccentSubtle}" CornerRadius="10" Padding="8,2" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} шт.'}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}"/>
+                                            </Border>
+                                            <TextBlock FontSize="11" Margin="0,2,0,0" HorizontalAlignment="Right"
+                                                       ToolTip="Стоимость всех экземпляров"
+                                                       Foreground="{StaticResource TextSecondary}"
+                                                       Typography.NumeralAlignment="Tabular">
+                                                <TextBlock.Text>
+                                                    <MultiBinding Converter="{StaticResource GroupTotalCostConverter}">
+                                                        <Binding/>
+                                                        <Binding Path="DataContext.CostsVersion" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                        </StackPanel>
                                     </Grid>
                                 </Expander.Header>
                                 <Border Margin="16,0,0,4" Padding="8,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1,0,0,0">
@@ -733,7 +758,7 @@
                 <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Command="{Binding ToggleProductsPanelCommand}"
                             Style="{StaticResource PanelButtonStyle}"
-                            ToolTip="Список сохранённых изделий">
+                            ToolTip="Список сохранённых изделий (Ctrl+P)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE700;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
                             <TextBlock Text="Изделия"/>
@@ -780,7 +805,7 @@
 
                     <Button Command="{Binding CopyAllDataToClipboardCommand}"
                             Style="{StaticResource PanelButtonStyle}"
-                            ToolTip="Копировать покупные детали, листовые и трубные материалы в Excel">
+                            ToolTip="Копировать покупные детали, листовые и трубные материалы в Excel (Ctrl+Shift+C)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE8C8;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
                             <TextBlock Text="Копировать всё"/>
@@ -789,7 +814,7 @@
 
                     <Button Command="{Binding ExportToExcelCommand}"
                             Style="{StaticResource PanelButtonStyle}"
-                            ToolTip="Открыть ведомость материалов в Excel">
+                            ToolTip="Открыть ведомость материалов в Excel (Ctrl+E)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE9F9;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
                             <TextBlock Text="Ведомость в Excel"/>
@@ -931,15 +956,32 @@
                                     <TextBlock Text="{Binding DetailsVisibleCount}" Style="{StaticResource CountBadgeText}"/>
                                 </Border>
                             </StackPanel>
-                            <Button Grid.Column="1"
-                                    Content="&#xE8C8;"
-                                    Style="{StaticResource CopyButtonStyle}"
-                                    Command="{Binding CopyAllToClipboardCommand}"
-                                    ToolTip="Копировать в Excel"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <ComboBox SelectedValue="{Binding DetailsSortType, Mode=TwoWay}"
+                                          Style="{StaticResource SortComboBoxStyle}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          ToolTip="Сортировка деталей">
+                                    <models:MaterialSortType>ByAssemblyOrder</models:MaterialSortType>
+                                    <models:MaterialSortType>ByName</models:MaterialSortType>
+                                    <models:MaterialSortType>ByCost</models:MaterialSortType>
+                                    <models:MaterialSortType>ByMass</models:MaterialSortType>
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Content="&#xE8C8;"
+                                        Style="{StaticResource CopyButtonStyle}"
+                                        Command="{Binding CopyAllToClipboardCommand}"
+                                        ToolTip="Копировать в Excel"/>
+                            </StackPanel>
                         </Grid>
 
                         <Grid>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -1042,7 +1084,7 @@
 
                                     <TextBox Grid.Column="1"
                                              x:Name="SearchBox"
-                                             ToolTip="Поиск по названию и обозначению (Ctrl+F)"
+                                             ToolTip="Поиск по названию, обозначению, материалу и типу детали (Ctrl+F)"
                                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                              BorderThickness="0"
                                              VerticalAlignment="Center"
@@ -1114,7 +1156,38 @@
                                 </Grid>
                             </Border>
 
-                            <ListBox Grid.Row="3" x:Name="Список_всех_деталей"
+                            <!-- Фильтр из блока «Требует внимания» -->
+                            <Border Grid.Row="3"
+                                    Background="{StaticResource WarningSubtle}"
+                                    CornerRadius="6"
+                                    Padding="10,2,2,2"
+                                    Margin="0,0,0,8"
+                                    Visibility="{Binding AttentionFilterText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="11" Foreground="{StaticResource Warning}" Margin="0,0,8,0"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding AttentionFilterText}"
+                                               FontSize="11"
+                                               Foreground="{StaticResource Warning}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <Button Grid.Column="2"
+                                            Content="&#xE711;"
+                                            Style="{StaticResource IconButton}"
+                                            Width="22" Height="22"
+                                            FontSize="9"
+                                            Foreground="{StaticResource Warning}"
+                                            ToolTip="Сбросить фильтр"
+                                            Command="{Binding ClearAttentionFilterCommand}"/>
+                                </Grid>
+                            </Border>
+
+                            <ListBox Grid.Row="4" x:Name="Список_всех_деталей"
                                      ItemsSource="{Binding DetailsView}"
                                      SelectedItem="{Binding SelectedDetail}"
                                      ItemTemplate="{StaticResource PartItemTemplate}"
@@ -1233,6 +1306,62 @@
                                             </TextBlock>
                                         </StackPanel>
                                     </WrapPanel>
+
+                                    <!-- Стоимость операций по видам -->
+                                    <StackPanel Margin="0,0,0,14"
+                                                Visibility="{Binding OperationCostBreakdown.Count, Converter={StaticResource ZeroToVisibilityConverter}, ConverterParameter=Inverse}">
+                                        <TextBlock Text="ОПЕРАЦИИ ПО ВИДАМ" Style="{StaticResource BlockHeader}"/>
+                                        <ItemsControl ItemsSource="{Binding OperationCostBreakdown}" Focusable="False">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Key}" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Value, StringFormat='{}{0:N2} ₽'}"
+                                                                   FontSize="12" Foreground="{StaticResource TextPrimary}"
+                                                                   Typography.NumeralAlignment="Tabular"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+
+                                    <!-- Требует внимания: стоимость может быть занижена -->
+                                    <Border Background="{StaticResource WarningSubtle}"
+                                            CornerRadius="8"
+                                            Padding="12,10"
+                                            Margin="0,0,0,14"
+                                            Visibility="{Binding HasAttentionItems, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                <TextBlock Text="&#xE7BA;" Style="{StaticResource IconText}" FontSize="12" Foreground="{StaticResource Warning}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="Требует внимания" FontWeight="SemiBold" Foreground="{StaticResource Warning}"/>
+                                            </StackPanel>
+                                            <Button Style="{StaticResource PanelButtonStyle}"
+                                                    Command="{Binding ShowAttentionPartsCommand}"
+                                                    CommandParameter="{x:Static vm:PartAttentionFilter.NoMetalPrice}"
+                                                    ToolTip="Нет цены материала в расценках: стоимость металла не посчитана. Нажмите, чтобы показать детали"
+                                                    Visibility="{Binding PartsWithoutMetalPriceCount, Converter={StaticResource ZeroToVisibilityConverter}, ConverterParameter=Inverse}">
+                                                <TextBlock>
+                                                    <Run Text="Без цены металла:"/>
+                                                    <Run Text="{Binding PartsWithoutMetalPriceCount, Mode=OneWay, StringFormat='{}{0} дет.'}" FontWeight="SemiBold"/>
+                                                </TextBlock>
+                                            </Button>
+                                            <Button Style="{StaticResource PanelButtonStyle}"
+                                                    Command="{Binding ShowAttentionPartsCommand}"
+                                                    CommandParameter="{x:Static vm:PartAttentionFilter.NoLaserCutting}"
+                                                    ToolTip="Для листовой детали не найден DXF: резка не посчитана. Нажмите, чтобы показать детали"
+                                                    Visibility="{Binding SheetPartsWithoutCuttingCount, Converter={StaticResource ZeroToVisibilityConverter}, ConverterParameter=Inverse}">
+                                                <TextBlock>
+                                                    <Run Text="Листовые без лазерной резки:"/>
+                                                    <Run Text="{Binding SheetPartsWithoutCuttingCount, Mode=OneWay, StringFormat='{}{0} дет.'}" FontWeight="SemiBold"/>
+                                                </TextBlock>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
 
                                     <!-- Превью изделия -->
                                     <Border Style="{StaticResource PreviewBoxStyle}"
@@ -1824,6 +1953,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -1946,14 +2076,101 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Поиск и сортировка изделий -->
+                    <Grid Grid.Row="2" Margin="16,10,12,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border CornerRadius="6" BorderThickness="1" Padding="8,5">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource SecondaryBackground}"/>
+                                    <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource PrimaryBackground}"/>
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="&#xE721;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0" Foreground="{StaticResource TextMuted}"/>
+                                <TextBox Grid.Column="1"
+                                         x:Name="SavedProductsSearchBox"
+                                         ToolTip="Поиск по названию, обозначению и автору (Ctrl+F)"
+                                         Text="{Binding SavedProductsSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         PreviewKeyDown="SavedProductsSearchBox_PreviewKeyDown"
+                                         BorderThickness="0"
+                                         VerticalAlignment="Center"
+                                         FontSize="12"
+                                         Foreground="{StaticResource TextPrimary}">
+                                    <TextBox.Style>
+                                        <Style TargetType="TextBox">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="Text" Value="">
+                                                    <Setter Property="Background">
+                                                        <Setter.Value>
+                                                            <VisualBrush Stretch="None" AlignmentX="Left">
+                                                                <VisualBrush.Visual>
+                                                                    <TextBlock Text="Поиск изделий"
+                                                                               Foreground="{StaticResource TextMuted}"
+                                                                               FontFamily="Segoe UI"
+                                                                               FontSize="12"/>
+                                                                </VisualBrush.Visual>
+                                                            </VisualBrush>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBox.Style>
+                                </TextBox>
+                                <Button Grid.Column="2"
+                                        Content="&#xE711;"
+                                        Style="{StaticResource IconButton}"
+                                        Width="20" Height="20"
+                                        FontSize="9"
+                                        Margin="4,0,0,0"
+                                        ToolTip="Очистить"
+                                        Command="{Binding ClearSavedProductsSearchCommand}"
+                                        Visibility="{Binding SavedProductsSearchText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
+                            </Grid>
+                        </Border>
+                        <ComboBox Grid.Column="1"
+                                  SelectedValue="{Binding SavedProductsSortType, Mode=TwoWay}"
+                                  Style="{StaticResource SortComboBoxStyle}"
+                                  VerticalAlignment="Center"
+                                  Margin="6,0,0,0"
+                                  ToolTip="Сортировка изделий">
+                            <models:MaterialSortType>ByDate</models:MaterialSortType>
+                            <models:MaterialSortType>ByName</models:MaterialSortType>
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource MaterialSortTypeConverter}}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </Grid>
+
                     <!-- Список сохранённых продуктов -->
-                    <ListBox Grid.Row="2"
-                             ItemsSource="{Binding SavedProducts}"
+                    <ListBox Grid.Row="3"
+                             x:Name="SavedProductsList"
+                             ItemsSource="{Binding SavedProductsView}"
                              SelectedItem="{Binding SelectedSavedProduct}"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             Background="Transparent"
-                             BorderThickness="0"
+                             Style="{StaticResource EmptyAwareListBox}"
+                             Tag="Изделия не найдены"
                              Padding="8,6">
+                        <ListBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding OpenSelectedSavedProductCommand}"/>
+                        </ListBox.InputBindings>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Padding" Value="10,8"/>
@@ -1986,7 +2203,7 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid>
+                                <Grid Background="Transparent" ToolTip="Двойной щелчок или Enter — открыть изделие">
                                     <Grid.InputBindings>
                                         <MouseBinding MouseAction="LeftDoubleClick"
                                                       Command="{Binding DataContext.SwitchToProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -2029,6 +2246,15 @@
                                     <StackPanel Grid.Column="1" Orientation="Horizontal"
                                                 VerticalAlignment="Center"
                                                 Margin="8,0,0,0">
+                                        <!-- Открыть изделие -->
+                                        <Button Command="{Binding DataContext.SwitchToProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                Panel.ZIndex="1"
+                                                ToolTip="Открыть изделие"
+                                                Style="{StaticResource IconButton}"
+                                                Margin="0,0,2,0">
+                                            <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFont}" IsHitTestVisible="False"/>
+                                        </Button>
                                         <!-- История изменений изделия -->
                                         <Button Command="{Binding DataContext.OpenProductAuditLogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
@@ -2242,27 +2468,46 @@
 
                         <!-- Заголовок с кнопкой закрытия -->
                         <Grid Grid.Row="0" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
                             <TextBlock x:Name="DrawingPopupTitle"
                                        FontSize="14"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimary}"
                                        VerticalAlignment="Center"
-                                       Margin="0,0,40,0"/>
-                            <Button Content="&#xE711;"
-                                    HorizontalAlignment="Right"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,16,0"/>
+                            <TextBlock x:Name="DrawingZoomText"
+                                       Grid.Column="1"
+                                       Style="{StaticResource CaptionText}"
+                                       Margin="0,0,12,0"
+                                       ToolTip="Ctrl + колесо мыши — масштаб, двойной щелчок — вписать в окно / 100%"/>
+                            <Button Grid.Column="2"
+                                    Content="&#xE711;"
                                     Style="{StaticResource IconButton}"
                                     ToolTip="Закрыть (Esc)"
                                     Click="DrawingPopupClose_Click"/>
                         </Grid>
 
                         <Border Grid.Row="1" Background="{StaticResource SecondaryBackground}" CornerRadius="6">
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer x:Name="DrawingScrollViewer"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Auto"
+                                          PreviewMouseWheel="DrawingScrollViewer_PreviewMouseWheel">
                                 <Image x:Name="DrawingPopupImage"
                                        Stretch="None"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
-                                       Margin="20"/>
+                                       Margin="20"
+                                       ToolTip="Ctrl + колесо мыши — масштаб, двойной щелчок — вписать в окно / 100%"
+                                       MouseLeftButtonDown="DrawingPopupImage_MouseLeftButtonDown">
+                                    <Image.LayoutTransform>
+                                        <ScaleTransform x:Name="DrawingScale" ScaleX="1" ScaleY="1"/>
+                                    </Image.LayoutTransform>
+                                </Image>
                             </ScrollViewer>
                         </Border>
                     </Grid>

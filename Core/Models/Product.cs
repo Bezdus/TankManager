@@ -99,6 +99,22 @@ namespace TankManager.Core.Models
                 ? $"Сохранил: {SavedByDisplay}, {SavedUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
                 : $"Сохранил: {SavedByDisplay}";
 
+        private bool _hasUnsavedChanges;
+
+        /// <summary>
+        /// Загружено из КОМПАС и не сохранено: сохранения нет или сборка изменена после него
+        /// </summary>
+        public bool HasUnsavedChanges
+        {
+            get => _hasUnsavedChanges;
+            set
+            {
+                if (_hasUnsavedChanges == value) return;
+                _hasUnsavedChanges = value;
+                OnPropertyChanged(nameof(HasUnsavedChanges));
+            }
+        }
+
         private void NotifySavedInfoChanged()
         {
             OnPropertyChanged(nameof(SavedBy));
@@ -133,7 +149,7 @@ namespace TankManager.Core.Models
         /// (KompasService.ExtractAllParts); StandardParts добавляем, только если в Details
         /// покупных нет (сохранения, где покупные хранились отдельно)
         /// </summary>
-        private IEnumerable<PartModel> AllParts =>
+        public IEnumerable<PartModel> AllParts =>
             Details.Any(p => p.ProductType == ProductType.PurchasedPart)
                 ? Details
                 : Details.Concat(StandardParts);

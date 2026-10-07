@@ -44,6 +44,14 @@ namespace TankManager.Core.ViewModels
         private MaterialSortType _sheetMaterialsSortType = MaterialSortType.ByMass;
         private MaterialSortType _tubularProductsSortType = MaterialSortType.ByLength;
         private MaterialSortType _otherMaterialsSortType = MaterialSortType.ByMass;
+        private MaterialSortType _detailsSortType = MaterialSortType.ByAssemblyOrder;
+        private MaterialSortType _savedProductsSortType = MaterialSortType.ByDate;
+        private string _savedProductsSearchText;
+        private PartAttentionFilter _attentionFilter;
+        private int _costsVersion;
+        private int _partsWithoutMetalPriceCount;
+        private int _sheetPartsWithoutCuttingCount;
+        private IReadOnlyList<KeyValuePair<string, double>> _operationCostBreakdown = new KeyValuePair<string, double>[0];
         private PartModel _currentlySelectedPart;
         private PartModel _selectedDetail;
         private PartModel _selectedStandardPart;
@@ -232,8 +240,77 @@ namespace TankManager.Core.ViewModels
         public ObservableCollection<ProductFileInfo> SavedProducts
         {
             get => _savedProducts;
-            private set => SetProperty(ref _savedProducts, value, nameof(SavedProducts));
+            private set
+            {
+                if (SetProperty(ref _savedProducts, value, nameof(SavedProducts)))
+                {
+                    SavedProductsView = value == null ? null : CollectionViewSource.GetDefaultView(value);
+                    if (SavedProductsView != null)
+                    {
+                        SavedProductsView.Filter = FilterSavedProducts;
+                        ApplySavedProductsSort();
+                    }
+                    OnPropertyChanged(nameof(SavedProductsView));
+                }
+            }
         }
+
+        /// <summary>
+        /// Список изделий в панели с поиском и сортировкой
+        /// </summary>
+        public ICollectionView SavedProductsView { get; private set; }
+
+        public string SavedProductsSearchText
+        {
+            get => _savedProductsSearchText;
+            set
+            {
+                if (SetProperty(ref _savedProductsSearchText, value, nameof(SavedProductsSearchText)))
+                    SavedProductsView?.Refresh();
+            }
+        }
+
+        public MaterialSortType SavedProductsSortType
+        {
+            get => _savedProductsSortType;
+            set
+            {
+                if (SetProperty(ref _savedProductsSortType, value, nameof(SavedProductsSortType)))
+                    ApplySavedProductsSort();
+            }
+        }
+
+        private bool FilterSavedProducts(object obj)
+        {
+            if (!(obj is ProductFileInfo info)) return false;
+            if (string.IsNullOrWhiteSpace(_savedProductsSearchText)) return true;
+
+            var search = _savedProductsSearchText.Trim();
+            return Contains(info.ProductName, search) || Contains(info.Marking, search) || Contains(info.SavedBy, search);
+        }
+
+        private void ApplySavedProductsSort()
+        {
+            var view = SavedProductsView;
+            if (view == null) return;
+
+            using (view.DeferRefresh())
+            {
+                view.SortDescriptions.Clear();
+                if (_savedProductsSortType == MaterialSortType.ByName)
+                {
+                    view.SortDescriptions.Add(new SortDescription(nameof(ProductFileInfo.ProductName), ListSortDirection.Ascending));
+                    view.SortDescriptions.Add(new SortDescription(nameof(ProductFileInfo.Marking), ListSortDirection.Ascending));
+                }
+                else
+                {
+                    view.SortDescriptions.Add(new SortDescription(nameof(ProductFileInfo.SavedDate), ListSortDirection.Descending));
+                }
+            }
+        }
+
+        private static bool Contains(string text, string search) =>
+            text != null && text.IndexOf(search, StringComparison.CurrentCultureIgnoreCase) >= 0;
 
         public ProductFileInfo SelectedSavedProduct
         {
@@ -431,6 +508,120 @@ namespace TankManager.Core.ViewModels
             }
         }
 
+        /// <summary>
+        /// Сортировка списка «Все детали»: как в сборке, по названию, стоимости или массе
+        /// </summary>
+        public MaterialSortType DetailsSortType
+        {
+            get => _detailsSortType;
+            set
+            {
+                if (SetProperty(ref _detailsSortType, value, nameof(DetailsSortType)))
+                    ApplyDetailsSort(DetailsView);
+            }
+        }
+
+        /// <summary>
+        /// Фильтр списка деталей из блока «Требует внимания»
+        /// </summary>
+        public PartAttentionFilter AttentionFilter
+        {
+            get => _attentionFilter;
+            set
+            {
+                if (SetProperty(ref _attentionFilter, value, nameof(AttentionFilter), nameof(AttentionFilterText)))
+                {
+                    DetailsView?.Refresh();
+                    NotifyCountsChanged();
+                    UpdateCalculations();
+                }
+            }
+        }
+
+        public string AttentionFilterText =>
+            _attentionFilter == PartAttentionFilter.NoMetalPrice ? "Без цены металла"
+            : _attentionFilter == PartAttentionFilter.NoLaserCutting ? "Листовые без лазерной резки"
+            : null;
+
+        #endregion
+
+        #region Properties - Cost Summary
+
+        /// <summary>
+        /// Растёт при каждом пересчёте стоимости: по нему обновляются суммы в заголовках групп деталей
+        /// </summary>
+        public int CostsVersion
+        {
+            get => _costsVersion;
+            private set => SetProperty(ref _costsVersion, value, nameof(CostsVersion));
+        }
+
+        /// <summary>
+        /// Деталей (без повторов) с массой, но без стоимости металла: не задана цена материала
+        /// </summary>
+        public int PartsWithoutMetalPriceCount
+        {
+            get => _partsWithoutMetalPriceCount;
+            private set => SetProperty(ref _partsWithoutMetalPriceCount, value, nameof(PartsWithoutMetalPriceCount), nameof(HasAttentionItems));
+        }
+
+        /// <summary>
+        /// Листовых деталей (без повторов) без лазерной резки: не найден DXF
+        /// </summary>
+        public int SheetPartsWithoutCuttingCount
+        {
+            get => _sheetPartsWithoutCuttingCount;
+            private set => SetProperty(ref _sheetPartsWithoutCuttingCount, value, nameof(SheetPartsWithoutCuttingCount), nameof(HasAttentionItems));
+        }
+
+        public bool HasAttentionItems => PartsWithoutMetalPriceCount > 0 || SheetPartsWithoutCuttingCount > 0;
+
+        /// <summary>
+        /// Стоимость операций изделия по видам (только ненулевые)
+        /// </summary>
+        public IReadOnlyList<KeyValuePair<string, double>> OperationCostBreakdown
+        {
+            get => _operationCostBreakdown;
+            private set => SetProperty(ref _operationCostBreakdown, value, nameof(OperationCostBreakdown));
+        }
+
+        private static bool LacksMetalPrice(PartModel part) =>
+            part.ProductType != ProductType.PurchasedPart && part.Mass > 0 && part.MetalCost < 0.005;
+
+        private static bool LacksLaserCutting(PartModel part) =>
+            part.ProductType == ProductType.SheetMaterial && !part.Operations.OfType<LaserCuttingOperation>().Any();
+
+        private static string PartGroupKey(PartModel part) => $"{part.Name}|{part.Marking}|{part.Material}";
+
+        /// <summary>
+        /// Пересчитывает блок «Требует внимания» и разбивку операций по видам
+        /// </summary>
+        private void UpdateCostSummary()
+        {
+            var details = Details?.ToList() ?? new List<PartModel>();
+
+            PartsWithoutMetalPriceCount = details.Where(LacksMetalPrice).Select(PartGroupKey).Distinct().Count();
+            SheetPartsWithoutCuttingCount = details.Where(LacksLaserCutting).Select(PartGroupKey).Distinct().Count();
+
+            var parts = CurrentProduct?.AllParts ?? Enumerable.Empty<PartModel>();
+            OperationCostBreakdown = parts
+                .SelectMany(p => p.Operations)
+                .Where(op => !op.IsExcluded)
+                .GroupBy(op => op.Type)
+                .OrderBy(g => g.Key)
+                .Select(g => new KeyValuePair<string, double>(
+                    g.Key == ManufacturingOperationType.Custom ? "Прочие операции" : g.First().TypeTitle,
+                    g.Sum(op => op.Cost)))
+                .Where(item => item.Value > 0.005)
+                .ToList();
+
+            CostsVersion++;
+
+            // Сортировка по стоимости сама не обновляется при смене цен
+            if (_detailsSortType == MaterialSortType.ByCost)
+                DetailsView?.Refresh();
+        }
+
         #endregion
 
         #region Properties - Selection
@@ -578,6 +769,11 @@ namespace TankManager.Core.ViewModels
         public bool HasProduct => CurrentProduct != null
             && (!string.IsNullOrEmpty(CurrentProduct.Name) || (Details?.Count ?? 0) > 0);
 
+        /// <summary>
+        /// Конструктор загрузил сборку из КОМПАС и не сохранил её
+        /// </summary>
+        public bool HasUnsavedChanges => IsEngineerMode && CurrentProduct?.HasUnsavedChanges == true;
+
         #endregion
 
         #region Properties - Server Storage
@@ -679,6 +875,10 @@ namespace TankManager.Core.ViewModels
         public ICommand OpenUsersCommand { get; private set; }
         public ICommand OpenAuditLogCommand { get; private set; }
         public ICommand OpenProductAuditLogCommand { get; private set; }
+        public ICommand ShowAttentionPartsCommand { get; private set; }
+        public ICommand ClearAttentionFilterCommand { get; private set; }
+        public ICommand ClearSavedProductsSearchCommand { get; private set; }
+        public ICommand OpenSelectedSavedProductCommand { get; private set; }
 
         #endregion
 
@@ -715,7 +915,11 @@ namespace TankManager.Core.ViewModels
             DeleteProductLocalCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: false), () => SelectedSavedProduct != null && !IsLoading);
             DeleteProductEverywhereCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => IsEngineerMode && SelectedSavedProduct != null && !IsLoading);
             ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
-            SwitchToProductCommand = new RelayCommand<ProductFileInfo>(SwitchToProduct);
+            SwitchToProductCommand = new RelayCommand<ProductFileInfo>(async p => await SwitchToProductAsync(p));
+            OpenSelectedSavedProductCommand = new RelayCommand(async () => await SwitchToProductAsync(SelectedSavedProduct));
+            ClearSavedProductsSearchCommand = new RelayCommand(() => SavedProductsSearchText = string.Empty);
+            ShowAttentionPartsCommand = new RelayCommand<PartAttentionFilter>(filter => AttentionFilter = filter);
+            ClearAttentionFilterCommand = new RelayCommand(() => AttentionFilter = PartAttentionFilter.None);
             CopyAllToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyPartsToClipboard, Details), () => Details?.Any() == true);
             CopySheetToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyMaterialsToClipboard, SheetMaterials), () => SheetMaterials?.Any() == true);
             CopyTubularProductsToClipboardCommand = new RelayCommand(() => CopyToClipboard(_excelService.CopyTubularProductsToClipboard, TubularProducts), () => TubularProducts?.Any() == true);
@@ -967,6 +1171,7 @@ namespace TankManager.Core.ViewModels
             }
 
             CurrentProduct?.NotifyAggregatesChanged();
+            UpdateCostSummary();
 
             if (unreliableOperations > 0 && showWarnings)
             {
@@ -1154,6 +1359,32 @@ namespace TankManager.Core.ViewModels
                 kompasProduct.SavedByName = savedProduct.SavedByName;
                 kompasProduct.SavedUtc = savedProduct.SavedUtc;
             }
+
+            kompasProduct.HasUnsavedChanges = IsModifiedSinceSave(kompasProduct, savedProduct);
+        }
+
+        /// <summary>
+        /// Сборки нет среди сохранённых или её файл изменён после сохранения.
+        /// Правки только в файлах деталей (без пересохранения сборки) здесь не видны
+        /// </summary>
+        private bool IsModifiedSinceSave(Product kompasProduct, Product savedProduct)
+        {
+            if (savedProduct == null)
+                return true;
+
+            if (!savedProduct.SavedUtc.HasValue || string.IsNullOrEmpty(kompasProduct.FilePath))
+                return false;
+
+            try
+            {
+                return File.Exists(kompasProduct.FilePath) &&
+                    File.GetLastWriteTimeUtc(kompasProduct.FilePath) > savedProduct.SavedUtc.Value;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Не удалось проверить дату изменения сборки: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>
@@ -1290,6 +1521,15 @@ namespace TankManager.Core.ViewModels
                 return;
             }
 
+            bool isSameFile = string.Equals(filePath, CurrentProduct?.FilePath, StringComparison.OrdinalIgnoreCase);
+            if (!isSameFile && !await ConfirmUnsavedChangesAsync())
+            {
+                // Чтобы этот же файл можно было выбрать снова
+                _filePath = CurrentProduct?.FilePath;
+                OnPropertyChanged(nameof(FilePath));
+                return;
+            }
+
             try
             {
                 IsLoading = true;
@@ -1329,6 +1569,9 @@ namespace TankManager.Core.ViewModels
                 ShowSnackbar(ViewerModeLoadMessage, SnackbarKind.Warning);
                 return;
             }
+
+            if (!await ConfirmUnsavedChangesAsync())
+                return;
 
             try
             {
@@ -1372,9 +1615,14 @@ namespace TankManager.Core.ViewModels
                 LoadAndLinkProduct(product, $"Загружено: {product.Name}");
         }
 
-        private void SwitchToProduct(ProductFileInfo productInfo)
+        private async Task SwitchToProductAsync(ProductFileInfo productInfo)
         {
-            if (productInfo == null) return;
+            if (productInfo == null || IsLoading) return;
+
+            bool isCurrent = CurrentProduct != null &&
+                CurrentProduct.Name == productInfo.ProductName && CurrentProduct.Marking == productInfo.Marking;
+            if (!isCurrent && !await ConfirmUnsavedChangesAsync())
+                return;
 
             var product = _storageService.Load(productInfo.FileName);
             if (product != null)
@@ -1464,6 +1712,9 @@ namespace TankManager.Core.ViewModels
                 var filePath = await Task.Run(() => _storageService.Save(product));
                 var fileName = Path.GetFileName(filePath);
 
+                product.HasUnsavedChanges = false;
+                OnPropertyChanged(nameof(HasUnsavedChanges));
+
                 var serverError = _storageService.LastServerError;
                 if (string.IsNullOrEmpty(serverError))
                 {
@@ -1488,6 +1739,31 @@ namespace TankManager.Core.ViewModels
             {
                 IsLoading = false;
             }
+        }
+
+        /// <summary>
+        /// Перед закрытием программы или сменой изделия предлагает сохранить загруженную из КОМПАС сборку.
+        /// false — продолжать нельзя: пользователь отменил действие или сохранение не удалось
+        /// </summary>
+        public async Task<bool> ConfirmUnsavedChangesAsync()
+        {
+            var product = CurrentProduct;
+            if (!HasUnsavedChanges || !SaveProductCommand.CanExecute(null))
+                return true;
+
+            var answer = MessageBox.Show(
+                $"Изделие «{product.Name}» загружено из КОМПАС и не сохранено.\n\nСохранить его?",
+                "Несохранённое изделие",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+
+            if (answer == MessageBoxResult.Cancel)
+                return false;
+            if (answer == MessageBoxResult.No)
+                return true;
+
+            await SaveProductAsync();
+            return !product.HasUnsavedChanges;
         }
 
         /// <summary>
@@ -1891,6 +2167,7 @@ namespace TankManager.Core.ViewModels
         private void InitializeCollectionViews()
         {
             DetailsView = CreatePartView(Details);
+            ApplyDetailsSort(DetailsView);
             StandardPartsView = CreatePartView(StandardParts);
             SheetMaterialsView = CreateMaterialView(SheetMaterials, SheetMaterialsSortType);
             TubularProductsView = CreateMaterialView(TubularProducts, TubularProductsSortType);
@@ -1902,6 +2179,32 @@ namespace TankManager.Core.ViewModels
             OnPropertyChanged(nameof(TubularProductsView));
             OnPropertyChanged(nameof(OtherMaterialsView));
             NotifyCountsChanged();
+            UpdateCostSummary();
+        }
+
+        private void ApplyDetailsSort(ICollectionView view)
+        {
+            if (view == null) return;
+
+            using (view.DeferRefresh())
+            {
+                view.SortDescriptions.Clear();
+                switch (_detailsSortType)
+                {
+                    case MaterialSortType.ByName:
+                        view.SortDescriptions.Add(new SortDescription(nameof(PartModel.Name), ListSortDirection.Ascending));
+                        view.SortDescriptions.Add(new SortDescription(nameof(PartModel.Marking), ListSortDirection.Ascending));
+                        break;
+                    case MaterialSortType.ByCost:
+                        view.SortDescriptions.Add(new SortDescription(nameof(PartModel.TotalCost), ListSortDirection.Descending));
+                        view.SortDescriptions.Add(new SortDescription(nameof(PartModel.Name), ListSortDirection.Ascending));
+                        break;
+                    case MaterialSortType.ByMass:
+                        view.SortDescriptions.Add(new SortDescription(nameof(PartModel.Mass), ListSortDirection.Descending));
+                        view.SortDescriptions.Add(new SortDescription(nameof(PartModel.Name), ListSortDirection.Ascending));
+                        break;
+                }
+            }
         }
 
         private void NotifyCountsChanged()
@@ -1942,12 +2245,17 @@ namespace TankManager.Core.ViewModels
             if (materialFilter != null && part.Material != materialFilter.Name)
                 return false;
 
+            if (_attentionFilter == PartAttentionFilter.NoMetalPrice && !LacksMetalPrice(part))
+                return false;
+            if (_attentionFilter == PartAttentionFilter.NoLaserCutting && !LacksLaserCutting(part))
+                return false;
+
             if (string.IsNullOrWhiteSpace(_searchText))
                 return true;
 
-            var searchLower = _searchText.ToLower();
-            return (part.Name?.ToLower().Contains(searchLower) ?? false) ||
-                   (part.Marking?.ToLower().Contains(searchLower) ?? false);
+            var search = _searchText.Trim();
+            return Contains(part.Name, search) || Contains(part.Marking, search) ||
+                   Contains(part.Material, search) || Contains(part.DetailType, search);
         }
 
         private void ApplyMaterialSort(ICollectionView view, MaterialSortType sortType)
@@ -2320,6 +2628,7 @@ namespace TankManager.Core.ViewModels
             OnPropertyChanged(nameof(TubularProducts));
             OnPropertyChanged(nameof(StandardParts));
             OnPropertyChanged(nameof(OtherMaterials));
+            OnPropertyChanged(nameof(HasUnsavedChanges));
         }
 
         private void NotifyCopyCommandsCanExecuteChanged()
@@ -2359,6 +2668,14 @@ namespace TankManager.Core.ViewModels
             SelectedOtherMaterial = null;
             CurrentlySelectedPart = null;
             IsProductSelected = false;
+
+            // Фильтр «Требует внимания» относится к прежнему изделию
+            if (_attentionFilter != PartAttentionFilter.None)
+            {
+                _attentionFilter = PartAttentionFilter.None;
+                OnPropertyChanged(nameof(AttentionFilter));
+                OnPropertyChanged(nameof(AttentionFilterText));
+            }
         }
 
         private void OnMaterialFilterChanged()
@@ -2528,6 +2845,18 @@ namespace TankManager.Core.ViewModels
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Фильтр списка деталей из блока «Требует внимания»
+    /// </summary>
+    public enum PartAttentionFilter
+    {
+        None,
+        /// <summary>Есть масса, но нет стоимости металла</summary>
+        NoMetalPrice,
+        /// <summary>Листовая деталь без лазерной резки</summary>
+        NoLaserCutting
     }
 
     /// <summary>

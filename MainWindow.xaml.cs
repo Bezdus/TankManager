@@ -25,6 +25,8 @@ namespace TankManager
         private MainViewModel _viewModel;
         private readonly WindowSettingsService _windowSettingsService = new WindowSettingsService(new FileLogger());
         private double[] _savedColumnStars;
+        private bool _closeConfirmed;
+        private double _drawingFitScale = 1;
 
         public MainWindow()
         {
@@ -52,6 +54,10 @@ namespace TankManager
             var productName = _viewModel.CurrentProduct?.Name;
             if (!string.IsNullOrWhiteSpace(productName))
                 title += $" — {productName}";
+
+            // «•» — сборка загружена из КОМПАС и не сохранена
+            if (_viewModel.HasUnsavedChanges)
+                title += " •";
 
             Title = title;
         }
@@ -127,8 +133,21 @@ namespace TankManager
             });
         }
 
-        protected override void OnClosing(CancelEventArgs e)
+        protected override async void OnClosing(CancelEventArgs e)
         {
+            // Несохранённая сборка: закрытие откладываем до ответа (и сохранения, если выбрано «Да»)
+            if (!_closeConfirmed && _viewModel.HasUnsavedChanges)
+            {
+                e.Cancel = true;
+                if (await _viewModel.ConfirmUnsavedChangesAsync())
+                {
+                    _closeConfirmed = true;
+                    // Close() нельзя вызывать внутри обработчика Closing
+                    _ = Dispatcher.BeginInvoke(new Action(Close));
+                }
+                return;
+            }
+
             base.OnClosing(e);
             if (!e.Cancel)
                 SaveWindowSettings();
@@ -138,7 +157,8 @@ namespace TankManager
 
         private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(MainViewModel.CurrentProduct))
+            if (e.PropertyName == nameof(MainViewModel.CurrentProduct) ||
+                e.PropertyName == nameof(MainViewModel.HasUnsavedChanges))
             {
                 UpdateTitle();
             }
@@ -396,8 +416,30 @@ namespace TankManager
                 return;
 
             var ctrl = Keyboard.Modifiers == ModifierKeys.Control;
+            var ctrlShift = Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
 
-            if (ctrl && e.Key == Key.O)
+            if (ctrl && e.Key == Key.E)
+            {
+                ExecuteIfCan(_viewModel.ExportToExcelCommand);
+                e.Handled = true;
+            }
+            else if (ctrlShift && e.Key == Key.C)
+            {
+                ExecuteIfCan(_viewModel.CopyAllDataToClipboardCommand);
+                e.Handled = true;
+            }
+            else if (ctrl && e.Key == Key.P)
+            {
+                _viewModel.IsProductsPanelOpen = !_viewModel.IsProductsPanelOpen;
+                e.Handled = true;
+            }
+            else if (ctrl && e.Key == Key.F && _viewModel.IsProductsPanelOpen)
+            {
+                SavedProductsSearchBox.Focus();
+                SavedProductsSearchBox.SelectAll();
+                e.Handled = true;
+            }
+            else if (ctrl && e.Key == Key.O)
             {
                 // В режиме просмотра «открыть» — это список изделий
                 if (_viewModel.IsViewerMode)
@@ -432,6 +474,37 @@ namespace TankManager
             }
         }
 
+        private static void ExecuteIfCan(ICommand command)
+        {
+            if (command?.CanExecute(null) == true)
+                command.Execute(null);
+        }
+
+        /// <summary>
+        /// Поиск изделий: «вниз» — к списку, Enter — открыть единственное найденное или выбранное
+        /// </summary>
+        private void SavedProductsSearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Down && SavedProductsList.Items.Count > 0)
+            {
+                if (SavedProductsList.SelectedIndex < 0)
+                    SavedProductsList.SelectedIndex = 0;
+                SavedProductsList.UpdateLayout();
+                var item = SavedProductsList.ItemContainerGenerator.ContainerFromIndex(SavedProductsList.SelectedIndex) as ListBoxItem;
+                item?.Focus();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                var target = SavedProductsList.Items.Count == 1
+                    ? SavedProductsList.Items[0] as ProductFileInfo
+                    : _viewModel.SelectedSavedProduct;
+                if (target != null)
+                    _viewModel.SwitchToProductCommand.Execute(target);
+                e.Handled = true;
+            }
+        }
+
         private void OverlayBackground_MouseDown(object sender, MouseButtonEventArgs e)
         {
             _viewModel.IsProductsPanelOpen = false;
@@ -445,7 +518,75 @@ namespace TankManager
 
             DrawingPopupTitle.Text = $"Чертёж: {part.Name} {part.Marking}";
             DrawingPopupImage.Source = part.DrawingPreview;
+            SetDrawingScale(1);
             DrawingPopupOverlay.Visibility = Visibility.Visible;
+
+            // Размер области просмотра известен только после разметки при масштабе 100%
+            DrawingPopupOverlay.UpdateLayout();
+            _drawingFitScale = CalculateDrawingFitScale();
+            SetDrawingScale(_drawingFitScale);
+        }
+
+        private const double DrawingMinScale = 0.1;
+        private const double DrawingMaxScale = 8;
+        private const double DrawingZoomStep = 1.2;
+
+        /// <summary>
+        /// Масштаб, при котором чертёж целиком помещается в окно (не больше 100%)
+        /// </summary>
+        private double CalculateDrawingFitScale()
+        {
+            var source = DrawingPopupImage.Source;
+            if (source == null || source.Width <= 0 || source.Height <= 0)
+                return 1;
+
+            var margin = DrawingPopupImage.Margin;
+            double availableWidth = DrawingScrollViewer.ViewportWidth - margin.Left - margin.Right;
+            double availableHeight = DrawingScrollViewer.ViewportHeight - margin.Top - margin.Bottom;
+            if (availableWidth <= 0 || availableHeight <= 0)
+                return 1;
+
+            double scale = Math.Min(availableWidth / source.Width, availableHeight / source.Height);
+            return Math.Max(DrawingMinScale, Math.Min(1, scale));
+        }
+
+        private void SetDrawingScale(double scale)
+        {
+            scale = Math.Max(DrawingMinScale, Math.Min(DrawingMaxScale, scale));
+            DrawingScale.ScaleX = scale;
+            DrawingScale.ScaleY = scale;
+            DrawingZoomText.Text = $"{scale * 100:0}%";
+        }
+
+        private void DrawingScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (Keyboard.Modifiers != ModifierKeys.Control)
+                return;
+
+            // Масштабируем относительно указателя мыши: точка под курсором остаётся на месте
+            var pointer = e.GetPosition(DrawingScrollViewer);
+            double oldHorizontal = DrawingScrollViewer.HorizontalOffset;
+            double oldVertical = DrawingScrollViewer.VerticalOffset;
+            double oldScale = DrawingScale.ScaleX;
+            double newScale = e.Delta > 0 ? oldScale * DrawingZoomStep : oldScale / DrawingZoomStep;
+            SetDrawingScale(newScale);
+
+            double ratio = DrawingScale.ScaleX / oldScale;
+            DrawingScrollViewer.UpdateLayout();
+            DrawingScrollViewer.ScrollToHorizontalOffset((oldHorizontal + pointer.X) * ratio - pointer.X);
+            DrawingScrollViewer.ScrollToVerticalOffset((oldVertical + pointer.Y) * ratio - pointer.Y);
+            e.Handled = true;
+        }
+
+        private void DrawingPopupImage_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 2)
+                return;
+
+            // Двойной щелчок: «вписать в окно» ↔ 100%
+            bool isFit = Math.Abs(DrawingScale.ScaleX - _drawingFitScale) < 0.001;
+            SetDrawingScale(isFit ? 1 : _drawingFitScale);
+            e.Handled = true;
         }
 
         private void CloseDrawingPopup()

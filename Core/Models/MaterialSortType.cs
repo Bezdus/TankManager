@@ -4,6 +4,9 @@ namespace TankManager.Core.Models
     {
         ByName,
         ByMass,
-        ByLength
+        ByLength,
+        ByCost,
+        ByDate,
+        ByAssemblyOrder
     }
 }
