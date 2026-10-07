@@ -139,6 +139,43 @@ namespace TankManager.Core.ViewModels
 
         #endregion
 
+        #region Properties - Current User
+
+        /// <summary>
+        /// ФИО (или логин) текущего сотрудника
+        /// </summary>
+        public string CurrentUserName => CurrentUser.DisplayName;
+
+        public string CurrentUserLogin => CurrentUser.Login;
+
+        /// <summary>
+        /// Роль задаётся в общем списке сотрудников (переключатель режима не действует)
+        /// </summary>
+        public bool AccountsEnabled => CurrentUser.AccountsEnabled && !CurrentUser.NeedsRegistration;
+
+        /// <summary>
+        /// Переключатель режима доступен, только пока роли не назначаются по списку сотрудников
+        /// </summary>
+        public bool IsModeSwitchAvailable => !AccountsEnabled;
+
+        public bool IsAdmin => CurrentUser.IsAdmin;
+
+        /// <summary>
+        /// Окно «Сотрудники»: администратор при заданной серверной папке
+        /// </summary>
+        public bool CanManageUsers => IsAdmin && HasServerStorageFolder;
+
+        private void NotifyCurrentUserChanged()
+        {
+            OnPropertyChanged(nameof(CurrentUserName));
+            OnPropertyChanged(nameof(AccountsEnabled));
+            OnPropertyChanged(nameof(IsModeSwitchAvailable));
+            OnPropertyChanged(nameof(IsAdmin));
+            OnPropertyChanged(nameof(CanManageUsers));
+        }
+
+        #endregion
+
         #region Properties - Product
 
         public Product CurrentProduct
@@ -559,6 +596,7 @@ namespace TankManager.Core.ViewModels
                     OnPropertyChanged(nameof(ServerStorageFolder));
                     OnPropertyChanged(nameof(ServerStorageFolderDisplay));
                     OnPropertyChanged(nameof(HasServerStorageFolder));
+                    OnPropertyChanged(nameof(CanManageUsers));
                     OnPropertyChanged(nameof(CanDeleteFromServer));
                     OnPropertyChanged(nameof(IsServerAvailable));
                     ((RelayCommand)ClearServerStorageFolderCommand)?.NotifyCanExecuteChanged();
@@ -638,6 +676,9 @@ namespace TankManager.Core.ViewModels
         public ICommand ExportToExcelCommand { get; private set; }
         public ICommand OpenPricingSettingsCommand { get; private set; }
         public ICommand EditOperationsCommand { get; private set; }
+        public ICommand OpenUsersCommand { get; private set; }
+        public ICommand OpenAuditLogCommand { get; private set; }
+        public ICommand OpenProductAuditLogCommand { get; private set; }
 
         #endregion
 
@@ -648,7 +689,10 @@ namespace TankManager.Core.ViewModels
         public MainViewModel(IKompasService kompasService)
         {
             _kompasService = kompasService ?? throw new ArgumentNullException(nameof(kompasService));
-            AppMode.Initialize(_storageService.ModeSetting);
+            // Роль — из общего списка сотрудников; без списка — по переключателю режима, как раньше
+            var users = new UserDirectoryService(_storageService.ServerStorageFolder).LoadForStartup();
+            AppMode.Initialize(CurrentUser.Initialize(users, _storageService.AdminLogins, _storageService.ModeSetting));
+            _logger.LogInfo($"Сотрудник: {CurrentUser.Login} ({CurrentUser.DisplayName}), список сотрудников: {(CurrentUser.AccountsEnabled ? "есть" : "нет")}, администратор: {CurrentUser.IsAdmin}");
             _logger.LogInfo($"Режим работы: {(AppMode.IsTechnologist ? "технолог" : AppMode.IsViewer ? "просмотр" : "конструктор")} (настройка: {AppMode.Setting}, КОМПАС установлен: {AppMode.IsKompasInstalled})");
 
             // Локальная копия расценок; общие с сервера подтянутся при синхронизации (OnWindowLoaded)
@@ -689,6 +733,9 @@ namespace TankManager.Core.ViewModels
             OpenPricingSettingsCommand = new RelayCommand(OpenPricingSettings);
             // Правки сохраняются сразу в отдельный файл (operations.json), связь с КОМПАС не нужна
             EditOperationsCommand = new RelayCommand(async () => await EditOperationsAsync(), () => CanEditOperations && CurrentlySelectedPart != null && !IsLoading);
+            OpenUsersCommand = new RelayCommand(OpenUsers, () => CanManageUsers);
+            OpenAuditLogCommand = new RelayCommand(() => OpenAuditLog(null));
+            OpenProductAuditLogCommand = new RelayCommand<ProductFileInfo>(p => OpenAuditLog(p?.ProductName));
         }
 
         #endregion
@@ -703,6 +750,15 @@ namespace TankManager.Core.ViewModels
             if (dialog.ShowDialog() == true && IsEngineerMode)
             {
                 var newSettings = dialog.PricingSettings;
+                string changes = ChangeDescriber.DescribePricing(_pricingSettings, newSettings);
+
+                // Без изменений — не перезаписываем общий файл и не подписываем
+                if (changes == null)
+                    return;
+
+                newSettings.ModifiedBy = CurrentUser.Login;
+                newSettings.ModifiedByName = CurrentUser.Name;
+                newSettings.ModifiedUtcTicks = DateTime.UtcNow.Ticks;
 
                 try
                 {
@@ -723,9 +779,69 @@ namespace TankManager.Core.ViewModels
                         "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
+                _storageService.Audit.Record(AuditAction.PricingChanged, details: changes);
+
                 PricingSettings = newSettings;
                 RecalculateAllCosts();
             }
+        }
+
+        /// <summary>
+        /// Окно «Сотрудники» (администратор): роли берутся из _users.json в серверной папке
+        /// </summary>
+        private void OpenUsers()
+        {
+            if (!CanManageUsers) return;
+
+            var directory = new UserDirectoryService(_storageService.ServerStorageFolder);
+            List<UserAccount> users;
+            try
+            {
+                users = directory.ReadServer();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Не удалось прочитать список сотрудников: {ex.Message}");
+                MessageBox.Show($"Не удалось прочитать список сотрудников с сервера:\n{ex.Message}",
+                    "Сотрудники", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var dialog = new TankManager.Views.UsersDialog(users, _storageService.AdminLogins.ToList());
+            dialog.Owner = Application.Current.MainWindow;
+            if (dialog.ShowDialog() != true || dialog.ChangedUsers.Count == 0)
+                return;
+
+            try
+            {
+                directory.SaveChanges(dialog.ChangedUsers);
+                _storageService.Audit.Record(AuditAction.UsersChanged, details: dialog.ChangesDescription);
+                ShowSnackbar("Список сотрудников сохранён. Роли применятся после перезапуска программы у сотрудников");
+
+                // Своё ФИО могли поправить
+                var me = UserDirectoryService.Find(dialog.ChangedUsers, CurrentUser.Login);
+                if (me != null)
+                {
+                    CurrentUser.SetRegistered(me);
+                    NotifyCurrentUserChanged();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Не удалось сохранить список сотрудников", ex);
+                MessageBox.Show($"Не удалось сохранить список сотрудников:\n{ex.Message}",
+                    "Сотрудники", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Журнал изменений (все сотрудники); productName — сразу отфильтровать по изделию
+        /// </summary>
+        private void OpenAuditLog(string productName)
+        {
+            var dialog = new TankManager.Views.AuditLogDialog(() => _storageService.Audit.ReadAll(), productName);
+            dialog.Owner = Application.Current.MainWindow;
+            dialog.ShowDialog();
         }
 
         /// <summary>
@@ -750,6 +866,9 @@ namespace TankManager.Core.ViewModels
             if (dialog.ShowDialog() != true)
                 return;
 
+            // Для журнала: операции до правки
+            var operationsBefore = part.Operations.Select(op => op.Clone()).ToList();
+
             foreach (var target in sameParts)
             {
                 target.Operations.Clear();
@@ -766,9 +885,18 @@ namespace TankManager.Core.ViewModels
             // сохранять изделие, и пересохранение изделия конструктором их не затирает
             var product = CurrentProduct;
             var operations = dialog.Operations.Select(op => op.Clone()).ToList();
+            string changes = ChangeDescriber.DescribeOperations(operationsBefore, part.Operations);
             try
             {
                 string serverError = await Task.Run(() => _storageService.SaveOperationEdits(product, part, operations));
+
+                foreach (var target in sameParts)
+                    target.SetOperationsModified(CurrentUser.DisplayName, DateTime.UtcNow);
+
+                if (changes != null)
+                    _storageService.Audit.Record(AuditAction.OperationsEdited, product.Name, product.Marking,
+                        part.Name, part.Marking, changes);
+
                 if (serverError == null)
                 {
                     StatusMessage = $"Операции детали «{part.Name}» сохранены";
@@ -1004,6 +1132,14 @@ namespace TankManager.Core.ViewModels
 
             RestoreOperationEdits(kompasProduct);
             RestoreImagePathsFromSaved(kompasProduct, savedProduct);
+
+            // Кто сохранял — показываем и для изделия, открытого из КОМПАС
+            if (savedProduct != null)
+            {
+                kompasProduct.SavedBy = savedProduct.SavedBy;
+                kompasProduct.SavedByName = savedProduct.SavedByName;
+                kompasProduct.SavedUtc = savedProduct.SavedUtc;
+            }
         }
 
         /// <summary>
@@ -1917,6 +2053,44 @@ namespace TankManager.Core.ViewModels
             }
 
             RunSafe(RunServerSyncAsync(interactive: false));
+            RunSafe(RegisterCurrentUserAsync());
+        }
+
+        /// <summary>
+        /// Добавляет сотрудника в общий список при первом запуске (ФИО — из домена, в фоне).
+        /// Первый администратор (из storage_settings) так же создаёт сам список
+        /// </summary>
+        private async Task RegisterCurrentUserAsync()
+        {
+            bool needed = CurrentUser.NeedsRegistration || (!CurrentUser.AccountsEnabled && CurrentUser.IsAdmin);
+            if (!needed || !HasServerStorageFolder)
+                return;
+
+            string serverFolder = _storageService.ServerStorageFolder;
+            var role = CurrentUser.RoleFromCurrentMode();
+            bool isAdmin = CurrentUser.IsAdmin;
+
+            try
+            {
+                bool created = false;
+                var account = await Task.Run(() => new UserDirectoryService(serverFolder).Register(CurrentUser.Login, role, isAdmin, out created));
+                if (account == null)
+                    return;
+
+                CurrentUser.SetRegistered(account);
+                NotifyCurrentUserChanged();
+
+                if (created)
+                {
+                    _storageService.Audit.Record(AuditAction.UserRegistered,
+                        details: $"{account.Login} — {account.DisplayName}, роль: {UserAccount.RoleTitle(account.Role)}{(account.IsAdmin ? ", администратор" : "")}");
+                    _logger.LogInfo($"Сотрудник {account.Login} добавлен в общий список");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Не удалось добавить сотрудника в общий список: {ex.Message}");
+            }
         }
 
         private Task SyncFromServerAsync() => RunServerSyncAsync(interactive: true);

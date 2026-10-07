@@ -385,6 +385,34 @@ namespace TankManager.Core.Models
             };
         }
 
+        private string _operationsModifiedBy;
+        private DateTime? _operationsModifiedUtc;
+
+        /// <summary>
+        /// Кто последним правил операции детали (из operations.json, не сохраняется в product.json)
+        /// </summary>
+        public string OperationsModifiedBy => _operationsModifiedBy;
+
+        public DateTime? OperationsModifiedUtc => _operationsModifiedUtc;
+
+        /// <summary>
+        /// «Операции изменил: ФИО, дата» для карточки детали (null — правок не было)
+        /// </summary>
+        public string OperationsModifiedInfo => string.IsNullOrEmpty(_operationsModifiedBy)
+            ? null
+            : _operationsModifiedUtc.HasValue
+                ? $"Операции изменил: {_operationsModifiedBy}, {_operationsModifiedUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
+                : $"Операции изменил: {_operationsModifiedBy}";
+
+        public void SetOperationsModified(string by, DateTime? utc)
+        {
+            _operationsModifiedBy = by;
+            _operationsModifiedUtc = utc;
+            OnPropertyChanged(nameof(OperationsModifiedBy));
+            OnPropertyChanged(nameof(OperationsModifiedUtc));
+            OnPropertyChanged(nameof(OperationsModifiedInfo));
+        }
+
         /// <summary>
         /// Пересчитать стоимость операций из сумм Cost каждой операции
         /// </summary>

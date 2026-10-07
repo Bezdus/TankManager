@@ -262,6 +262,35 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
+        /// Кто и когда последним изменил расценки (в старых файлах отсутствует)
+        /// </summary>
+        [DataMember(EmitDefaultValue = false)]
+        public string ModifiedBy { get; set; }
+
+        [DataMember(EmitDefaultValue = false)]
+        public string ModifiedByName { get; set; }
+
+        [DataMember(EmitDefaultValue = false)]
+        public long ModifiedUtcTicks { get; set; }
+
+        /// <summary>
+        /// «Изменил: ФИО, дата» для окна расценок (null — не известно)
+        /// </summary>
+        public string ModifiedInfo
+        {
+            get
+            {
+                string by = string.IsNullOrWhiteSpace(ModifiedByName) ? ModifiedBy : ModifiedByName;
+                if (string.IsNullOrEmpty(by))
+                    return null;
+
+                return ModifiedUtcTicks > 0
+                    ? $"Последнее изменение: {by}, {new DateTime(ModifiedUtcTicks, DateTimeKind.Utc).ToLocalTime():dd.MM.yyyy HH:mm}"
+                    : $"Последнее изменение: {by}";
+            }
+        }
+
+        /// <summary>
         /// Найти цену за метр трубы по подстроке сортамента в материале
         /// </summary>
         public double GetTubularPricePerMeter(string material)

@@ -21,7 +21,10 @@ namespace TankManager.Views
                 EngravingPricePerMm = settings.EngravingPricePerMm,
                 BendingPricePerOperation = settings.BendingPricePerOperation,
                 RollingPricePerKg = settings.RollingPricePerKg,
-                FlangingPricePerOperation = settings.FlangingPricePerOperation
+                FlangingPricePerOperation = settings.FlangingPricePerOperation,
+                ModifiedBy = settings.ModifiedBy,
+                ModifiedByName = settings.ModifiedByName,
+                ModifiedUtcTicks = settings.ModifiedUtcTicks
             };
 
             foreach (var entry in settings.TubularPricing ?? Enumerable.Empty<TubularPricingEntry>())

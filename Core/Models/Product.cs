@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Media.Imaging;
@@ -61,6 +62,51 @@ namespace TankManager.Core.Models
         /// Трубный прокат (материал -> суммарная масса)
         /// </summary>
         public ObservableCollection<MaterialInfo> OtherMaterials { get; }
+
+        private string _savedBy;
+        private string _savedByName;
+        private DateTime? _savedUtc;
+
+        /// <summary>
+        /// Логин сотрудника, сохранившего изделие (null — изделие не сохранялось или сохранено старой версией)
+        /// </summary>
+        public string SavedBy
+        {
+            get => _savedBy;
+            set { _savedBy = value; NotifySavedInfoChanged(); }
+        }
+
+        public string SavedByName
+        {
+            get => _savedByName;
+            set { _savedByName = value; NotifySavedInfoChanged(); }
+        }
+
+        public DateTime? SavedUtc
+        {
+            get => _savedUtc;
+            set { _savedUtc = value; NotifySavedInfoChanged(); }
+        }
+
+        public string SavedByDisplay => string.IsNullOrWhiteSpace(SavedByName) ? SavedBy : SavedByName;
+
+        /// <summary>
+        /// «Сохранил: ФИО, дата» для шапки изделия (null — не известно)
+        /// </summary>
+        public string SavedInfo => string.IsNullOrEmpty(SavedByDisplay)
+            ? null
+            : SavedUtc.HasValue
+                ? $"Сохранил: {SavedByDisplay}, {SavedUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
+                : $"Сохранил: {SavedByDisplay}";
+
+        private void NotifySavedInfoChanged()
+        {
+            OnPropertyChanged(nameof(SavedBy));
+            OnPropertyChanged(nameof(SavedByName));
+            OnPropertyChanged(nameof(SavedUtc));
+            OnPropertyChanged(nameof(SavedByDisplay));
+            OnPropertyChanged(nameof(SavedInfo));
+        }
 
         /// <summary>
         /// Общее количество деталей в изделии
@@ -147,6 +193,9 @@ namespace TankManager.Core.Models
             Name = null;
             Marking = null;
             Mass = 0;
+            SavedBy = null;
+            SavedByName = null;
+            SavedUtc = null;
             Context?.Dispose();
             Context = null;
             

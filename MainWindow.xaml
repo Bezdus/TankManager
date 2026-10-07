@@ -778,6 +778,15 @@
                             <TextBlock Text="Цены"/>
                         </StackPanel>
                     </Button>
+
+                    <Button Command="{Binding OpenAuditLogCommand}"
+                            Style="{StaticResource PanelButtonStyle}"
+                            ToolTip="Кто и когда менял изделия, операции, расценки и сотрудников">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE81C;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
+                            <TextBlock Text="Журнал"/>
+                        </StackPanel>
+                    </Button>
                 </WrapPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -800,6 +809,9 @@
                         </Button.Style>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding ModeIcon}" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding CurrentUserName}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                       MaxWidth="200" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="·" VerticalAlignment="Center" Margin="0,0,6,0"/>
                             <TextBlock Text="{Binding ModeBannerText}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             <Ellipse Width="6" Height="6" Fill="{StaticResource Warning}" Margin="6,0,0,0" VerticalAlignment="Center"
                                      ToolTip="Режим изменится после перезапуска программы"
@@ -1115,7 +1127,12 @@
                                     <TextBox Text="{Binding CurrentProduct.Marking, Mode=OneWay}"
                                              Style="{StaticResource PropertyValue}"
                                              Foreground="{StaticResource TextSecondary}"
-                                             Margin="0,2,0,14"/>
+                                             Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding CurrentProduct.SavedInfo}"
+                                               FontSize="11" Margin="0,2,0,0"
+                                               Foreground="{StaticResource TextMuted}"
+                                               Visibility="{Binding CurrentProduct.SavedInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
+                                    <Border Height="14"/>
 
                                     <!-- Ключевые показатели -->
                                     <UniformGrid Columns="3" Margin="0,0,-8,0">
@@ -1417,6 +1434,11 @@
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
                                         </ItemsControl>
+
+                                        <TextBlock Text="{Binding OperationsModifiedInfo}"
+                                                   FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource TextMuted}"
+                                                   Visibility="{Binding OperationsModifiedInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
                                     </StackPanel>
                                 </Grid>
                             </Grid>
@@ -1972,13 +1994,22 @@
                                                    Foreground="{StaticResource TextMuted}">
                                             <Run Text="{Binding DetailsCount, StringFormat='{}{0} дет.', Mode=OneWay}"/>
                                             <Run Text="·"/>
-                                            <Run Text="{Binding SavedDate, StringFormat='{}{0:dd.MM.yyyy HH:mm}', Mode=OneWay}"/>
+                                            <Run Text="{Binding SavedInfo, Mode=OneWay}"/>
                                         </TextBlock>
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="1" Orientation="Horizontal"
                                                 VerticalAlignment="Center"
                                                 Margin="8,0,0,0">
+                                        <!-- История изменений изделия -->
+                                        <Button Command="{Binding DataContext.OpenProductAuditLogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                Panel.ZIndex="1"
+                                                ToolTip="История изменений изделия"
+                                                Style="{StaticResource IconButton}"
+                                                Margin="0,0,2,0">
+                                            <TextBlock Text="&#xE81C;" FontFamily="{StaticResource IconFont}" IsHitTestVisible="False"/>
+                                        </Button>
                                         <!-- Кнопка удаления локально -->
                                         <Button PreviewMouseDown="DeleteProductLocal_PreviewMouseDown"
                                                 Panel.ZIndex="1"
@@ -2060,6 +2091,34 @@
                     Width="300"
                     Effect="{StaticResource SoftShadow}">
                 <StackPanel>
+                    <TextBlock Text="Сотрудник"
+                               Style="{StaticResource CaptionText}"
+                               Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding CurrentUserName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding CurrentUserLogin, StringFormat='Логин Windows: {0}'}"
+                               FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,10"/>
+
+                    <!-- Роль из общего списка сотрудников -->
+                    <StackPanel Visibility="{Binding AccountsEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,4" Text="Роль"/>
+                        <TextBlock Text="{Binding ModeBannerText}" FontWeight="SemiBold"/>
+                        <TextBlock Text="Роль назначает администратор в списке сотрудников. Изменение роли вступает в силу после перезапуска программы."
+                                   FontSize="10" Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </StackPanel>
+
+                    <Button Command="{Binding OpenUsersCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            Height="30" Margin="0,10,0,0"
+                            Visibility="{Binding CanManageUsers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE716;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"/>
+                            <TextBlock Text="Сотрудники…"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Списка сотрудников нет: режим выбирается вручную, как раньше -->
+                    <StackPanel Visibility="{Binding IsModeSwitchAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock Text="Режим работы"
                                Style="{StaticResource CaptionText}"
                                Margin="0,0,0,6"/>
@@ -2117,6 +2176,7 @@
                                TextWrapping="Wrap"
                                Foreground="{StaticResource Warning}"
                                Visibility="{Binding IsModeRestartRequired, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Popup>

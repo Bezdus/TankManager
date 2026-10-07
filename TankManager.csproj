@@ -71,6 +71,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.DirectoryServices.AccountManagement" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
@@ -98,12 +99,25 @@
     <Compile Include="Core\Services\DxfResolver.cs" />
     <Compile Include="Core\Services\FileLockDiagnostics.cs" />
     <Compile Include="Core\Services\ImageSyncService.cs" />
+    <Compile Include="Core\Services\AuditLog.cs" />
+    <Compile Include="Core\Services\ChangeDescriber.cs" />
     <Compile Include="Core\Services\OperationEditsMerger.cs" />
     <Compile Include="Core\Services\ProductStorageService.OperationEdits.cs" />
+    <Compile Include="Core\Services\UserAccounts.cs" />
+    <Compile Include="Views\AuditLogDialog.xaml.cs" />
     <Compile Include="Views\NumberInput.cs" />
     <Compile Include="Views\OperationsEditorDialog.xaml.cs" />
+    <Compile Include="Views\UsersDialog.xaml.cs" />
     <Compile Include="Views\PricingSettingsDialog.xaml.cs" />
     <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\AuditLogDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\UsersDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

@@ -51,8 +51,25 @@ namespace TankManager.Core.Services
             new Dictionary<string, ProductMeta>(StringComparer.OrdinalIgnoreCase);
         private string _serverStorageFolder;
         private AppModeSetting _modeSetting = AppModeSetting.Auto;
+        private List<string> _ownAdmins;
+        private List<string> _defaultAdmins;
         private DateTime _serverCheckedAtUtc = DateTime.MinValue;
         private bool _serverAvailableCached;
+
+        /// <summary>
+        /// Журнал изменений (записи копируются в серверную папку)
+        /// </summary>
+        public AuditService Audit { get; }
+
+        /// <summary>
+        /// Логины, которые всегда администраторы: из storage_settings.json и storage_settings.default.json
+        /// </summary>
+        public IReadOnlyCollection<string> AdminLogins =>
+            (_ownAdmins ?? new List<string>())
+                .Concat(_defaultAdmins ?? new List<string>())
+                .Where(a => !string.IsNullOrWhiteSpace(a))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
         /// <summary>
         /// Ошибка последней операции с серверной папкой (null, если всё прошло успешно)
@@ -128,6 +145,7 @@ namespace TankManager.Core.Services
         {
             Directory.CreateDirectory(ProductsDirectory);
             LoadSettings();
+            Audit = new AuditService(() => _serverStorageFolder);
         }
 
         #region Settings
@@ -139,27 +157,43 @@ namespace TankManager.Core.Services
                 // Своих настроек ещё нет — берём поставляемые с программой (путь к общей папке изделий)
                 string path = File.Exists(SettingsFilePath) ? SettingsFilePath : DefaultSettingsFilePath;
 
-                if (File.Exists(path))
+                var settings = ReadSettingsFile(path);
+                if (settings != null)
                 {
-                    var serializer = new DataContractJsonSerializer(typeof(StorageSettings));
-                    using (var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    using (var memoryStream = new MemoryStream())
-                    {
-                        fileStream.CopyTo(memoryStream);
-                        memoryStream.Position = 0;
-                        var settings = (StorageSettings)serializer.ReadObject(memoryStream);
-                        _serverStorageFolder = settings?.ServerStorageFolder;
+                    _serverStorageFolder = settings.ServerStorageFolder;
 
-                        AppModeSetting mode;
-                        if (Enum.TryParse(settings?.Mode, true, out mode))
-                            _modeSetting = mode;
-                    }
+                    AppModeSetting mode;
+                    if (Enum.TryParse(settings.Mode, true, out mode))
+                        _modeSetting = mode;
+
+                    if (path == SettingsFilePath)
+                        _ownAdmins = settings.Admins;
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"Ошибка загрузки настроек хранения: {ex.Message}");
             }
+
+            // Администраторы из поставляемых настроек действуют, даже если у пользователя свой storage_settings.json
+            try
+            {
+                _defaultAdmins = ReadSettingsFile(DefaultSettingsFilePath)?.Admins;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Ошибка чтения {Path.GetFileName(DefaultSettingsFilePath)}: {ex.Message}");
+            }
+        }
+
+        private static StorageSettings ReadSettingsFile(string path)
+        {
+            if (!File.Exists(path))
+                return null;
+
+            var serializer = new DataContractJsonSerializer(typeof(StorageSettings));
+            using (var memoryStream = new MemoryStream(File.ReadAllBytes(path)))
+                return (StorageSettings)serializer.ReadObject(memoryStream);
         }
 
         private void SaveSettings()
@@ -169,7 +203,8 @@ namespace TankManager.Core.Services
                 var settings = new StorageSettings
                 {
                     ServerStorageFolder = _serverStorageFolder,
-                    Mode = _modeSetting == AppModeSetting.Auto ? null : _modeSetting.ToString()
+                    Mode = _modeSetting == AppModeSetting.Auto ? null : _modeSetting.ToString(),
+                    Admins = _ownAdmins
                 };
                 var serializer = new DataContractJsonSerializer(typeof(StorageSettings));
 
@@ -336,6 +371,9 @@ namespace TankManager.Core.Services
                 // Фаза 3: Синхронизация изображений на уровне отдельных файлов
                 if (!skipImages)
                     SyncAllProductImages();
+
+                // Фаза 4: свои записи журнала изменений, сделанные без сервера
+                Audit.UploadPending();
             }
             catch (Exception ex)
             {
@@ -495,7 +533,27 @@ namespace TankManager.Core.Services
             {
                 LastServerError = null;
 
+                // Прежняя версия — для журнала изменений
+                Product previous = null;
+                string previousFolder = FindExistingProductFolder(product, ProductsDirectory);
+                if (previousFolder != null)
+                    previous = LoadFromFile(Path.Combine(previousFolder, ProductJsonFileName), null);
+
+                product.SavedBy = CurrentUser.Login;
+                product.SavedByName = CurrentUser.Name;
+                product.SavedUtc = DateTime.UtcNow;
+
                 string localFilePath = SaveToDirectory(product, ProductsDirectory, customName);
+
+                string changes;
+                try { changes = ChangeDescriber.DescribeProduct(previous, product); }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Не удалось сравнить изделие с прежней версией: {ex.Message}");
+                    changes = null;
+                }
+                Audit.Record(AuditAction.ProductSaved, product.Name, product.Marking, details: changes);
+                previous?.Dispose();
 
                 if (DownloadOnly)
                 {
@@ -675,7 +733,8 @@ namespace TankManager.Core.Services
                         ProductName = meta.Name,
                         Marking = meta.Marking,
                         DetailsCount = meta.DetailsCount,
-                        SavedDate = meta.SavedDate
+                        SavedDate = meta.SavedDate,
+                        SavedBy = meta.SavedBy
                     });
                 }
                 catch (Exception ex)
@@ -732,10 +791,28 @@ namespace TankManager.Core.Services
             lock (_ioLock)
             {
                 LastServerError = null;
+
+                // Название изделия для журнала — до удаления папки
+                ProductMeta meta = null;
+                try
+                {
+                    string localFolder = Path.Combine(ProductsDirectory, folderName);
+                    meta = GetMeta(localFolder);
+                    if (meta == null && HasServerFolder && IsServerAvailable)
+                        meta = GetMeta(Path.Combine(_serverStorageFolder, folderName));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Не удалось прочитать удаляемое изделие {folderName}: {ex.Message}");
+                }
+
                 bool deletedAny = DeleteLocalCore(folderName);
 
                 if (!HasServerFolder || DownloadOnly)
                     return deletedAny;
+
+                Audit.Record(AuditAction.ProductDeleted, meta?.Name ?? folderName, meta?.Marking,
+                    details: meta == null ? null : $"Деталей: {meta.DetailsCount}");
 
                 bool serverDone = false;
 
@@ -829,6 +906,7 @@ namespace TankManager.Core.Services
             public string Marking;
             public int DetailsCount;
             public DateTime SavedDate;
+            public string SavedBy;
         }
 
         /// <summary>
@@ -861,7 +939,9 @@ namespace TankManager.Core.Services
                 Name = product.Name,
                 Marking = product.Marking,
                 DetailsCount = product.Details.Count,
-                SavedDate = info.LastWriteTime
+                // Дата из файла, если её записали: при синхронизации дата изменения файла — время копирования
+                SavedDate = product.SavedUtc?.ToLocalTime() ?? info.LastWriteTime,
+                SavedBy = product.SavedByDisplay
             };
 
             lock (_metaCache)
@@ -919,7 +999,7 @@ namespace TankManager.Core.Services
         {
             var items = ReadTombstones(path);
             items.RemoveAll(i => string.Equals(i.FolderName, folderName, StringComparison.OrdinalIgnoreCase));
-            items.Add(new TombstoneEntry { FolderName = folderName, DeletedUtcTicks = DateTime.UtcNow.Ticks });
+            items.Add(new TombstoneEntry { FolderName = folderName, DeletedUtcTicks = DateTime.UtcNow.Ticks, DeletedBy = CurrentUser.Login });
             WriteTombstones(path, items);
         }
 
@@ -954,6 +1034,7 @@ namespace TankManager.Core.Services
                 else if (entry.DeletedUtcTicks > existing.DeletedUtcTicks)
                 {
                     existing.DeletedUtcTicks = entry.DeletedUtcTicks;
+                    existing.DeletedBy = entry.DeletedBy;
                     changed = true;
                 }
             }
@@ -1106,6 +1187,9 @@ namespace TankManager.Core.Services
                     : MakeRelativePath(product.FilePreviewPngPath, productFolder),
                 Details = product.Details.Select(d => ToPartDto(d, productFolder)).ToList(),
                 StandardParts = product.StandardParts.Select(d => ToPartDto(d, productFolder)).ToList(),
+                SavedBy = product.SavedBy,
+                SavedByName = product.SavedByName,
+                SavedUtcTicks = product.SavedUtc?.Ticks ?? 0,
                 SheetMaterials = product.SheetMaterials.Select(m => ToMaterialDto(m)).ToList(),
                 TubularProducts = product.TubularProducts.Select(m => ToMaterialDto(m)).ToList(),
                 OtherMaterials = product.OtherMaterials.Select(m => ToMaterialDto(m)).ToList()
@@ -1343,6 +1427,9 @@ namespace TankManager.Core.Services
             product.Marking = dto.Marking;
             product.Mass = dto.Mass;
             product.FilePath = dto.FilePath;
+            product.SavedBy = dto.SavedBy;
+            product.SavedByName = dto.SavedByName;
+            product.SavedUtc = dto.SavedUtcTicks > 0 ? new DateTime(dto.SavedUtcTicks, DateTimeKind.Utc) : (DateTime?)null;
 
             if (!string.IsNullOrEmpty(dto.FilePreviewPngPath) && !string.IsNullOrEmpty(productFolder))
                 product.FilePreviewPngPath = EnsureInsideProducts(ResolveAbsolutePath(dto.FilePreviewPngPath, productFolder));
@@ -1479,7 +1566,16 @@ namespace TankManager.Core.Services
         public int DetailsCount { get; set; }
         public DateTime SavedDate { get; set; }
 
+        /// <summary>
+        /// Кто сохранил изделие (ФИО или логин; null — в старых файлах не записано)
+        /// </summary>
+        public string SavedBy { get; set; }
+
         public string DisplayName => $"{ProductName} ({Marking}) - {DetailsCount} дет.";
+
+        public string SavedInfo => string.IsNullOrEmpty(SavedBy)
+            ? SavedDate.ToString("dd.MM.yyyy HH:mm")
+            : $"{SavedDate:dd.MM.yyyy HH:mm} · {SavedBy}";
     }
 
     /// <summary>
@@ -1496,6 +1592,12 @@ namespace TankManager.Core.Services
         /// </summary>
         [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
         public string Mode { get; set; }
+
+        /// <summary>
+        /// Логины, которые всегда администраторы (первый администратор задаётся в storage_settings.default.json)
+        /// </summary>
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public List<string> Admins { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
@@ -1506,6 +1608,9 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public long DeletedUtcTicks { get; set; }
+
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public string DeletedBy { get; set; }
     }
 
     [System.Runtime.Serialization.DataContract]
@@ -1541,6 +1646,18 @@ namespace TankManager.Core.Services
 
         [System.Runtime.Serialization.DataMember]
         public List<PartModelDto> StandardParts { get; set; }
+
+        /// <summary>
+        /// Кто и когда сохранил изделие (в старых файлах отсутствует)
+        /// </summary>
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public string SavedBy { get; set; }
+
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public string SavedByName { get; set; }
+
+        [System.Runtime.Serialization.DataMember(EmitDefaultValue = false)]
+        public long SavedUtcTicks { get; set; }
 
         [System.Runtime.Serialization.DataMember]
         public List<MaterialInfoDto> SheetMaterials { get; set; }

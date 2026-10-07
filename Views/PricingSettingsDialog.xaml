@@ -13,6 +13,7 @@
         Background="{StaticResource WindowBackground}">
     <Window.Resources>
         <app:DecimalTextConverter x:Key="DecimalText"/>
+        <app:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter"/>
 
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -108,6 +109,10 @@
                        FontSize="11" Margin="0,4,0,0"
                        Foreground="{StaticResource TextMuted}"
                        Visibility="Collapsed"/>
+            <TextBlock Text="{Binding ModifiedInfo, Mode=OneTime}"
+                       FontSize="11" Margin="0,4,0,0"
+                       Foreground="{StaticResource TextMuted}"
+                       Visibility="{Binding ModifiedInfo, Mode=OneTime, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">

@@ -37,7 +37,8 @@ namespace TankManager.Core.Services
                 PartName = part.Name,
                 Marking = part.Marking,
                 ModifiedUtcTicks = DateTime.UtcNow.Ticks,
-                ModifiedBy = Environment.UserName,
+                ModifiedBy = CurrentUser.Login,
+                ModifiedByName = CurrentUser.Name,
                 Operations = ops.Any(op => op.IsModified)
                     ? ops.Select(ToOperationDto).ToList()
                     : new List<OperationDto>()
@@ -110,6 +111,9 @@ namespace TankManager.Core.Services
                         .ToList();
 
                     int lost = OperationEditsMerger.ReplaceEdits(part, operations);
+                    part.SetOperationsModified(
+                        string.IsNullOrWhiteSpace(entry.ModifiedByName) ? entry.ModifiedBy : entry.ModifiedByName,
+                        entry.ModifiedUtcTicks > 0 ? new DateTime(entry.ModifiedUtcTicks, DateTimeKind.Utc) : (DateTime?)null);
                     if (lost > 0 && reported.Add(key))
                         _logger.LogWarning($"Правки операций детали {part.Name} {part.Marking}: {lost} шт. не применены — операции больше нет в модели КОМПАС");
                 }
@@ -265,6 +269,9 @@ namespace TankManager.Core.Services
 
         [DataMember]
         public string ModifiedBy { get; set; }
+
+        [DataMember(EmitDefaultValue = false)]
+        public string ModifiedByName { get; set; }
 
         /// <summary>
         /// Все операции детали после правки; пустой список — правки сброшены

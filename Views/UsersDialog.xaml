@@ -1,0 +1,72 @@
+﻿<Window x:Class="TankManager.Views.UsersDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Сотрудники"
+        Width="760" Height="520"
+        MinWidth="560" MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI"
+        FontSize="12"
+        Foreground="{StaticResource TextPrimary}"
+        Background="{StaticResource WindowBackground}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="4,0,0,12">
+            <TextBlock Text="Сотрудники и роли" FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{StaticResource TextMuted}"
+                       Text="Сотрудник попадает в список сам при первом запуске программы. Роль применяется после перезапуска программы у сотрудника. Отключённый сотрудник может только просматривать изделия."/>
+        </StackPanel>
+
+        <DataGrid x:Name="UsersGrid" Grid.Row="1" Style="{StaticResource ListGrid}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Логин" Width="130" IsReadOnly="True" Binding="{Binding Login}"/>
+                <DataGridTextColumn Header="ФИО" Width="*" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
+                <DataGridTemplateColumn Header="Роль" Width="140">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ComboBox ItemsSource="{Binding RoleOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      SelectedValuePath="Key" DisplayMemberPath="Value"
+                                      SelectedValue="{Binding Role, UpdateSourceTrigger=PropertyChanged}"
+                                      Height="26"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Админ" Width="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsAdmin, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"
+                                      ToolTip="Администратор ведёт список сотрудников"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Отключён" Width="70">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsDisabled, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"
+                                      ToolTip="Только просмотр (например, сотрудник уволился)"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Добавлен" Width="90" IsReadOnly="True"
+                                    Binding="{Binding AddedLocal, StringFormat='{}{0:dd.MM.yyyy}'}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <DockPanel Grid.Row="2" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Отмена" IsCancel="True" Click="CancelButton_Click"
+                        Style="{StaticResource SecondaryButton}"
+                        MinWidth="90" Height="32" Margin="0,0,8,0"/>
+                <Button Content="Сохранить" IsDefault="True" Click="SaveButton_Click"
+                        Style="{StaticResource PrimaryButton}"
+                        MinWidth="110" Height="32"/>
+            </StackPanel>
+            <TextBlock x:Name="CountText" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="4,0,0,0"/>
+        </DockPanel>
+    </Grid>
+</Window>

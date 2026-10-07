@@ -86,6 +86,21 @@ syncs saved products to local/server storage.
   `ProductStorageService` checks `DownloadOnly` (sync phase 2, tombstones, image sync,
   Save/Delete). KOMPAS-only UI is bound to `IsEngineerMode`. Sync also runs in the
   background on startup and when the products panel opens (`RunServerSyncAsync`).
+- Accounts (`Core\Services\UserAccounts.cs`): the user is identified by Windows login
+  (`CurrentUser.Login`, no password); roles come from `<server folder>\_users.json` (cache
+  `users_cache.json` next to the exe), read at startup with a ~3 s timeout. If the list exists the role
+  overrides the `Mode` setting and the mode switcher is hidden; without the list (file not created yet,
+  no server, no cache) the old `Mode` logic applies. A user not in the list keeps the old mode and is
+  added in the background (`RegisterCurrentUserAsync`, role = current mode, full name read-only from AD
+  via `UserPrincipal.Current` with a timeout) — the only server write allowed for viewers. Logins in
+  `Admins` of `storage_settings.json` / `storage_settings.default.json` are always admin + engineer;
+  admins edit the list in `Views\UsersDialog` (saved by re-reading and merging per login).
+- Change tracking: `product.json` (`SavedBy`/`SavedByName`/`SavedUtcTicks`, set in `Save`),
+  `operations.json` (`ModifiedBy`/`ModifiedByName`, shown via `PartModel.OperationsModifiedInfo`),
+  pricing (`ModifiedBy*`, set in `OpenPricingSettings`), tombstones (`DeletedBy`). Audit log
+  (`Core\Services\AuditLog.cs`): one append-only file per user and month
+  `products\_audit\<login>_<yyyy-MM>.jsonl`, copied to `<server folder>\_audit` (`UploadPending`, also
+  sync phase 4); `ChangeDescriber` builds the «было → стало» text; viewed in `Views\AuditLogDialog`.
 - `FileLogger` writes `%AppData%\TankManager\TankManager.log`. Use `ILogger`, not
   `Debug.WriteLine` (no output in Release).
 - COM lifetime: `Product` owns its `KompasContext` and disposes it (`Product.Dispose`);
