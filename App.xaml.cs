@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Markup;
 using TankManager.Core.Services;
@@ -10,6 +11,8 @@ namespace TankManager
     /// </summary>
     public partial class App : Application
     {
+        private static readonly ILogger Logger = new FileLogger();
+
         protected override void OnStartup(StartupEventArgs e)
         {
             // Привязки WPF форматируют числа по Language элемента (по умолчанию en-US).
@@ -22,6 +25,7 @@ namespace TankManager
             
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
             // Проверка обновлений при запуске приложения
             UpdateService.CheckForUpdates(showNoUpdateMessage: false);
@@ -34,6 +38,7 @@ namespace TankManager
             }
             catch (Exception ex)
             {
+                Logger.LogError("Критическая ошибка при запуске приложения", ex);
                 MessageBox.Show(
                     $"Критическая ошибка при запуске приложения:\n\n{ex.Message}",
                     "Ошибка запуска", 
@@ -45,6 +50,7 @@ namespace TankManager
 
         private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
+            Logger.LogError("Необработанное исключение в UI-потоке", e.Exception);
             MessageBox.Show(
                 $"Необработанное исключение:\n\n{e.Exception.Message}",
                 "Ошибка", 
@@ -57,11 +63,19 @@ namespace TankManager
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             var exception = e.ExceptionObject as Exception;
+            Logger.LogError($"Критическая ошибка (завершение: {e.IsTerminating})", exception);
             MessageBox.Show(
                 $"Критическая ошибка:\n\n{exception?.Message}",
                 "Критическая ошибка", 
                 MessageBoxButton.OK, 
                 MessageBoxImage.Error);
+        }
+
+        // Исключение в задаче, результат которой никто не ждал: без обработчика оно пропадает бесследно
+        private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Logger.LogError("Необработанное исключение в фоновой задаче", e.Exception?.GetBaseException());
+            e.SetObserved();
         }
     }
 }

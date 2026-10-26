@@ -14,11 +14,35 @@ namespace TankManager.Core.Services
     public static class OperationEditsMerger
     {
         /// <summary>
-        /// Ключ детали для правок: одинаковые экземпляры в сборке правятся вместе
+        /// Ключ детали для правок: одинаковые экземпляры в сборке правятся вместе.
+        /// Из пути к файлу берётся только имя: тот же проект у разных сотрудников может лежать
+        /// по разным путям (буква диска, сетевой путь), а после переноса папки правки не должны теряться
         /// </summary>
         public static string GetPartKey(PartModel part)
         {
-            return $"{part.Name}|{part.Marking}|{part.FilePath}";
+            return $"{part.Name}|{part.Marking}|{FileNameOf(part.FilePath)}";
+        }
+
+        /// <summary>
+        /// Ключ из файлов прежних версий («Имя|Обозначение|полный путь») в нынешнем виде
+        /// </summary>
+        public static string NormalizeKey(string key)
+        {
+            if (string.IsNullOrEmpty(key))
+                return key;
+
+            int separator = key.LastIndexOf('|');
+            return separator < 0 ? key : key.Substring(0, separator + 1) + FileNameOf(key.Substring(separator + 1));
+        }
+
+        // Без Path.GetFileName: путь из чужого файла может содержать недопустимые символы
+        private static string FileNameOf(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return string.Empty;
+
+            int slash = path.LastIndexOfAny(new[] { '\\', '/' });
+            return slash < 0 ? path : path.Substring(slash + 1);
         }
 
         /// <summary>

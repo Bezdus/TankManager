@@ -424,16 +424,31 @@ namespace TankManager.Core.Models
         /// </summary>
         public double GetLaserCuttingPricePerMeter(double thickness)
         {
-            if (thickness > 0 && LaserCuttingPricing != null)
+            var entry = FindLaserCuttingEntry(thickness);
+            return entry != null ? entry.PricePerMeter : LaserCuttingPricePerMeter;
+        }
+
+        /// <summary>
+        /// Цены по толщинам заданы, но для этой толщины (или нераспознанной) цены нет —
+        /// резка посчитается по цене по умолчанию
+        /// </summary>
+        public bool UsesDefaultLaserCuttingPrice(double thickness)
+        {
+            return LaserCuttingPricing != null && LaserCuttingPricing.Count > 0 && FindLaserCuttingEntry(thickness) == null;
+        }
+
+        private LaserCuttingPricingEntry FindLaserCuttingEntry(double thickness)
+        {
+            if (thickness <= 0 || LaserCuttingPricing == null)
+                return null;
+
+            foreach (var entry in LaserCuttingPricing)
             {
-                foreach (var entry in LaserCuttingPricing)
-                {
-                    if (Math.Abs(entry.Thickness - thickness) < 0.001)
-                        return entry.PricePerMeter;
-                }
+                if (Math.Abs(entry.Thickness - thickness) < 0.001)
+                    return entry;
             }
 
-            return LaserCuttingPricePerMeter;
+            return null;
         }
 
         /// <summary>

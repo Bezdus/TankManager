@@ -1360,6 +1360,16 @@
                                                     <Run Text="{Binding SheetPartsWithoutCuttingCount, Mode=OneWay, StringFormat='{}{0} дет.'}" FontWeight="SemiBold"/>
                                                 </TextBlock>
                                             </Button>
+                                            <Button Style="{StaticResource PanelButtonStyle}"
+                                                    Command="{Binding ShowAttentionPartsCommand}"
+                                                    CommandParameter="{x:Static vm:PartAttentionFilter.DefaultCuttingPrice}"
+                                                    ToolTip="Толщины листа нет в таблице цен резки: резка посчитана по цене по умолчанию. Нажмите, чтобы показать детали"
+                                                    Visibility="{Binding PartsWithDefaultCuttingPriceCount, Converter={StaticResource ZeroToVisibilityConverter}, ConverterParameter=Inverse}">
+                                                <TextBlock>
+                                                    <Run Text="Резка по цене по умолчанию:"/>
+                                                    <Run Text="{Binding PartsWithDefaultCuttingPriceCount, Mode=OneWay, StringFormat='{}{0} дет.'}" FontWeight="SemiBold"/>
+                                                </TextBlock>
+                                            </Button>
                                         </StackPanel>
                                     </Border>
 

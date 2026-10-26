@@ -58,7 +58,7 @@ syncs saved products to local/server storage.
   `Origin` (Kompas/Manual), `Quantity`, `IsExcluded` (KOMPAS operations are excluded, never deleted),
   `HasManualCost`/`ManualCost`, `IsEdited`. `CustomOperation` = user-defined name + price per unit.
   Edits are saved immediately, separately from `product.json`, to `operations.json` in the product folder
-  (`ProductStorageService.OperationEdits.cs`): one entry per part key `Name|Marking|FilePath` holding all
+  (`ProductStorageService.OperationEdits.cs`): one entry per part key `Name|Marking|<file name of FilePath>` (no folder, so moved projects keep their edits; old full-path keys are normalized on read, newest wins) holding all
   operations of the part (empty list = edits reset), merged per part by `ModifiedUtcTicks` between local and
   server (`SyncOperationEditsFolder`; `CopyProductFolder` skips this file). `Load` and KOMPAS loads
   (`RestoreFromSaved`) apply it with `OperationEditsMerger.ReplaceEdits` (replaces edits stored in

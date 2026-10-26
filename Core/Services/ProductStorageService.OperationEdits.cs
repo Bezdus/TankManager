@@ -225,11 +225,23 @@ namespace TankManager.Core.Services
                     return new List<PartOperationEditsDto>();
 
                 var serializer = new DataContractJsonSerializer(typeof(OperationEditsFile));
+                List<PartOperationEditsDto> parts;
                 using (var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     var file = (OperationEditsFile)serializer.ReadObject(fileStream);
-                    return file?.Parts ?? new List<PartOperationEditsDto>();
+                    parts = file?.Parts ?? new List<PartOperationEditsDto>();
                 }
+
+                // В прежних версиях ключ содержал полный путь: одна деталь с разных компьютеров
+                // могла попасть под разными ключами — оставляем более позднюю правку
+                foreach (var entry in parts.Where(e => e != null))
+                    entry.Key = OperationEditsMerger.NormalizeKey(entry.Key);
+
+                return parts
+                    .Where(e => e != null)
+                    .GroupBy(e => e.Key ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.OrderByDescending(e => e.ModifiedUtcTicks).First())
+                    .ToList();
             }
             catch (Exception ex)
             {

@@ -90,9 +90,10 @@ namespace TankManager.Core.Services
     }
 
     /// <summary>
-    /// Журнал изменений. У каждого сотрудника свой файл на месяц (&lt;логин&gt;_&lt;гггг-ММ&gt;.jsonl, строка — запись),
-    /// поэтому в один файл одновременно никто не пишет. Запись дописывается в локальную папку
-    /// products\_audit и копируется в &lt;серверная папка&gt;\_audit; без сервера — при следующей синхронизации
+    /// Журнал изменений. У каждого сотрудника свой файл на месяц (&lt;логин&gt;_&lt;гггг-ММ&gt;.jsonl, строка — запись).
+    /// Запись дописывается в локальную папку products\_audit, а недостающие строки дописываются
+    /// в &lt;серверная папка&gt;\_audit (с нескольких компьютеров сотрудника — в один файл); без сервера —
+    /// при следующей синхронизации
     /// </summary>
     public class AuditService
     {
@@ -166,7 +167,8 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
-        /// Копирует свои файлы журнала на сервер, если там они короче (файлы только дописываются)
+        /// Дописывает на сервер свои записи, которых там ещё нет. Файл на сервере не заменяется, а дополняется:
+        /// сотрудник может работать на нескольких компьютерах, и у каждого своя локальная часть того же файла
         /// </summary>
         public void UploadPending()
         {
@@ -183,21 +185,54 @@ namespace TankManager.Core.Services
 
                     foreach (var localFile in Directory.GetFiles(LocalFolder, OwnFilePrefix + "*" + FileExtension))
                     {
-                        string serverFile = Path.Combine(serverFolder, Path.GetFileName(localFile));
-                        var localInfo = new FileInfo(localFile);
-                        var serverInfo = new FileInfo(serverFile);
-                        if (serverInfo.Exists && serverInfo.Length >= localInfo.Length)
-                            continue;
-
-                        Directory.CreateDirectory(serverFolder);
-                        byte[] data = File.ReadAllBytes(localFile);
-                        AtomicFile.WriteAllBytes(serverFile, data);
+                        try
+                        {
+                            UploadFile(localFile, Path.Combine(serverFolder, Path.GetFileName(localFile)));
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning($"Не удалось выложить журнал {Path.GetFileName(localFile)} на сервер: {ex.Message}");
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning($"Не удалось выложить журнал изменений на сервер: {ex.Message}");
                 }
+            }
+        }
+
+        private static void UploadFile(string localFile, string serverFile)
+        {
+            var localLines = ReadLines(localFile);
+            if (localLines.Count == 0)
+                return;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(serverFile));
+
+            using (SharedFileLock.Acquire(serverFile))
+            {
+                var serverLines = File.Exists(serverFile) ? ReadLines(serverFile) : new List<string>();
+                var known = new HashSet<string>(serverLines, StringComparer.Ordinal);
+                var missing = localLines.Where(known.Add).ToList();
+                if (missing.Count == 0)
+                    return;
+
+                var merged = serverLines.Concat(missing).Select(line => line + "\n");
+                AtomicFile.WriteAllBytes(serverFile, Utf8NoBom.GetBytes(string.Concat(merged)));
+            }
+        }
+
+        private static List<string> ReadLines(string path)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
+            {
+                return reader.ReadToEnd()
+                    .Split('\n')
+                    .Select(line => line.Trim())
+                    .Where(line => line.Length > 0)
+                    .ToList();
             }
         }
 

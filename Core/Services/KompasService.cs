@@ -67,6 +67,8 @@ namespace TankManager.Core.Services
                 else
                 {
                     _logger.LogWarning("Document loaded but TopPart is null");
+                    // Продукт без контекста: контекст никто не освободит
+                    context.Dispose();
                     return new Product();
                 }
             }
@@ -111,6 +113,8 @@ namespace TankManager.Core.Services
                 else
                 {
                     _logger.LogWarning("Active document loaded but TopPart is null");
+                    // Продукт без контекста: контекст никто не освободит
+                    context.Dispose();
                     return new Product();
                 }
             }

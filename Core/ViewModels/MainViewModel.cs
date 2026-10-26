@@ -51,6 +51,7 @@ namespace TankManager.Core.ViewModels
         private int _costsVersion;
         private int _partsWithoutMetalPriceCount;
         private int _sheetPartsWithoutCuttingCount;
+        private int _partsWithDefaultCuttingPriceCount;
         private IReadOnlyList<KeyValuePair<string, double>> _operationCostBreakdown = new KeyValuePair<string, double>[0];
         private PartModel _currentlySelectedPart;
         private PartModel _selectedDetail;
@@ -541,6 +542,7 @@ namespace TankManager.Core.ViewModels
         public string AttentionFilterText =>
             _attentionFilter == PartAttentionFilter.NoMetalPrice ? "Без цены металла"
             : _attentionFilter == PartAttentionFilter.NoLaserCutting ? "Листовые без лазерной резки"
+            : _attentionFilter == PartAttentionFilter.DefaultCuttingPrice ? "Резка по цене по умолчанию"
             : null;
 
         #endregion
@@ -574,7 +576,18 @@ namespace TankManager.Core.ViewModels
             private set => SetProperty(ref _sheetPartsWithoutCuttingCount, value, nameof(SheetPartsWithoutCuttingCount), nameof(HasAttentionItems));
         }
 
-        public bool HasAttentionItems => PartsWithoutMetalPriceCount > 0 || SheetPartsWithoutCuttingCount > 0;
+        /// <summary>
+        /// Листовых деталей (без повторов), резка которых посчитана по цене по умолчанию:
+        /// толщины нет в таблице цен резки
+        /// </summary>
+        public int PartsWithDefaultCuttingPriceCount
+        {
+            get => _partsWithDefaultCuttingPriceCount;
+            private set => SetProperty(ref _partsWithDefaultCuttingPriceCount, value, nameof(PartsWithDefaultCuttingPriceCount), nameof(HasAttentionItems));
+        }
+
+        public bool HasAttentionItems =>
+            PartsWithoutMetalPriceCount > 0 || SheetPartsWithoutCuttingCount > 0 || PartsWithDefaultCuttingPriceCount > 0;
 
         /// <summary>
         /// Стоимость операций изделия по видам (только ненулевые)
@@ -591,6 +604,12 @@ namespace TankManager.Core.ViewModels
         private static bool LacksLaserCutting(PartModel part) =>
             part.ProductType == ProductType.SheetMaterial && !part.Operations.OfType<LaserCuttingOperation>().Any();
 
+        // Резка считается по расценкам (не исключена и цена не задана вручную), но толщины нет в таблице
+        private bool UsesDefaultCuttingPrice(PartModel part) =>
+            _pricingSettings != null &&
+            part.Operations.OfType<LaserCuttingOperation>().Any(op => !op.IsExcluded && !op.HasManualCost) &&
+            _pricingSettings.UsesDefaultLaserCuttingPrice(part.SheetThickness);
+
         private static string PartGroupKey(PartModel part) => $"{part.Name}|{part.Marking}|{part.Material}";
 
         /// <summary>
@@ -602,6 +621,7 @@ namespace TankManager.Core.ViewModels
 
             PartsWithoutMetalPriceCount = details.Where(LacksMetalPrice).Select(PartGroupKey).Distinct().Count();
             SheetPartsWithoutCuttingCount = details.Where(LacksLaserCutting).Select(PartGroupKey).Distinct().Count();
+            PartsWithDefaultCuttingPriceCount = details.Where(UsesDefaultCuttingPrice).Select(PartGroupKey).Distinct().Count();
 
             var parts = CurrentProduct?.AllParts ?? Enumerable.Empty<PartModel>();
             OperationCostBreakdown = parts
@@ -2294,6 +2314,8 @@ namespace TankManager.Core.ViewModels
                 return false;
             if (_attentionFilter == PartAttentionFilter.NoLaserCutting && !LacksLaserCutting(part))
                 return false;
+            if (_attentionFilter == PartAttentionFilter.DefaultCuttingPrice && !UsesDefaultCuttingPrice(part))
+                return false;
 
             if (string.IsNullOrWhiteSpace(_searchText))
                 return true;
@@ -2905,7 +2927,9 @@ namespace TankManager.Core.ViewModels
         /// <summary>Есть масса, но нет стоимости металла</summary>
         NoMetalPrice,
         /// <summary>Листовая деталь без лазерной резки</summary>
-        NoLaserCutting
+        NoLaserCutting,
+        /// <summary>Резка по цене по умолчанию: толщины нет в таблице цен резки</summary>
+        DefaultCuttingPrice
     }
 
     /// <summary>
