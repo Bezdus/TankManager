@@ -30,7 +30,7 @@ syncs saved products to local/server storage.
 - Startup: `App.xaml.cs` (update check, global exception handlers) →
   `MainWindow` → `MainViewModel` (constructed in the `MainWindow` ctor). MVVM
   with manual constructor injection (no DI container). Nearly all UI lives in
-  `MainWindow.xaml`; `Views\PricingSettingsDialog` is the only separate view.
+  `MainWindow.xaml`; dialogs are in `Views\`.
 - Load pipeline (`KompasService.LoadDocument` / `LoadActiveDocument`, called
   from the VM via `Task.Run`): `KompasContext` → `new Product(topPart, context)`
   → `PartExtractor` walks the assembly into `PartModel`s → `MaterialAggregator`
@@ -44,8 +44,21 @@ syncs saved products to local/server storage.
   `CalculateCost(PricingSettings)`. `PricingSettings` are shared: the master copy is
   `<server folder>\_pricing_settings.json`, `pricing_settings.json` next to the exe is the
   offline cache (`PricingSettings.SyncWithServer`; equal mtimes = cache in sync). They are
-  edited in `PricingSettingsDialog`, which is read-only in viewer mode. Stored products
+  edited on the «Цены» slide-out panel of the main window (`IsPricingPanelOpen`, toolbar button): it binds to `MainViewModel.PricingDraft` (a clone),
+  each edit is saved ~1 s later through `SavePricingSettings` (`FlushPricingDraft` before other pricing changes and on
+  close); read-only outside engineer mode (`IsPricingReadOnly`). Stored products
   are re-costed with the current prices on open (`LoadAndLinkProduct`).
+  Material (metal) price = rules `PricingSettings.MaterialPricing` (`MaterialPriceEntry`: kind of stock,
+  grade, size — empty = any; unit руб/кг by mass or руб/м by `PartModel.Length`, which only tubular parts have).
+  `MaterialKey.Parse` splits the material string into kind/size/grade (sheet size = thickness, ГОСТ/ТУ stripped,
+  `CompareKey` ignores spelling differences); `FindMaterialPrice` picks the most specific rule (grade 4 > size 2 >
+  kind 1). Prices are entered on the «Цены» panel: one list of `MaterialPriceRow` — materials of the open
+  product (consumption, cost), then the other entries of `MaterialPricing` (other products, general rules; can be
+  removed), with search (`UpdateMaterialPriceRows`, `ApplyMaterialPriceFilter`). A price is saved immediately through
+  `MainViewModel.SavePricingSettings` as an exact rule. There is no UI for creating new general rules.
+  Materials of an opened product without any priced rule are added automatically (engineer mode, once per session,
+  `AddMissingMaterialsToPricing`) as rules with `Price = null` (⚠ in the UI); such rules are ignored by
+  `FindMaterialPrice`, not written to the audit log, and dropped on save once a general rule covers them (`RemoveCoveredMaterials`).
   Laser cutting price (руб/м; cut length is in mm) depends on sheet thickness: `PricingSettings.LaserCuttingPricing`
   (exact thickness → price, otherwise `LaserCuttingPricePerMeter`; the old руб/мм value
   `LaserCuttingPricePerMm` is converted ×1000 on load); the thickness is parsed from the
@@ -106,7 +119,7 @@ syncs saved products to local/server storage.
   each operation (`ChangeKind` Added/Edited/Excluded + `ChangedBy*` in `OperationDto`, shown as
   `ChangeInfo` on the operation card; stamped by `OperationEditsMerger.StampChanges`, which matches
   before/after by the session-only `InstanceId` and clears the stamp when the op is back to KOMPAS values),
-  pricing (`ModifiedBy*`, set in `OpenPricingSettings`), tombstones (`DeletedBy`). Audit log
+  pricing (`ModifiedBy*`, set in `SavePricingSettings`), tombstones (`DeletedBy`). Audit log
   (`Core\Services\AuditLog.cs`): one append-only file per user and month
   `products\_audit\<login>_<yyyy-MM>.jsonl`, copied to `<server folder>\_audit` (`UploadPending`, also
   sync phase 4); `ChangeDescriber` builds the «было → стало» text; viewed in `Views\AuditLogDialog`.

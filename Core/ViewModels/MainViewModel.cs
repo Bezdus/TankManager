@@ -35,6 +35,7 @@ namespace TankManager.Core.ViewModels
         private ObservableCollection<ProductFileInfo> _savedProducts;
         private ProductFileInfo _selectedSavedProduct;
         private bool _isProductsPanelOpen;
+        private bool _isPricingPanelOpen;
         private string _filePath;
         private string _searchText;
         private MaterialInfo _selectedSheetMaterial;
@@ -52,6 +53,7 @@ namespace TankManager.Core.ViewModels
         private int _partsWithoutMetalPriceCount;
         private int _sheetPartsWithoutCuttingCount;
         private int _partsWithDefaultCuttingPriceCount;
+        private int _materialsWithoutPriceCount;
         private IReadOnlyList<KeyValuePair<string, double>> _operationCostBreakdown = new KeyValuePair<string, double>[0];
         private PartModel _currentlySelectedPart;
         private PartModel _selectedDetail;
@@ -327,6 +329,29 @@ namespace TankManager.Core.ViewModels
             }
         }
 
+        /// <summary>
+        /// Выдвижная панель «Цены» (общие цены материалов и операций)
+        /// </summary>
+        public bool IsPricingPanelOpen
+        {
+            get => _isPricingPanelOpen;
+            set
+            {
+                if (!SetProperty(ref _isPricingPanelOpen, value, nameof(IsPricingPanelOpen)))
+                    return;
+                if (value)
+                {
+                    IsProductsPanelOpen = false;
+                    // Без открытого изделия список ещё не собирался
+                    UpdateMaterialPriceRows(Details?.ToList() ?? new List<PartModel>());
+                }
+                else
+                {
+                    FlushPricingDraft();
+                }
+            }
+        }
+
         public bool IsProductsPanelOpen
         {
             get => _isProductsPanelOpen;
@@ -334,6 +359,7 @@ namespace TankManager.Core.ViewModels
             {
                 if (SetProperty(ref _isProductsPanelOpen, value, nameof(IsProductsPanelOpen)) && value)
                 {
+                    IsPricingPanelOpen = false;
                     RefreshSavedProducts();
 
                     // Подтягиваем новые изделия с сервера, не дожидаясь ручной синхронизации
@@ -586,6 +612,75 @@ namespace TankManager.Core.ViewModels
             private set => SetProperty(ref _partsWithDefaultCuttingPriceCount, value, nameof(PartsWithDefaultCuttingPriceCount), nameof(HasAttentionItems));
         }
 
+        /// <summary>
+        /// Список материалов на вкладке «Цены»: материалы изделия (расход, цена, сумма)
+        /// </summary>
+        public ObservableCollection<MaterialPriceRow> MaterialPriceRows { get; } = new ObservableCollection<MaterialPriceRow>();
+
+        /// <summary>
+        /// Остальные материалы из расценок (нет в открытом изделии)
+        /// </summary>
+        public ObservableCollection<MaterialPriceRow> OtherMaterialPriceRows { get; } = new ObservableCollection<MaterialPriceRow>();
+
+        // Все строки; на вкладке показываются подходящие под поиск
+        private readonly List<MaterialPriceRow> _productMaterialRows = new List<MaterialPriceRow>();
+        private readonly List<MaterialPriceRow> _otherMaterialRows = new List<MaterialPriceRow>();
+        private string _materialPriceSearchText;
+        private bool _isOtherMaterialsExpanded;
+        private int _otherPricedMaterialsCount;
+        private int _otherMaterialsWithoutPriceCount;
+
+        /// <summary>
+        /// Поиск в списке материалов вкладки «Цены»
+        /// </summary>
+        public string MaterialPriceSearchText
+        {
+            get => _materialPriceSearchText;
+            set
+            {
+                if (!SetProperty(ref _materialPriceSearchText, value, nameof(MaterialPriceSearchText)))
+                    return;
+                if (!string.IsNullOrWhiteSpace(value))
+                    IsOtherMaterialsExpanded = true;
+                ApplyMaterialPriceFilter();
+            }
+        }
+
+        public bool IsOtherMaterialsExpanded
+        {
+            get => _isOtherMaterialsExpanded;
+            set => SetProperty(ref _isOtherMaterialsExpanded, value, nameof(IsOtherMaterialsExpanded));
+        }
+
+        public int OtherPricedMaterialsCount
+        {
+            get => _otherPricedMaterialsCount;
+            private set => SetProperty(ref _otherPricedMaterialsCount, value, nameof(OtherPricedMaterialsCount));
+        }
+
+        public int OtherMaterialsWithoutPriceCount
+        {
+            get => _otherMaterialsWithoutPriceCount;
+            private set => SetProperty(ref _otherMaterialsWithoutPriceCount, value, nameof(OtherMaterialsWithoutPriceCount));
+        }
+
+        private PricingSettings _pricingDraft;
+        private System.Windows.Threading.DispatcherTimer _pricingDraftSaveTimer;
+        private bool _savingPricingDraft;
+
+        // Материалы, уже добавленные в расценки без цены в этом сеансе (CompareKey)
+        private readonly HashSet<string> _materialsAddedToPricing = new HashSet<string>(StringComparer.Ordinal);
+        private bool _addingMaterialsToPricing;
+
+        /// <summary>
+        /// Материалов изделия без цены (материал не указан — не считается)
+        /// </summary>
+        public int MaterialsWithoutPriceCount
+        {
+            get => _materialsWithoutPriceCount;
+            private set => SetProperty(ref _materialsWithoutPriceCount, value, nameof(MaterialsWithoutPriceCount));
+        }
+
         public bool HasAttentionItems =>
             PartsWithoutMetalPriceCount > 0 || SheetPartsWithoutCuttingCount > 0 || PartsWithDefaultCuttingPriceCount > 0;
 
@@ -635,11 +730,200 @@ namespace TankManager.Core.ViewModels
                 .Where(item => item.Value > 0.005)
                 .ToList();
 
+            UpdateMaterialPriceRows(details);
+
             CostsVersion++;
 
             // Сортировка по стоимости сама не обновляется при смене цен
             if (_detailsSortType == MaterialSortType.ByCost)
                 DetailsView?.Refresh();
+        }
+
+        /// <summary>
+        /// Пересобрать список материалов вкладки «Цены». Если набор материалов тот же, строки обновляются
+        /// на месте: поле цены, в которое перешёл пользователь, не теряет фокус
+        /// </summary>
+        private void UpdateMaterialPriceRows(List<PartModel> details)
+        {
+            var groups = SortMaterials(details
+                .Where(p => p.ProductType != ProductType.PurchasedPart)
+                .Select(p => new { Part = p, Key = MaterialKey.Parse(p.Material) })
+                .GroupBy(x => x.Key.CompareKey)
+                .Select(g => new { Key = g.First().Key, Parts = g.Select(x => x.Part).ToList() })
+                .Where(g => !g.Key.IsUnknown || g.Parts.Sum(p => p.Mass) > 0), g => g.Key)
+                .ToList();
+
+            // Материалы из расценок, которых нет в изделии (в том числе общие правила: «Лист · AISI 304»)
+            var productKeys = new HashSet<string>(groups.Select(g => g.Key.CompareKey), StringComparer.Ordinal);
+            var otherKeys = SortMaterials((_pricingSettings?.MaterialPricing ?? Enumerable.Empty<MaterialPriceEntry>())
+                .Where(e => e != null)
+                .Select(e => e.Key)
+                .Where(k => !k.IsUnknown && !productKeys.Contains(k.CompareKey))
+                .GroupBy(k => k.CompareKey)
+                .Select(g => g.First()), k => k)
+                .ToList();
+
+            bool changed = SyncMaterialRows(_productMaterialRows, groups.Select(g => g.Key).ToList());
+            changed |= SyncMaterialRows(_otherMaterialRows, otherKeys);
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                var materials = groups[i].Parts
+                    .Select(p => string.IsNullOrWhiteSpace(p.Material) ? "(пусто)" : p.Material.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(m => m, StringComparer.CurrentCulture)
+                    .ToList();
+                _productMaterialRows[i].Update(groups[i].Parts, materials, _pricingSettings);
+            }
+            foreach (var row in _otherMaterialRows)
+                row.Update(Enumerable.Empty<PartModel>(), new string[0], _pricingSettings);
+
+            if (changed)
+                ApplyMaterialPriceFilter();
+
+            // Нет материалов изделия — весь список в «остальных», он должен быть виден
+            if (_productMaterialRows.Count == 0)
+                IsOtherMaterialsExpanded = true;
+
+            MaterialsWithoutPriceCount = _productMaterialRows.Count(r => r.NeedsPrice);
+            OtherPricedMaterialsCount = _otherMaterialRows.Count;
+            OtherMaterialsWithoutPriceCount = _otherMaterialRows.Count(r => r.NeedsPrice);
+
+            AddMissingMaterialsToPricing(groups.Select(g => new KeyValuePair<MaterialKey, MaterialPriceUnit>(
+                g.Key, g.Parts.Any(p => p.Length > 0) ? MaterialPriceUnit.Meter : MaterialPriceUnit.Kilogram)));
+        }
+
+        // Порядок: вид проката, марка, размер как число; без вида — после, «не указан» — в конце
+        private static IOrderedEnumerable<T> SortMaterials<T>(IEnumerable<T> items, Func<T, MaterialKey> key) =>
+            items
+                .OrderBy(x => key(x).IsUnknown)
+                .ThenBy(x => key(x).Kind.Length == 0)
+                .ThenBy(x => key(x).Kind, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => key(x).Grade, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => SizeSortValue(key(x).Size))
+                .ThenBy(x => key(x).Size, StringComparer.Ordinal);
+
+        // Строки пересоздаются, только если изменился набор материалов
+        private bool SyncMaterialRows(List<MaterialPriceRow> rows, List<MaterialKey> keys)
+        {
+            if (rows.Select(r => r.Key.CompareKey).SequenceEqual(keys.Select(k => k.CompareKey)))
+                return false;
+
+            rows.Clear();
+            rows.AddRange(keys.Select(k => new MaterialPriceRow(k, OnMaterialPriceEdited)));
+            return true;
+        }
+
+        private void ApplyMaterialPriceFilter()
+        {
+            Fill(MaterialPriceRows, _productMaterialRows);
+            Fill(OtherMaterialPriceRows, _otherMaterialRows);
+
+            void Fill(ObservableCollection<MaterialPriceRow> target, List<MaterialPriceRow> source)
+            {
+                target.Clear();
+                foreach (var row in source.Where(r => r.MatchesSearch(_materialPriceSearchText)))
+                    target.Add(row);
+            }
+        }
+
+        /// <summary>
+        /// Убрать из расценок материал, которого нет в открытом изделии
+        /// </summary>
+        private void DeleteMaterialPrice(MaterialPriceRow row)
+        {
+            if (row == null || row.IsUsed || !IsEngineerMode || _pricingSettings == null)
+                return;
+
+            if (row.HasPrice && row.IsExactRule &&
+                MessageBox.Show($"Удалить «{row.Title}» из цен?", "Цены",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+                return;
+
+            FlushPricingDraft();
+            var newSettings = _pricingSettings.Clone();
+            foreach (var entry in newSettings.MaterialPricing.Where(e => e != null && e.IsExactFor(row.Key)).ToList())
+                newSettings.MaterialPricing.Remove(entry);
+            SavePricingSettings(newSettings, showWarnings: false);
+        }
+
+        /// <summary>
+        /// Материалы изделия, которых нет в расценках, добавляются туда без цены — чтобы цену ввели.
+        /// Каждый материал добавляется один раз за сеанс (если сохранить не удалось, не повторяем)
+        /// </summary>
+        private void AddMissingMaterialsToPricing(IEnumerable<KeyValuePair<MaterialKey, MaterialPriceUnit>> materials)
+        {
+            if (!IsEngineerMode || _pricingSettings == null || _addingMaterialsToPricing)
+                return;
+
+            var missing = materials
+                .Where(m => !m.Key.IsUnknown &&
+                            _pricingSettings.FindMaterialPrice(m.Key) == null &&
+                            !_pricingSettings.MaterialPricing.Any(e => e != null && e.IsExactFor(m.Key)) &&
+                            _materialsAddedToPricing.Add(m.Key.CompareKey))
+                .ToList();
+            if (missing.Count == 0)
+                return;
+
+            // Сохраняем после пересчёта, который вызвал эту проверку
+            _addingMaterialsToPricing = true;
+            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _addingMaterialsToPricing = false;
+                try
+                {
+                    FlushPricingDraft();
+
+                    // Расценки на сервере могли измениться — добавляем к свежей версии, а не спрашиваем о конфликте
+                    string serverPath = _storageService.IsServerAvailable ? _storageService.ServerPricingFilePath : null;
+                    if (PricingSettings.DescribeServerChange(serverPath, _pricingSettings.ModifiedUtcTicks) != null)
+                        PricingSettings = PricingSettings.Load(serverPath);
+
+                    var newSettings = _pricingSettings.Clone();
+                    int added = newSettings.AddMissingMaterials(missing);
+                    if (added == 0)
+                    {
+                        RecalculateAllCosts(showWarnings: false);
+                        return;
+                    }
+
+                    SavePricingSettings(newSettings, showWarnings: false);
+                    ShowSnackbar($"В расценки добавлены материалы без цены: {added}. Введите цены на вкладке «Цены»",
+                        SnackbarKind.Warning, 6000);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Не удалось добавить материалы в расценки", ex);
+                }
+            }));
+        }
+
+        // «40х40х3» → 40: размеры сортируются как числа, а не как строки
+        private static double SizeSortValue(string size)
+        {
+            string first = (size ?? string.Empty).Split('х')[0].Replace(',', '.');
+            return double.TryParse(first, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) ? value : double.MaxValue;
+        }
+
+        /// <summary>
+        /// Цена материала изменена на вкладке «Цены»: правило ровно для этого материала
+        /// </summary>
+        private void OnMaterialPriceEdited(MaterialPriceRow row, double? price, MaterialPriceUnit unit)
+        {
+            // Сохраняем после того, как привязка закончит обновление поля ввода
+            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!IsEngineerMode || _pricingSettings == null)
+                {
+                    UpdateCostSummary();
+                    return;
+                }
+
+                FlushPricingDraft();
+                var newSettings = _pricingSettings.Clone();
+                newSettings.SetMaterialPrice(row.Key, price, unit);
+                SavePricingSettings(newSettings, showWarnings: false);
+            }));
         }
 
         #endregion
@@ -860,7 +1144,11 @@ namespace TankManager.Core.ViewModels
         public PricingSettings PricingSettings
         {
             get => _pricingSettings;
-            private set => SetProperty(ref _pricingSettings, value, nameof(PricingSettings));
+            private set
+            {
+                if (SetProperty(ref _pricingSettings, value, nameof(PricingSettings)) && !_savingPricingDraft)
+                    RebuildPricingDraft();
+            }
         }
 
         #endregion
@@ -875,6 +1163,7 @@ namespace TankManager.Core.ViewModels
         public ICommand DeleteProductLocalCommand { get; private set; }
         public ICommand DeleteProductEverywhereCommand { get; private set; }
         public ICommand ToggleProductsPanelCommand { get; private set; }
+        public ICommand TogglePricingPanelCommand { get; private set; }
         public ICommand SwitchToProductCommand { get; private set; }
         public ICommand CopyAllToClipboardCommand { get; private set; }
         public ICommand CopySheetToClipboardCommand { get; private set; }
@@ -890,8 +1179,8 @@ namespace TankManager.Core.ViewModels
         public ICommand ClearServerStorageFolderCommand { get; private set; }
         public ICommand SyncFromServerCommand { get; private set; }
         public ICommand ExportToExcelCommand { get; private set; }
-        public ICommand OpenPricingSettingsCommand { get; private set; }
         public ICommand EditOperationsCommand { get; private set; }
+        public ICommand DeleteMaterialPriceCommand { get; private set; }
         public ICommand OpenUsersCommand { get; private set; }
         public ICommand OpenAuditLogCommand { get; private set; }
         public ICommand OpenProductAuditLogCommand { get; private set; }
@@ -917,6 +1206,7 @@ namespace TankManager.Core.ViewModels
 
             // Локальная копия расценок; общие с сервера подтянутся при синхронизации (OnWindowLoaded)
             _pricingSettings = PricingSettings.Load();
+            RebuildPricingDraft();
             
             SavedProducts = new ObservableCollection<ProductFileInfo>();
             CurrentProduct = new Product();
@@ -935,6 +1225,7 @@ namespace TankManager.Core.ViewModels
             DeleteProductLocalCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: false), () => SelectedSavedProduct != null && !IsLoading);
             DeleteProductEverywhereCommand = new RelayCommand(async () => await DeleteSelectedProductAsync(everywhere: true), () => IsEngineerMode && SelectedSavedProduct != null && !IsLoading);
             ToggleProductsPanelCommand = new RelayCommand(() => IsProductsPanelOpen = !IsProductsPanelOpen);
+            TogglePricingPanelCommand = new RelayCommand(() => IsPricingPanelOpen = !IsPricingPanelOpen);
             SwitchToProductCommand = new RelayCommand<ProductFileInfo>(async p => await SwitchToProductAsync(p));
             OpenSelectedSavedProductCommand = new RelayCommand(async () => await SwitchToProductAsync(SelectedSavedProduct));
             ClearSavedProductsSearchCommand = new RelayCommand(() => SavedProductsSearchText = string.Empty);
@@ -954,9 +1245,9 @@ namespace TankManager.Core.ViewModels
             ClearServerStorageFolderCommand = new RelayCommand(ClearServerStorageFolder, () => HasServerStorageFolder);
             SyncFromServerCommand = new RelayCommand(async () => await SyncFromServerAsync(), () => IsServerAvailable && !IsLoading);
             ExportToExcelCommand = new RelayCommand(ExportToExcel, () => Details?.Any() == true || StandardParts?.Any() == true || SheetMaterials?.Any() == true || TubularProducts?.Any() == true || OtherMaterials?.Any() == true);
-            OpenPricingSettingsCommand = new RelayCommand(OpenPricingSettings);
             // Правки сохраняются сразу в отдельный файл (operations.json), связь с КОМПАС не нужна
             EditOperationsCommand = new RelayCommand(async () => await EditOperationsAsync(), () => CanEditOperations && CurrentlySelectedPart != null && !IsLoading);
+            DeleteMaterialPriceCommand = new RelayCommand<MaterialPriceRow>(DeleteMaterialPrice);
             OpenUsersCommand = new RelayCommand(OpenUsers, () => CanManageUsers);
             OpenAuditLogCommand = new RelayCommand(() => OpenAuditLog(null));
             OpenProductAuditLogCommand = new RelayCommand<ProductFileInfo>(p => OpenAuditLog(p?.ProductName));
@@ -966,72 +1257,188 @@ namespace TankManager.Core.ViewModels
 
         #region Pricing
 
-        private void OpenPricingSettings()
+        /// <summary>
+        /// Расценки, которые правятся на вкладке «Цены» (копия: правка сохраняется через секунду после ввода)
+        /// </summary>
+        public PricingSettings PricingDraft
         {
-            // В режиме просмотра расценки общие и только для чтения
-            var dialog = new TankManager.Views.PricingSettingsDialog(_pricingSettings, isReadOnly: IsViewerMode);
-            dialog.Owner = Application.Current.MainWindow;
-            if (dialog.ShowDialog() == true && IsEngineerMode)
+            get => _pricingDraft;
+            private set => SetProperty(ref _pricingDraft, value, nameof(PricingDraft));
+        }
+
+        /// <summary>
+        /// Расценки общие, меняет их только конструктор
+        /// </summary>
+        public bool IsPricingReadOnly => !IsEngineerMode;
+
+        /// <summary>
+        /// Новая копия для вкладки «Цены» — когда расценки изменились не через неё
+        /// (цена материала, материалы из изделия, расценки с сервера)
+        /// </summary>
+        private void RebuildPricingDraft()
+        {
+            _pricingDraftSaveTimer?.Stop();
+
+            if (_pricingDraft != null)
+                WatchPricingDraft(_pricingDraft, false);
+
+            PricingDraft = _pricingSettings?.Clone();
+
+            if (_pricingDraft != null)
+                WatchPricingDraft(_pricingDraft, true);
+        }
+
+        private void WatchPricingDraft(PricingSettings draft, bool watch)
+        {
+            if (watch)
             {
-                var newSettings = dialog.PricingSettings;
-                string changes = ChangeDescriber.DescribePricing(_pricingSettings, newSettings);
+                draft.PropertyChanged += OnPricingDraftChanged;
+                draft.MaterialPricing.CollectionChanged += OnPricingDraftCollectionChanged;
+                draft.LaserCuttingPricing.CollectionChanged += OnPricingDraftCollectionChanged;
+            }
+            else
+            {
+                draft.PropertyChanged -= OnPricingDraftChanged;
+                draft.MaterialPricing.CollectionChanged -= OnPricingDraftCollectionChanged;
+                draft.LaserCuttingPricing.CollectionChanged -= OnPricingDraftCollectionChanged;
+            }
 
-                // Без изменений — не перезаписываем общий файл и не подписываем
-                if (changes == null)
-                    return;
+            foreach (var item in draft.MaterialPricing.Cast<INotifyPropertyChanged>()
+                .Concat(draft.LaserCuttingPricing).Where(i => i != null))
+            {
+                item.PropertyChanged -= OnPricingDraftChanged;
+                if (watch)
+                    item.PropertyChanged += OnPricingDraftChanged;
+            }
+        }
 
-                newSettings.ModifiedBy = CurrentUser.Login;
-                newSettings.ModifiedByName = CurrentUser.Name;
-                newSettings.ModifiedUtcTicks = DateTime.UtcNow.Ticks;
-                newSettings.BaseModifiedUtcTicks = _pricingSettings.ModifiedUtcTicks;
+        private void OnPricingDraftCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            foreach (var item in (e.OldItems ?? new object[0]).OfType<INotifyPropertyChanged>())
+                item.PropertyChanged -= OnPricingDraftChanged;
+            foreach (var item in (e.NewItems ?? new object[0]).OfType<INotifyPropertyChanged>())
+                item.PropertyChanged += OnPricingDraftChanged;
 
-                try
+            SchedulePricingDraftSave();
+        }
+
+        private void OnPricingDraftChanged(object sender, PropertyChangedEventArgs e) => SchedulePricingDraftSave();
+
+        // Правки в таблицах приходят по ячейке: сохраняем, когда ввод на секунду затих
+        private void SchedulePricingDraftSave()
+        {
+            if (!IsEngineerMode)
+                return;
+
+            if (_pricingDraftSaveTimer == null)
+            {
+                _pricingDraftSaveTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _pricingDraftSaveTimer.Tick += (s, e) => SavePricingDraft();
+            }
+            _pricingDraftSaveTimer.Stop();
+            _pricingDraftSaveTimer.Start();
+        }
+
+        /// <summary>
+        /// Сохранить правку с вкладки «Цены», если она ещё ждёт (перед другими изменениями расценок и при закрытии)
+        /// </summary>
+        public void FlushPricingDraft()
+        {
+            if (_pricingDraftSaveTimer?.IsEnabled == true)
+                SavePricingDraft();
+        }
+
+        private void SavePricingDraft()
+        {
+            _pricingDraftSaveTimer?.Stop();
+            if (_pricingDraft == null || _pricingSettings == null || !IsEngineerMode)
+                return;
+
+            // Копия остаётся на вкладке как есть: таблицу, в которой идёт ввод, не пересоздаём
+            _savingPricingDraft = true;
+            try
+            {
+                SavePricingSettings(_pricingDraft.Clone(), showWarnings: false);
+            }
+            finally
+            {
+                _savingPricingDraft = false;
+            }
+
+            // Вместо правки загружены расценки с сервера (конфликт)
+            if (ChangeDescriber.DescribePricing(_pricingSettings, _pricingDraft) != null)
+                RebuildPricingDraft();
+        }
+
+        /// <summary>
+        /// Применить новые расценки: подписать, выложить на сервер (с проверкой, не изменил ли их
+        /// за это время другой сотрудник), записать в журнал и пересчитать стоимость
+        /// </summary>
+        private void SavePricingSettings(PricingSettings newSettings, bool showWarnings = true)
+        {
+            newSettings.RemoveCoveredMaterials();
+            string changes = ChangeDescriber.DescribePricing(_pricingSettings, newSettings);
+
+            // Без изменений — не перезаписываем общий файл и не подписываем
+            // (материалы без цены в журнал не попадают, но список материалов мог измениться)
+            if (changes == null && newSettings.MaterialListSignature == _pricingSettings.MaterialListSignature)
+            {
+                UpdateCostSummary();
+                return;
+            }
+
+            newSettings.ModifiedBy = CurrentUser.Login;
+            newSettings.ModifiedByName = CurrentUser.Name;
+            newSettings.ModifiedUtcTicks = DateTime.UtcNow.Ticks;
+            newSettings.BaseModifiedUtcTicks = _pricingSettings.ModifiedUtcTicks;
+
+            try
+            {
+                // Общие расценки лежат в серверной папке, локальная копия — для работы без сети
+                string serverPath = _storageService.IsServerAvailable ? _storageService.ServerPricingFilePath : null;
+
+                // Пока окно было открыто, расценки на сервере мог изменить другой сотрудник
+                string changedBy = PricingSettings.DescribeServerChange(serverPath, newSettings.BaseModifiedUtcTicks);
+                if (changedBy != null)
                 {
-                    // Общие расценки лежат в серверной папке, локальная копия — для работы без сети
-                    string serverPath = _storageService.IsServerAvailable ? _storageService.ServerPricingFilePath : null;
+                    var answer = MessageBox.Show(
+                        $"Расценки на сервере изменены после того, как вы их открыли: {changedBy}.\n\n" +
+                        "Сохранить ваши расценки поверх? Изменения той версии будут потеряны.\n\n" +
+                        "«Нет» — отменить ваши правки и загрузить расценки с сервера.",
+                        "Расценки изменены другим сотрудником",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning,
+                        MessageBoxResult.No);
 
-                    // Пока окно было открыто, расценки на сервере мог изменить другой сотрудник
-                    string changedBy = PricingSettings.DescribeServerChange(serverPath, newSettings.BaseModifiedUtcTicks);
-                    if (changedBy != null)
+                    if (answer != MessageBoxResult.Yes)
                     {
-                        var answer = MessageBox.Show(
-                            $"Расценки на сервере изменены после того, как вы их открыли: {changedBy}.\n\n" +
-                            "Сохранить ваши расценки поверх? Изменения той версии будут потеряны.\n\n" +
-                            "«Нет» — отменить ваши правки и загрузить расценки с сервера.",
-                            "Расценки изменены другим сотрудником",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Warning,
-                            MessageBoxResult.No);
-
-                        if (answer != MessageBoxResult.Yes)
-                        {
-                            PricingSettings = PricingSettings.Load(serverPath);
-                            RecalculateAllCosts();
-                            ShowSnackbar("Загружены расценки с сервера", SnackbarKind.Info);
-                            return;
-                        }
+                        PricingSettings = PricingSettings.Load(serverPath);
+                        RecalculateAllCosts(showWarnings);
+                        ShowSnackbar("Загружены расценки с сервера", SnackbarKind.Info);
+                        return;
                     }
-
-                    string serverError = newSettings.Save(serverPath);
-
-                    if (serverError != null)
-                        ShowSnackbar($"Расценки сохранены только локально: {serverError}", SnackbarKind.Warning, 6000);
-                    else if (serverPath == null && HasServerStorageFolder)
-                        ShowSnackbar("Сервер недоступен: расценки сохранены локально и будут выложены при синхронизации", SnackbarKind.Warning, 6000);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError("Не удалось сохранить расценки", ex);
-                    MessageBox.Show(
-                        $"Расценки применены, но не сохранены на диск:\n{ex.Message}",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
+                string serverError = newSettings.Save(serverPath);
+
+                if (serverError != null)
+                    ShowSnackbar($"Расценки сохранены только локально: {serverError}", SnackbarKind.Warning, 6000);
+                else if (serverPath == null && HasServerStorageFolder)
+                    ShowSnackbar("Сервер недоступен: расценки сохранены локально и будут выложены при синхронизации", SnackbarKind.Warning, 6000);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Не удалось сохранить расценки", ex);
+                MessageBox.Show(
+                    $"Расценки применены, но не сохранены на диск:\n{ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            if (changes != null)
                 _storageService.Audit.Record(AuditAction.PricingChanged, details: changes);
 
-                PricingSettings = newSettings;
-                RecalculateAllCosts();
-            }
+            PricingSettings = newSettings;
+            RecalculateAllCosts(showWarnings);
         }
 
         /// <summary>
@@ -1229,20 +1636,20 @@ namespace TankManager.Core.ViewModels
             if (part.ProductType == ProductType.PurchasedPart)
                 return 0;
 
-            if (part.ProductType == ProductType.TubularProduct)
+            var rule = _pricingSettings.FindMaterialPrice(MaterialKey.Parse(part.Material));
+            if (rule == null)
+                return 0;
+
+            if (rule.Unit == MaterialPriceUnit.Meter)
             {
                 // Длина неизвестна (например, старый файл без длины) — оставляем сохранённую стоимость
                 if (part.Length <= 0)
                     return part.MetalCost;
 
-                double pricePerMeter = _pricingSettings.GetTubularPricePerMeter(part.Material);
-                return (part.Length / 1000.0) * pricePerMeter;
+                return (part.Length / 1000.0) * rule.Price.Value;
             }
 
-            if (part.ProductType == ProductType.SheetMaterial)
-                return part.Mass * _pricingSettings.SheetMetalPricePerKg;
-
-            return part.Mass * _pricingSettings.OtherMetalPricePerKg;
+            return part.Mass * rule.Price.Value;
         }
 
         #endregion
@@ -2547,7 +2954,8 @@ namespace TankManager.Core.ViewModels
                     StatusMessage = "Синхронизация: данные актуальны";
                 }
 
-                if (result.Item2 != null)
+                // Правка с вкладки «Цены» ещё не сохранена — она уйдёт на сервер следующей (с проверкой конфликта)
+                if (result.Item2 != null && _pricingDraftSaveTimer?.IsEnabled != true)
                 {
                     PricingSettings = result.Item2;
                     if (HasProduct)

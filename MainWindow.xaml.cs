@@ -150,7 +150,10 @@ namespace TankManager
 
             base.OnClosing(e);
             if (!e.Cancel)
+            {
+                _viewModel.FlushPricingDraft();
                 SaveWindowSettings();
+            }
         }
 
         #endregion
@@ -173,6 +176,28 @@ namespace TankManager
                 {
                     var hideStoryboard = (Storyboard)FindResource("HideSnackbarStoryboard");
                     hideStoryboard?.Begin();
+                }
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsPricingPanelOpen))
+            {
+                if (_viewModel.IsPricingPanelOpen)
+                {
+                    PricingPanelOverlay.Visibility = Visibility.Visible;
+                    PricingPanel.Visibility = Visibility.Visible;
+                    ((Storyboard)FindResource("ShowPricingPanelStoryboard")).Begin();
+                }
+                else
+                {
+                    var hide = ((Storyboard)FindResource("HidePricingPanelStoryboard")).Clone();
+                    hide.Completed += (s, args) =>
+                    {
+                        // Панель могли снова открыть, пока она уезжала
+                        if (_viewModel.IsPricingPanelOpen)
+                            return;
+                        PricingPanelOverlay.Visibility = Visibility.Collapsed;
+                        PricingPanel.Visibility = Visibility.Collapsed;
+                    };
+                    hide.Begin(this);
                 }
             }
             else if (e.PropertyName == nameof(MainViewModel.IsProductsPanelOpen))
@@ -302,6 +327,52 @@ namespace TankManager
             HandleMaterialListBoxClick(sender, e,
                 () => _viewModel.SelectedOtherMaterial,
                 () => _viewModel.SelectedOtherMaterial = null);
+        }
+
+        // Поле цены на вкладке «Цены»: Enter сохраняет, Esc возвращает прежнее значение
+        private void PriceBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            var binding = (sender as TextBox)?.GetBindingExpression(TextBox.TextProperty);
+            if (binding == null)
+                return;
+
+            if (e.Key == Key.Enter)
+            {
+                binding.UpdateSource();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                binding.UpdateTarget();
+                Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+        }
+
+        private void PriceBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+            => Views.NumberInput.OnGotKeyboardFocus(sender);
+
+        private void PriceBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+            => Views.NumberInput.OnPreviewMouseLeftButtonDown(sender, e);
+
+        // Таблица цен показывается целиком: колесо мыши прокручивает вкладку, а не таблицу
+        private void PriceGrid_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (e.Handled || !(sender is UIElement grid))
+                return;
+
+            e.Handled = true;
+            var parent = VisualTreeHelper.GetParent(grid) as UIElement;
+            parent?.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+            {
+                RoutedEvent = UIElement.MouseWheelEvent,
+                Source = grid
+            });
+        }
+
+        private void ClearMaterialPriceSearch_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.MaterialPriceSearchText = string.Empty;
         }
 
         private void ClearFilter_Click(object sender, RoutedEventArgs e)
@@ -466,6 +537,14 @@ namespace TankManager
                     _viewModel.IsProductsPanelOpen = false;
                     e.Handled = true;
                 }
+                // Esc в поле цены или ячейке таблицы — отмена ввода (PriceBox_KeyDown, DataGrid),
+                // панель закрывается следующим нажатием
+                else if (_viewModel.IsPricingPanelOpen &&
+                         !(Keyboard.FocusedElement is TextBox && PricingPanel.IsKeyboardFocusWithin))
+                {
+                    _viewModel.IsPricingPanelOpen = false;
+                    e.Handled = true;
+                }
                 else if (SearchBox.IsKeyboardFocusWithin && !string.IsNullOrEmpty(_viewModel.SearchText))
                 {
                     _viewModel.SearchText = string.Empty;
@@ -508,6 +587,11 @@ namespace TankManager
         private void OverlayBackground_MouseDown(object sender, MouseButtonEventArgs e)
         {
             _viewModel.IsProductsPanelOpen = false;
+        }
+
+        private void PricingOverlay_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _viewModel.IsPricingPanelOpen = false;
         }
 
         private void DrawingPreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

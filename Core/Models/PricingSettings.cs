@@ -1,23 +1,87 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
-using System.Text;
 using TankManager.Core.Services;
 
 namespace TankManager.Core.Models
 {
     /// <summary>
-    /// Запись сортамента трубного проката
+    /// Единица цены материала
+    /// </summary>
+    public enum MaterialPriceUnit
+    {
+        /// <summary>
+        /// Руб/кг (по массе детали)
+        /// </summary>
+        Kilogram,
+
+        /// <summary>
+        /// Руб/м (по длине детали — есть только у трубного проката)
+        /// </summary>
+        Meter
+    }
+
+    /// <summary>
+    /// Правило цены материала: вид проката, марка и размер (пустое поле — любое значение).
+    /// Детали подходит самое точное правило (см. PricingSettings.FindMaterialPrice)
     /// </summary>
     [DataContract]
-    public class TubularPricingEntry : INotifyPropertyChanged
+    public class MaterialPriceEntry : INotifyPropertyChanged
     {
+        private string _kind;
+        private string _grade;
         private string _size;
-        private double _pricePerMeter;
+        private MaterialPriceUnit _unit;
+        private double? _price;
 
+        public static readonly KeyValuePair<MaterialPriceUnit, string>[] UnitOptions =
+        {
+            new KeyValuePair<MaterialPriceUnit, string>(MaterialPriceUnit.Kilogram, "руб/кг"),
+            new KeyValuePair<MaterialPriceUnit, string>(MaterialPriceUnit.Meter, "руб/м")
+        };
+
+        /// <summary>
+        /// Вид проката («Лист», «Труба»; пусто — любой)
+        /// </summary>
+        [DataMember]
+        public string Kind
+        {
+            get => _kind;
+            set
+            {
+                if (_kind != value)
+                {
+                    _kind = value;
+                    OnPropertyChanged(nameof(Kind));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Марка («AISI 304»; пусто — любая)
+        /// </summary>
+        [DataMember]
+        public string Grade
+        {
+            get => _grade;
+            set
+            {
+                if (_grade != value)
+                {
+                    _grade = value;
+                    OnPropertyChanged(nameof(Grade));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Размер: толщина листа, сортамент трубы, диаметр круга (пусто — любой)
+        /// </summary>
         [DataMember]
         public string Size
         {
@@ -33,18 +97,81 @@ namespace TankManager.Core.Models
         }
 
         [DataMember]
-        public double PricePerMeter
+        public MaterialPriceUnit Unit
         {
-            get => _pricePerMeter;
+            get => _unit;
             set
             {
-                if (Math.Abs(_pricePerMeter - value) > 0.0001)
+                if (_unit != value)
                 {
-                    _pricePerMeter = value;
-                    OnPropertyChanged(nameof(PricePerMeter));
+                    _unit = value;
+                    OnPropertyChanged(nameof(Unit));
+                    OnPropertyChanged(nameof(UnitTitle));
                 }
             }
         }
+
+        /// <summary>
+        /// Цена, руб за единицу Unit (null — материал добавлен из изделия, цену ещё не ввели)
+        /// </summary>
+        [DataMember]
+        public double? Price
+        {
+            get => _price;
+            set
+            {
+                if (_price.HasValue != value.HasValue || (value.HasValue && Math.Abs(_price.Value - value.Value) > 0.0001))
+                {
+                    _price = value;
+                    OnPropertyChanged(nameof(Price));
+                    OnPropertyChanged(nameof(HasPrice));
+                }
+            }
+        }
+
+        public bool HasPrice => Price.HasValue;
+
+        /// <summary>
+        /// Материал правила (для правила без цены — материала, добавленного из изделия)
+        /// </summary>
+        public MaterialKey Key => new MaterialKey(Kind?.Trim(), MaterialKey.FormatSize(Size), Grade?.Trim());
+
+        public string UnitTitle => Unit == MaterialPriceUnit.Meter ? "руб/м" : "руб/кг";
+
+        /// <summary>
+        /// «Лист · AISI 304» (пустые поля не показываются)
+        /// </summary>
+        public string Title => MaterialKey.FormatTitle(Kind?.Trim(), MaterialKey.FormatSize(Size), Grade?.Trim(), "Любой материал");
+
+        /// <summary>
+        /// Все заполненные поля правила совпадают с материалом
+        /// </summary>
+        public bool Matches(MaterialKey key)
+        {
+            if (key == null || key.IsUnknown)
+                return false;
+
+            return (string.IsNullOrWhiteSpace(Kind) || MaterialKey.TextKey(Kind) == MaterialKey.TextKey(key.Kind))
+                && (string.IsNullOrWhiteSpace(Grade) || MaterialKey.TextKey(Grade) == MaterialKey.TextKey(key.Grade))
+                && (string.IsNullOrWhiteSpace(Size) || MaterialKey.SizeKey(Size) == MaterialKey.SizeKey(key.Size));
+        }
+
+        /// <summary>
+        /// Точность правила: марка важнее размера, размер важнее вида проката
+        /// </summary>
+        public int Specificity =>
+            (string.IsNullOrWhiteSpace(Grade) ? 0 : 4) +
+            (string.IsNullOrWhiteSpace(Size) ? 0 : 2) +
+            (string.IsNullOrWhiteSpace(Kind) ? 0 : 1);
+
+        /// <summary>
+        /// Правило задано ровно для этого материала (все три поля совпадают)
+        /// </summary>
+        public bool IsExactFor(MaterialKey key) =>
+            key != null &&
+            MaterialKey.TextKey(Kind) == MaterialKey.TextKey(key.Kind) &&
+            MaterialKey.TextKey(Grade) == MaterialKey.TextKey(key.Grade) &&
+            MaterialKey.SizeKey(Size) == MaterialKey.SizeKey(key.Size);
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -116,8 +243,6 @@ namespace TankManager.Core.Models
 
         private static readonly ILogger Logger = new FileLogger();
 
-        private double _sheetMetalPricePerKg;
-        private double _otherMetalPricePerKg;
         private double _laserCuttingPricePerMeter;
         private double _engravingPricePerMm;
 
@@ -129,45 +254,11 @@ namespace TankManager.Core.Models
         private double _flangingPricePerOperation;
 
         /// <summary>
-        /// Цена листового проката, руб/кг
+        /// Цены материалов (правила по виду проката, марке и размеру)
         /// </summary>
         [DataMember]
-        public double SheetMetalPricePerKg
-        {
-            get => _sheetMetalPricePerKg;
-            set
-            {
-                if (Math.Abs(_sheetMetalPricePerKg - value) > 0.0001)
-                {
-                    _sheetMetalPricePerKg = value;
-                    OnPropertyChanged(nameof(SheetMetalPricePerKg));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Цена прочего металла, руб/кг
-        /// </summary>
-        [DataMember]
-        public double OtherMetalPricePerKg
-        {
-            get => _otherMetalPricePerKg;
-            set
-            {
-                if (Math.Abs(_otherMetalPricePerKg - value) > 0.0001)
-                {
-                    _otherMetalPricePerKg = value;
-                    OnPropertyChanged(nameof(OtherMetalPricePerKg));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Сортамент трубного проката с ценами за метр
-        /// </summary>
-        [DataMember]
-        public ObservableCollection<TubularPricingEntry> TubularPricing { get; set; }
-            = new ObservableCollection<TubularPricingEntry>();
+        public ObservableCollection<MaterialPriceEntry> MaterialPricing { get; set; }
+            = new ObservableCollection<MaterialPriceEntry>();
 
         /// <summary>
         /// Цена лазерной резки по умолчанию (для толщин, которых нет в LaserCuttingPricing), руб/м
@@ -298,124 +389,92 @@ namespace TankManager.Core.Models
         }
 
         /// <summary>
-        /// Найти цену за метр трубы по подстроке сортамента в материале
+        /// Самое точное правило цены для материала (null — цены нет). Правила без цены не учитываются.
+        /// При равной точности выигрывает правило выше в таблице
         /// </summary>
-        public double GetTubularPricePerMeter(string material)
+        public MaterialPriceEntry FindMaterialPrice(MaterialKey key)
         {
-            if (string.IsNullOrEmpty(material) || TubularPricing == null || TubularPricing.Count == 0)
-                return 0;
+            if (key == null || key.IsUnknown || MaterialPricing == null)
+                return null;
 
-            string normalizedMaterial = NormalizeSize(material);
-
-            // Самая длинная подходящая запись = самая точная («40х40х3» приоритетнее «40х40»)
-            TubularPricingEntry best = null;
-            int bestLength = 0;
-
-            foreach (var entry in TubularPricing)
+            MaterialPriceEntry best = null;
+            foreach (var entry in MaterialPricing)
             {
-                string size = NormalizeSize(entry.Size);
-                if (size.Length == 0 || !ContainsSize(normalizedMaterial, size))
-                    continue;
-
-                if (best == null || size.Length > bestLength)
-                {
+                if (entry != null && entry.HasPrice && entry.Matches(key) && (best == null || entry.Specificity > best.Specificity))
                     best = entry;
-                    bestLength = size.Length;
-                }
             }
-
-            return best != null ? best.PricePerMeter : 0;
+            return best;
         }
 
         /// <summary>
-        /// Сортамент для сравнения: «x», «X», «×» и «Х» → кириллическая «х», «,» → «.», без пробелов вокруг «х»
-        /// («40 x 40» и «40х40» — один размер), остальные пробелы — по одному
+        /// Задать цену ровно для этого материала (null — стереть цену: будет действовать более общее правило,
+        /// а если его нет — материал останется в списке без цены)
         /// </summary>
-        private static string NormalizeSize(string text)
+        public void SetMaterialPrice(MaterialKey key, double? price, MaterialPriceUnit unit)
         {
-            if (string.IsNullOrEmpty(text))
-                return string.Empty;
+            if (key == null || key.IsUnknown)
+                return;
 
-            var chars = new StringBuilder(text.Length);
-            foreach (char c in text.Trim())
+            var exact = MaterialPricing.FirstOrDefault(e => e != null && e.IsExactFor(key));
+            if (exact == null)
             {
-                switch (c)
-                {
-                    case 'x':
-                    case 'X':
-                    case '×':
-                    case 'Х':
-                        chars.Append('х');
-                        break;
-                    case ',':
-                        chars.Append('.');
-                        break;
-                    default:
-                        chars.Append(char.IsWhiteSpace(c) ? ' ' : char.ToLowerInvariant(c));
-                        break;
-                }
+                if (price == null)
+                    return;
+                exact = new MaterialPriceEntry { Kind = key.Kind, Grade = key.Grade, Size = key.Size };
+                MaterialPricing.Add(exact);
             }
+            exact.Unit = unit;
+            exact.Price = price;
+        }
 
-            var sb = new StringBuilder(chars.Length);
-            for (int i = 0; i < chars.Length; i++)
+        /// <summary>
+        /// Добавить в список материалы изделия, для которых нет ни одного правила с ценой
+        /// (без цены — чтобы её ввели). Возвращает число добавленных
+        /// </summary>
+        public int AddMissingMaterials(IEnumerable<KeyValuePair<MaterialKey, MaterialPriceUnit>> materials)
+        {
+            int added = 0;
+            foreach (var material in materials)
             {
-                char c = chars[i];
-                if (c != ' ')
-                {
-                    sb.Append(c);
+                var key = material.Key;
+                if (key == null || key.IsUnknown || FindMaterialPrice(key) != null ||
+                    MaterialPricing.Any(e => e != null && e.IsExactFor(key)))
                     continue;
-                }
 
-                int next = i;
-                while (next < chars.Length && chars[next] == ' ')
-                    next++;
-
-                bool nearX = (sb.Length > 0 && sb[sb.Length - 1] == 'х') || (next < chars.Length && chars[next] == 'х');
-                if (!nearX)
-                    sb.Append(' ');
-                i = next - 1;
+                MaterialPricing.Add(new MaterialPriceEntry { Kind = key.Kind, Grade = key.Grade, Size = key.Size, Unit = material.Value });
+                added++;
             }
-
-            return sb.ToString();
+            return added;
         }
 
         /// <summary>
-        /// Размер входит в материал отдельным числом: «40х40» не совпадает с «140х40х3» и «40х400»
+        /// Убрать материалы без цены, которым цену уже даёт общее правило (например, задали цену на марку),
+        /// и пустые строки таблицы
         /// </summary>
-        private static bool ContainsSize(string material, string size)
+        public void RemoveCoveredMaterials()
         {
-            for (int index = material.IndexOf(size, StringComparison.Ordinal);
-                 index >= 0;
-                 index = material.IndexOf(size, index + 1, StringComparison.Ordinal))
+            foreach (var entry in MaterialPricing.Where(e => e == null ||
+                (!e.HasPrice && (e.Key.IsUnknown || FindMaterialPrice(e.Key) != null))).ToList())
+                MaterialPricing.Remove(entry);
+        }
+
+        /// <summary>
+        /// Список материалов вместе с правилами без цены (их нет в журнале, но сохранять их нужно)
+        /// </summary>
+        public string MaterialListSignature => string.Join("\n", MaterialPricing.Where(e => e != null)
+            .Select(e => $"{e.Kind}|{e.Size}|{e.Grade}|{e.Unit}|{e.Price}"));
+
+        /// <summary>
+        /// Независимая копия (для редактирования)
+        /// </summary>
+        public PricingSettings Clone()
+        {
+            var serializer = new DataContractJsonSerializer(typeof(PricingSettings));
+            using (var stream = new MemoryStream())
             {
-                int end = index + size.Length;
-                bool startOk = !char.IsDigit(size[0]) || !ContinuesNumberBefore(material, index);
-                bool endOk = !char.IsDigit(size[size.Length - 1]) || !ContinuesNumberAfter(material, end);
-                if (startOk && endOk)
-                    return true;
+                serializer.WriteObject(stream, this);
+                return Deserialize(stream.ToArray());
             }
-
-            return false;
-        }
-
-        // «1» перед «40х40» или «2.» перед «5х…» — число продолжается
-        private static bool ContinuesNumberBefore(string text, int index)
-        {
-            if (index == 0)
-                return false;
-
-            char prev = text[index - 1];
-            return char.IsDigit(prev) || (prev == '.' && index >= 2 && char.IsDigit(text[index - 2]));
-        }
-
-        // «0» после «40х40» или «.5» — число продолжается; точка в конце предложения — нет
-        private static bool ContinuesNumberAfter(string text, int end)
-        {
-            if (end >= text.Length)
-                return false;
-
-            char next = text[end];
-            return char.IsDigit(next) || (next == '.' && end + 1 < text.Length && char.IsDigit(text[end + 1]));
         }
 
         /// <summary>
@@ -458,8 +517,8 @@ namespace TankManager.Core.Models
         [OnDeserialized]
         private void OnDeserialized(StreamingContext context)
         {
-            if (TubularPricing == null)
-                TubularPricing = new ObservableCollection<TubularPricingEntry>();
+            if (MaterialPricing == null)
+                MaterialPricing = new ObservableCollection<MaterialPriceEntry>();
             if (LaserCuttingPricing == null)
                 LaserCuttingPricing = new ObservableCollection<LaserCuttingPricingEntry>();
 

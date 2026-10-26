@@ -37,6 +37,78 @@
         <local:MaterialSortTypeConverter x:Key="MaterialSortTypeConverter"/>
         <local:ProductTypeConverter x:Key="ProductTypeConverter"/>
         <local:GroupTotalCostConverter x:Key="GroupTotalCostConverter"/>
+        <local:DecimalTextConverter x:Key="DecimalText"/>
+
+        <!-- Поле цены на вкладке «Цены» -->
+        <Style x:Key="PriceFieldBox" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+            <Setter Property="Width" Value="90"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="IsReadOnly" Value="{Binding IsPricingReadOnly}"/>
+            <EventSetter Event="KeyDown" Handler="PriceBox_KeyDown"/>
+            <EventSetter Event="GotKeyboardFocus" Handler="PriceBox_GotKeyboardFocus"/>
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PriceBox_PreviewMouseLeftButtonDown"/>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="ToolTip" Value="Введите число, например 12,5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Таблицы на вкладке «Цены» (правила для материалов, резка по толщине) -->
+        <Style x:Key="PriceGrid" TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="IsReadOnly" Value="{Binding IsPricingReadOnly}"/>
+            <Setter Property="CanUserAddRows" Value="{Binding IsEngineerMode}"/>
+            <Setter Property="CanUserDeleteRows" Value="{Binding IsEngineerMode}"/>
+            <Setter Property="CanUserSortColumns" Value="False"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="RowHeaderWidth" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="RowBackground" Value="{StaticResource PrimaryBackground}"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="Margin" Value="1"/>
+            <EventSetter Event="PreviewMouseWheel" Handler="PriceGrid_PreviewMouseWheel"/>
+            <Setter Property="ColumnHeaderStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{StaticResource SecondaryBackground}"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                        <Setter Property="FontSize" Value="11"/>
+                        <Setter Property="Padding" Value="6,5"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="CellStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Padding" Value="4,3"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="DataGridCell">
+                                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{StaticResource SelectedBackground}"/>
+                                <Setter Property="Foreground" Value="{StaticResource SelectedForeground}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- ObjectDataProvider для MaterialSortType enum -->
         <ObjectDataProvider x:Key="SheetMaterialSortOptions" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
@@ -95,6 +167,33 @@
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="ProductsPanelOverlay"
+                           Storyboard.TargetProperty="Opacity"
+                           To="0" Duration="0:0:0.25"/>
+        </Storyboard>
+
+        <!-- Анимация панели «Цены» (выезжает справа) -->
+        <Storyboard x:Key="ShowPricingPanelStoryboard">
+            <DoubleAnimation Storyboard.TargetName="PricingPanel"
+                           Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                           From="460" To="0" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PricingPanelOverlay"
+                           Storyboard.TargetProperty="Opacity"
+                           From="0" To="1" Duration="0:0:0.3"/>
+        </Storyboard>
+
+        <Storyboard x:Key="HidePricingPanelStoryboard">
+            <DoubleAnimation Storyboard.TargetName="PricingPanel"
+                           Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                           To="460" Duration="0:0:0.25">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PricingPanelOverlay"
                            Storyboard.TargetProperty="Opacity"
                            To="0" Duration="0:0:0.25"/>
         </Storyboard>
@@ -823,12 +922,15 @@
 
                     <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="6,0"/>
 
-                    <Button Command="{Binding OpenPricingSettingsCommand}"
+                    <Button Command="{Binding TogglePricingPanelCommand}"
                             Style="{StaticResource PanelButtonStyle}"
-                            ToolTip="Настроить расценки для расчёта стоимости деталей">
+                            ToolTip="Общие цены материалов и операций">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE713;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
+                            <TextBlock Text="&#xE8EC;" Style="{StaticResource IconText}" Margin="0,0,8,0"/>
                             <TextBlock Text="Цены"/>
+                            <TextBlock Text="{Binding MaterialsWithoutPriceCount, StringFormat='⚠{0}'}" Margin="6,0,0,0" FontWeight="SemiBold"
+                                       Foreground="{StaticResource Warning}" ToolTip="Материалов изделия без цены"
+                                       Visibility="{Binding MaterialsWithoutPriceCount, Converter={StaticResource ZeroToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         </StackPanel>
                     </Button>
 
@@ -1935,6 +2037,296 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- Затемнение фона при открытой панели «Цены» -->
+            <Border x:Name="PricingPanelOverlay"
+                    Background="{StaticResource PanelScrim}"
+                    Visibility="Collapsed"
+                    Opacity="0"
+                    MouseDown="PricingOverlay_MouseDown"/>
+
+            <!-- Выдвижная панель «Цены»: общие цены материалов и операций (не часть изделия) -->
+            <Border x:Name="PricingPanel"
+                    Background="{StaticResource PrimaryBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1,0,0,0"
+                    HorizontalAlignment="Right"
+                    Width="460"
+                    Visibility="Collapsed">
+                <Border.RenderTransform>
+                    <TranslateTransform X="460"/>
+                </Border.RenderTransform>
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="0" Opacity="0.15" BlurRadius="20"/>
+                </Border.Effect>
+                <Border.Resources>
+                    <!-- Строка списка материалов -->
+                    <DataTemplate x:Key="MaterialPriceRowTemplate">
+                        <Border Padding="8,6" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderColor}">
+                        <Grid ToolTip="{Binding MaterialsText}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <DockPanel>
+                                <TextBlock Text="⚠" FontSize="13" Margin="0,-1,6,0" VerticalAlignment="Top"
+                                           Foreground="{StaticResource Warning}" ToolTip="Нет цены — введите цену материала"
+                                           Visibility="{Binding NeedsPrice, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            </DockPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding Cost, StringFormat='{}{0:N2} ₽'}" FontSize="11" Margin="8,0,0,0"
+                                   Visibility="{Binding IsUsed, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                       Foreground="{StaticResource TextSecondary}" VerticalAlignment="Top" Typography.NumeralAlignment="Tabular"/>
+
+                            <TextBlock Grid.Row="1" Text="{Binding AmountText}" FontSize="11" Foreground="{StaticResource TextMuted}"
+                                   Visibility="{Binding IsUsed, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                       VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="8,4,0,0"
+                                        Visibility="{Binding CanHavePrice, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBox Width="72" Height="26" Style="{StaticResource ModernTextBox}" Padding="4,2"
+                                         HorizontalContentAlignment="Right"
+                                         Text="{Binding PriceText, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}"
+                                         IsEnabled="{Binding DataContext.IsEngineerMode, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                         ToolTip="Цена этого материала (Enter — сохранить, пусто — по общему правилу)"
+                                         KeyDown="PriceBox_KeyDown"
+                                         GotKeyboardFocus="PriceBox_GotKeyboardFocus"
+                                         PreviewMouseLeftButtonDown="PriceBox_PreviewMouseLeftButtonDown"/>
+                                <ComboBox Width="62" Margin="4,0,0,0" VerticalAlignment="Center"
+                                          Style="{StaticResource SortComboBoxStyle}"
+                                          ItemsSource="{x:Static models:MaterialPriceEntry.UnitOptions}"
+                                          SelectedValuePath="Key"
+                                          DisplayMemberPath="Value"
+                                          SelectedValue="{Binding Unit}"
+                                          IsEnabled="{Binding DataContext.IsEngineerMode, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                          Visibility="{Binding ShowUnitChoice, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Text="{Binding UnitTitle}" Width="62" Margin="4,0,0,0" FontSize="11" Padding="6,0,0,0"
+                                           Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                                           Visibility="{Binding ShowUnitChoice, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                                <Button Content="&#xE74D;" Width="22" Height="22" FontSize="11" Margin="2,0,0,0"
+                                        ToolTip="Убрать из цен"
+                                        Command="{Binding DataContext.DeleteMaterialPriceCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsUsed}" Value="False"/>
+                                                        <Condition Binding="{Binding DataContext.IsEngineerMode, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding SourceText}" FontSize="10" Margin="0,3,0,0" TextWrapping="Wrap"
+                                       Visibility="{Binding SourceText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasPrice}" Value="False">
+                                                <Setter Property="Foreground" Value="{StaticResource Danger}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        </Border>
+                    </DataTemplate>
+                </Border.Resources>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Заголовок панели -->
+                    <Grid Grid.Row="0" Margin="16,14,10,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Цены" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="{Binding PricingSettings.ModifiedInfo}" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextMuted}"
+                                       Visibility="{Binding PricingSettings.ModifiedInfo, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Content="&#xE711;"
+                                Style="{StaticResource IconButton}"
+                                VerticalAlignment="Top"
+                                Command="{Binding TogglePricingPanelCommand}"
+                                ToolTip="Закрыть (Esc)"/>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="12,0,8,12">
+                    <StackPanel Margin="0,0,4,0">
+                        <TextBlock Margin="2,0,2,6" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMuted}"
+                                   Text="Просмотр: цены общие для всех, меняет их конструктор."
+                                   Visibility="{Binding IsPricingReadOnly, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <!-- Поиск по материалам -->
+                        <Border Background="{StaticResource SecondaryBackground}" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="&#xE721;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,8,0"
+                                           Foreground="{StaticResource TextMuted}"/>
+                                <TextBox Grid.Column="1" BorderThickness="0" VerticalAlignment="Center" FontSize="12"
+                                         Foreground="{StaticResource TextPrimary}"
+                                         ToolTip="Поиск по материалам: вид проката, марка, размер"
+                                         Text="{Binding MaterialPriceSearchText, UpdateSourceTrigger=PropertyChanged, Delay=200}">
+                                    <TextBox.Style>
+                                        <Style TargetType="TextBox">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="Text" Value="">
+                                                    <Setter Property="Background">
+                                                        <Setter.Value>
+                                                            <VisualBrush Stretch="None" AlignmentX="Left">
+                                                                <VisualBrush.Visual>
+                                                                    <TextBlock Text="Поиск материала" Foreground="{StaticResource TextMuted}"
+                                                                               FontFamily="Segoe UI" FontSize="12"/>
+                                                                </VisualBrush.Visual>
+                                                            </VisualBrush>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBox.Style>
+                                </TextBox>
+                                <Button Grid.Column="2" Content="&#xE711;" Style="{StaticResource IconButton}"
+                                        Width="20" Height="20" FontSize="9" Margin="4,0,0,0" ToolTip="Очистить"
+                                        Click="ClearMaterialPriceSearch_Click"
+                                        Visibility="{Binding MaterialPriceSearchText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Margin="2,0,2,6" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMuted}"
+                                   Text="Материалы изделий сами попадают в список; ⚠ — цены нет, её нужно ввести. Цена сохраняется сразу."/>
+
+                        <!-- Материалы открытого изделия -->
+                        <StackPanel Visibility="{Binding HasProduct, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock FontSize="13" FontWeight="SemiBold" Margin="2,4,0,4" TextWrapping="Wrap">
+                                <Run Text="В изделии"/> <Run Text="{Binding CurrentProduct.Name, Mode=OneWay}" Foreground="{StaticResource TextSecondary}"/>
+                            </TextBlock>
+                            <TextBlock Text="Ничего не найдено" Margin="2,4" FontSize="12" Foreground="{StaticResource TextMuted}"
+                                       Visibility="{Binding MaterialPriceRows.Count, Converter={StaticResource ZeroToVisibilityConverter}}"/>
+                            <ItemsControl ItemsSource="{Binding MaterialPriceRows}" ItemTemplate="{StaticResource MaterialPriceRowTemplate}"/>
+                        </StackPanel>
+
+                        <!-- Остальные материалы из цен (без открытого изделия — все) -->
+                        <Expander Style="{StaticResource GroupExpanderStyle}" Margin="0,8,0,0"
+                                  IsExpanded="{Binding IsOtherMaterialsExpanded, Mode=TwoWay}"
+                                  Visibility="{Binding OtherPricedMaterialsCount, Converter={StaticResource ZeroToVisibilityConverter}, ConverterParameter=Inverse}">
+                            <Expander.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Остальные материалы" FontSize="13" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding OtherPricedMaterialsCount}" Margin="6,0,0,0" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                    <TextBlock Margin="6,0,0,0" FontSize="11" Foreground="{StaticResource Warning}" VerticalAlignment="Center"
+                                               ToolTip="Без цены"
+                                               Visibility="{Binding OtherMaterialsWithoutPriceCount, Converter={StaticResource ZeroToVisibilityConverter}, ConverterParameter=Inverse}">
+                                        <Run Text="⚠"/><Run Text="{Binding OtherMaterialsWithoutPriceCount, Mode=OneWay}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel Margin="0,2,0,8">
+                                <TextBlock Margin="2,0,2,6" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMuted}"
+                                           Text="Материалы других изделий и общие цены (например, «Лист · AISI 304» — для листа любой толщины)."/>
+                                <TextBlock Text="Ничего не найдено" Margin="2,4" FontSize="12" Foreground="{StaticResource TextMuted}"
+                                           Visibility="{Binding OtherMaterialPriceRows.Count, Converter={StaticResource ZeroToVisibilityConverter}}"/>
+                                <ItemsControl ItemsSource="{Binding OtherMaterialPriceRows}" ItemTemplate="{StaticResource MaterialPriceRowTemplate}"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Операции -->
+                        <Expander Style="{StaticResource GroupExpanderStyle}">
+                            <Expander.Header>
+                                <TextBlock Text="Операции" FontSize="13" FontWeight="SemiBold"/>
+                            </Expander.Header>
+                            <StackPanel Margin="0,2,0,8">
+                                <TextBlock Text="Резка на лазере по толщине листа" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,4"/>
+                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,4">
+                                    <DataGrid Style="{StaticResource PriceGrid}" ItemsSource="{Binding PricingDraft.LaserCuttingPricing}">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Толщина, мм" Width="*"
+                                                                Binding="{Binding Thickness, Converter={StaticResource DecimalText}}"/>
+                                            <DataGridTextColumn Header="Цена, руб/м" Width="*"
+                                                                Binding="{Binding PricePerMeter, Converter={StaticResource DecimalText}}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Border>
+                                <TextBlock Text="Толщина берётся из наименования материала (Лист 3 ГОСТ… → 3)"
+                                           FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Резка, прочие толщины (руб/м)" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    <TextBox Grid.Column="1" Style="{StaticResource PriceFieldBox}"
+                                             Text="{Binding PricingDraft.LaserCuttingPricePerMeter, Converter={StaticResource DecimalText}}"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Гравировка (руб/мм)" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    <TextBox Grid.Column="1" Style="{StaticResource PriceFieldBox}"
+                                             Text="{Binding PricingDraft.EngravingPricePerMm, Converter={StaticResource DecimalText}}"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Гибка (руб/операция)" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    <TextBox Grid.Column="1" Style="{StaticResource PriceFieldBox}"
+                                             Text="{Binding PricingDraft.BendingPricePerOperation, Converter={StaticResource DecimalText}}"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Вальцовка (руб/кг)" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    <TextBox Grid.Column="1" Style="{StaticResource PriceFieldBox}"
+                                             Text="{Binding PricingDraft.RollingPricePerKg, Converter={StaticResource DecimalText}}"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Отбортовка (руб/операция)" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    <TextBox Grid.Column="1" Style="{StaticResource PriceFieldBox}"
+                                             Text="{Binding PricingDraft.FlangingPricePerOperation, Converter={StaticResource DecimalText}}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
 
             <!-- Затемнение фона при открытой панели -->
             <Border x:Name="ProductsPanelOverlay"

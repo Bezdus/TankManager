@@ -108,7 +108,6 @@
     <Compile Include="Views\NumberInput.cs" />
     <Compile Include="Views\OperationsEditorDialog.xaml.cs" />
     <Compile Include="Views\UsersDialog.xaml.cs" />
-    <Compile Include="Views\PricingSettingsDialog.xaml.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -125,10 +124,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\PricingSettingsDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -141,6 +136,8 @@
     <Compile Include="Core\Models\ManufacturingOperations.cs" />
     <Compile Include="Core\Models\PricingSettings.cs" />
     <Compile Include="Core\Models\MaterialInfo.cs" />
+    <Compile Include="Core\Models\MaterialKey.cs" />
+    <Compile Include="Core\Models\MaterialPriceRow.cs" />
     <Compile Include="Core\Models\MaterialSortType.cs" />
     <Compile Include="Core\Models\PartModel.cs" />
     <Compile Include="Core\Models\PartModelFromStorage.cs" />

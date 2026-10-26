@@ -30,8 +30,6 @@ namespace TankManager.Core.Services
                     lines.Add($"{title}: {Num(was)} → {Num(now)}");
             }
 
-            Compare("Листовой прокат, руб/кг", before.SheetMetalPricePerKg, after.SheetMetalPricePerKg);
-            Compare("Прочий металл, руб/кг", before.OtherMetalPricePerKg, after.OtherMetalPricePerKg);
             Compare("Лазерная резка по умолчанию, руб/м", before.LaserCuttingPricePerMeter, after.LaserCuttingPricePerMeter);
             Compare("Гравировка, руб/мм", before.EngravingPricePerMm, after.EngravingPricePerMm);
             Compare("Гибка, руб/операция", before.BendingPricePerOperation, after.BendingPricePerOperation);
@@ -42,12 +40,16 @@ namespace TankManager.Core.Services
                 ToTable(before.LaserCuttingPricing, e => Num(e.Thickness), e => e.PricePerMeter),
                 ToTable(after.LaserCuttingPricing, e => Num(e.Thickness), e => e.PricePerMeter));
 
-            CompareTable(lines, "Труба {0}, руб/м",
-                ToTable(before.TubularPricing, e => e.Size?.Trim(), e => e.PricePerMeter),
-                ToTable(after.TubularPricing, e => e.Size?.Trim(), e => e.PricePerMeter));
+            // Материалы без цены (добавлены из изделия) в журнал не попадают: попадёт введённая цена
+            CompareTable(lines, "{0}",
+                ToTable(before.MaterialPricing.Where(e => e?.HasPrice == true), MaterialPriceTitle, e => e.Price.Value),
+                ToTable(after.MaterialPricing.Where(e => e?.HasPrice == true), MaterialPriceTitle, e => e.Price.Value));
 
             return lines.Count == 0 ? null : string.Join("\n", lines);
         }
+
+        // Единица входит в ключ: смена руб/кг на руб/м видна как удаление и добавление
+        private static string MaterialPriceTitle(MaterialPriceEntry e) => $"{e.Title}, {e.UnitTitle}";
 
         private static Dictionary<string, double> ToTable<T>(IEnumerable<T> items, Func<T, string> key, Func<T, double> price)
         {

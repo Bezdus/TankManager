@@ -7,7 +7,7 @@ namespace TankManager
 {
     /// <summary>
     /// Число ↔ текст для полей ввода: принимает и запятую, и точку, пробелы между разрядами,
-    /// пустое поле = 0. Параметр — формат отображения (по умолчанию без лишних нулей)
+    /// пустое поле = 0 (для double? — null). Параметр — формат отображения (по умолчанию без лишних нулей)
     /// </summary>
     public class DecimalTextConverter : IValueConverter
     {
@@ -28,7 +28,7 @@ namespace TankManager
                 .Replace(',', '.');
 
             if (text.Length == 0)
-                return 0d;
+                return Nullable.GetUnderlyingType(targetType) != null ? null : (object)0d;
 
             if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double result) &&
                 !double.IsNaN(result) && !double.IsInfinity(result))
