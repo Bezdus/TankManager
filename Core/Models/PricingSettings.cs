@@ -274,6 +274,13 @@ namespace TankManager.Core.Models
         public long ModifiedUtcTicks { get; set; }
 
         /// <summary>
+        /// ModifiedUtcTicks версии, от которой сделана эта правка. Если на сервере к моменту выкладки
+        /// лежит более поздняя версия, её изменил кто-то другой — перезаписывать её нельзя
+        /// </summary>
+        [DataMember(EmitDefaultValue = false)]
+        public long BaseModifiedUtcTicks { get; set; }
+
+        /// <summary>
         /// «Изменил: ФИО, дата» для окна расценок (null — не известно)
         /// </summary>
         public string ModifiedInfo
@@ -298,20 +305,117 @@ namespace TankManager.Core.Models
             if (string.IsNullOrEmpty(material) || TubularPricing == null || TubularPricing.Count == 0)
                 return 0;
 
+            string normalizedMaterial = NormalizeSize(material);
+
             // Самая длинная подходящая запись = самая точная («40х40х3» приоритетнее «40х40»)
             TubularPricingEntry best = null;
+            int bestLength = 0;
 
             foreach (var entry in TubularPricing)
             {
-                if (string.IsNullOrEmpty(entry.Size) ||
-                    material.IndexOf(entry.Size, StringComparison.OrdinalIgnoreCase) < 0)
+                string size = NormalizeSize(entry.Size);
+                if (size.Length == 0 || !ContainsSize(normalizedMaterial, size))
                     continue;
 
-                if (best == null || entry.Size.Length > best.Size.Length)
+                if (best == null || size.Length > bestLength)
+                {
                     best = entry;
+                    bestLength = size.Length;
+                }
             }
 
             return best != null ? best.PricePerMeter : 0;
+        }
+
+        /// <summary>
+        /// Сортамент для сравнения: «x», «X», «×» и «Х» → кириллическая «х», «,» → «.», без пробелов вокруг «х»
+        /// («40 x 40» и «40х40» — один размер), остальные пробелы — по одному
+        /// </summary>
+        private static string NormalizeSize(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
+
+            var chars = new StringBuilder(text.Length);
+            foreach (char c in text.Trim())
+            {
+                switch (c)
+                {
+                    case 'x':
+                    case 'X':
+                    case '×':
+                    case 'Х':
+                        chars.Append('х');
+                        break;
+                    case ',':
+                        chars.Append('.');
+                        break;
+                    default:
+                        chars.Append(char.IsWhiteSpace(c) ? ' ' : char.ToLowerInvariant(c));
+                        break;
+                }
+            }
+
+            var sb = new StringBuilder(chars.Length);
+            for (int i = 0; i < chars.Length; i++)
+            {
+                char c = chars[i];
+                if (c != ' ')
+                {
+                    sb.Append(c);
+                    continue;
+                }
+
+                int next = i;
+                while (next < chars.Length && chars[next] == ' ')
+                    next++;
+
+                bool nearX = (sb.Length > 0 && sb[sb.Length - 1] == 'х') || (next < chars.Length && chars[next] == 'х');
+                if (!nearX)
+                    sb.Append(' ');
+                i = next - 1;
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Размер входит в материал отдельным числом: «40х40» не совпадает с «140х40х3» и «40х400»
+        /// </summary>
+        private static bool ContainsSize(string material, string size)
+        {
+            for (int index = material.IndexOf(size, StringComparison.Ordinal);
+                 index >= 0;
+                 index = material.IndexOf(size, index + 1, StringComparison.Ordinal))
+            {
+                int end = index + size.Length;
+                bool startOk = !char.IsDigit(size[0]) || !ContinuesNumberBefore(material, index);
+                bool endOk = !char.IsDigit(size[size.Length - 1]) || !ContinuesNumberAfter(material, end);
+                if (startOk && endOk)
+                    return true;
+            }
+
+            return false;
+        }
+
+        // «1» перед «40х40» или «2.» перед «5х…» — число продолжается
+        private static bool ContinuesNumberBefore(string text, int index)
+        {
+            if (index == 0)
+                return false;
+
+            char prev = text[index - 1];
+            return char.IsDigit(prev) || (prev == '.' && index >= 2 && char.IsDigit(text[index - 2]));
+        }
+
+        // «0» после «40х40» или «.5» — число продолжается; точка в конце предложения — нет
+        private static bool ContinuesNumberAfter(string text, int end)
+        {
+            if (end >= text.Length)
+                return false;
+
+            char next = text[end];
+            return char.IsDigit(next) || (next == '.' && end + 1 < text.Length && char.IsDigit(text[end + 1]));
         }
 
         /// <summary>
@@ -400,8 +504,12 @@ namespace TankManager.Core.Models
         /// </summary>
         /// <param name="serverFilePath">Путь к общим расценкам на сервере (null — только локальные)</param>
         /// <param name="downloadOnly">Не записывать на сервер</param>
-        public static PricingSettings SyncWithServer(string serverFilePath, bool downloadOnly)
+        /// <param name="conflict">Не null — локальные правки не выложены: расценки на сервере за это время
+        /// изменил другой сотрудник. Локальная версия сохранена в отдельный файл, загружены серверные</param>
+        public static PricingSettings SyncWithServer(string serverFilePath, bool downloadOnly, out string conflict)
         {
+            conflict = null;
+
             if (string.IsNullOrEmpty(serverFilePath))
                 return LoadLocal();
 
@@ -416,8 +524,22 @@ namespace TankManager.Core.Models
                         var local = Deserialize(File.ReadAllBytes(SettingsPath));
                         if (local != null)
                         {
-                            local.Save(serverFilePath);
-                            return local;
+                            string changedBy = DescribeServerChange(serverFilePath, local.BaseModifiedUtcTicks);
+                            if (changedBy == null)
+                            {
+                                // Не удалось выложить — локальная копия остаётся новее и уйдёт при следующей синхронизации
+                                local.Save(serverFilePath);
+                                return local;
+                            }
+                            else
+                            {
+                                string conflictPath = Path.Combine(Path.GetDirectoryName(SettingsPath),
+                                    $"pricing_settings.conflict_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+                                File.Copy(SettingsPath, conflictPath, true);
+                                conflict = $"расценки на сервере изменил {changedBy}, ваши правки без сети не выложены " +
+                                           $"(сохранены в {Path.GetFileName(conflictPath)})";
+                                Logger.LogWarning($"Конфликт расценок: {conflict}");
+                            }
                         }
                     }
                 }
@@ -428,6 +550,36 @@ namespace TankManager.Core.Models
             }
 
             return Load(serverFilePath);
+        }
+
+        /// <summary>
+        /// Если расценки на сервере изменены позже версии baseModifiedUtcTicks — «ФИО, дата» этого изменения, иначе null
+        /// </summary>
+        public static string DescribeServerChange(string serverFilePath, long baseModifiedUtcTicks)
+        {
+            if (string.IsNullOrEmpty(serverFilePath))
+                return null;
+
+            PricingSettings server;
+            try
+            {
+                if (!File.Exists(serverFilePath))
+                    return null;
+                server = Deserialize(File.ReadAllBytes(serverFilePath));
+            }
+            catch (Exception ex)
+            {
+                // Нечитаемый файл на сервере сохранением как раз чинится
+                Logger.LogWarning($"Не удалось прочитать общие расценки {serverFilePath}: {ex.Message}");
+                return null;
+            }
+
+            if (server == null || server.ModifiedUtcTicks <= baseModifiedUtcTicks)
+                return null;
+
+            string by = string.IsNullOrWhiteSpace(server.ModifiedByName) ? server.ModifiedBy : server.ModifiedByName;
+            string when = new DateTime(server.ModifiedUtcTicks, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+            return string.IsNullOrEmpty(by) ? when : $"{by}, {when}";
         }
 
         private static PricingSettings LoadLocal()
@@ -482,7 +634,8 @@ namespace TankManager.Core.Models
             {
                 try
                 {
-                    AtomicFile.WriteAllBytes(serverFilePath, data);
+                    using (SharedFileLock.Acquire(serverFilePath))
+                        AtomicFile.WriteAllBytes(serverFilePath, data);
                 }
                 catch (Exception ex)
                 {

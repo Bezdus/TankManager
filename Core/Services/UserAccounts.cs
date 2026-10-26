@@ -309,7 +309,9 @@ namespace TankManager.Core.Services
             // Запрос к домену — до блокировки файла: он может быть медленным
             string name = LookupDomainDisplayName();
 
+            // Список общий: сотрудники регистрируются сами, в том числе одновременно
             lock (FileLock)
+            using (SharedFileLock.Acquire(serverPath))
             {
                 var users = File.Exists(serverPath) ? ReadFile(serverPath) : new List<UserAccount>();
                 var existing = Find(users, login);
@@ -346,6 +348,7 @@ namespace TankManager.Core.Services
                 throw new InvalidOperationException("Серверная папка не задана");
 
             lock (FileLock)
+            using (SharedFileLock.Acquire(serverPath))
             {
                 var users = File.Exists(serverPath) ? ReadFile(serverPath) : new List<UserAccount>();
                 foreach (var edit in changed)

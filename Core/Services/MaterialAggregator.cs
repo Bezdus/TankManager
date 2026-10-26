@@ -25,6 +25,10 @@ namespace TankManager.Core.Services
             if (product == null)
                 return;
 
+            product.SheetMaterials.Clear();
+            product.TubularProducts.Clear();
+            product.OtherMaterials.Clear();
+
             AggregateSheetMaterials(product);
             AggregateTubularProducts(product);
             AggregateOtherMaterials(product);
@@ -33,12 +37,21 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
+        /// Детали, материал которых учитывается в сводках: покупные изделия не учитываются
+        /// </summary>
+        private static IEnumerable<PartModel> GetMaterialParts(Product product)
+        {
+            return product.Details
+                .Where(p => p.ProductType != ProductType.PurchasedPart && !string.IsNullOrEmpty(p.Material));
+        }
+
+        /// <summary>
         /// Группирует листовой прокат по материалу
         /// </summary>
         private void AggregateSheetMaterials(Product product)
         {
-            var sheetMaterials = product.Details
-                .Where(p => p.ProductType == ProductType.SheetMaterial && !string.IsNullOrEmpty(p.Material))
+            var sheetMaterials = GetMaterialParts(product)
+                .Where(p => p.ProductType == ProductType.SheetMaterial)
                 .GroupBy(p => p.Material)
                 .Select(g => new MaterialInfo
                 {
@@ -58,8 +71,8 @@ namespace TankManager.Core.Services
         /// </summary>
         private void AggregateTubularProducts(Product product)
         {
-            var tubularProducts = product.Details
-                .Where(p => p.ProductType == ProductType.TubularProduct && !string.IsNullOrEmpty(p.Material))
+            var tubularProducts = GetMaterialParts(product)
+                .Where(p => p.ProductType == ProductType.TubularProduct)
                 .GroupBy(p => p.Material)
                 .Select(g => new MaterialInfo
                 {
@@ -80,10 +93,9 @@ namespace TankManager.Core.Services
         /// </summary>
         private void AggregateOtherMaterials(Product product)
         {
-            var otherMaterials = product.Details
-                .Where(p => p.ProductType != ProductType.SheetMaterial 
-                         && p.ProductType != ProductType.TubularProduct 
-                         && !string.IsNullOrEmpty(p.Material))
+            var otherMaterials = GetMaterialParts(product)
+                .Where(p => p.ProductType != ProductType.SheetMaterial
+                         && p.ProductType != ProductType.TubularProduct)
                 .GroupBy(p => p.Material)
                 .Select(g => new MaterialInfo
                 {

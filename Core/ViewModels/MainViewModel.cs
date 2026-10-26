@@ -963,11 +963,35 @@ namespace TankManager.Core.ViewModels
                 newSettings.ModifiedBy = CurrentUser.Login;
                 newSettings.ModifiedByName = CurrentUser.Name;
                 newSettings.ModifiedUtcTicks = DateTime.UtcNow.Ticks;
+                newSettings.BaseModifiedUtcTicks = _pricingSettings.ModifiedUtcTicks;
 
                 try
                 {
                     // Общие расценки лежат в серверной папке, локальная копия — для работы без сети
                     string serverPath = _storageService.IsServerAvailable ? _storageService.ServerPricingFilePath : null;
+
+                    // Пока окно было открыто, расценки на сервере мог изменить другой сотрудник
+                    string changedBy = PricingSettings.DescribeServerChange(serverPath, newSettings.BaseModifiedUtcTicks);
+                    if (changedBy != null)
+                    {
+                        var answer = MessageBox.Show(
+                            $"Расценки на сервере изменены после того, как вы их открыли: {changedBy}.\n\n" +
+                            "Сохранить ваши расценки поверх? Изменения той версии будут потеряны.\n\n" +
+                            "«Нет» — отменить ваши правки и загрузить расценки с сервера.",
+                            "Расценки изменены другим сотрудником",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning,
+                            MessageBoxResult.No);
+
+                        if (answer != MessageBoxResult.Yes)
+                        {
+                            PricingSettings = PricingSettings.Load(serverPath);
+                            RecalculateAllCosts();
+                            ShowSnackbar("Загружены расценки с сервера", SnackbarKind.Info);
+                            return;
+                        }
+                    }
+
                     string serverError = newSettings.Save(serverPath);
 
                     if (serverError != null)
@@ -1700,6 +1724,27 @@ namespace TankManager.Core.ViewModels
             try
             {
                 IsLoading = true;
+
+                // Пока изделие было открыто, его мог сохранить другой сотрудник — не затираем молча
+                string newerVersion = await Task.Run(() => _storageService.FindNewerSavedVersion(product));
+                if (newerVersion != null)
+                {
+                    var answer = MessageBox.Show(
+                        $"Изделие «{product.Name}» сохранили после того, как вы его открыли: {newerVersion}.\n\n" +
+                        "Сохранить вашу версию поверх? Изменения в той версии будут потеряны " +
+                        "(что именно изменится, будет видно в журнале изменений).\n\n" +
+                        "«Нет» — отменить сохранение. Чтобы увидеть новую версию, откройте изделие заново.",
+                        "Изделие изменено другим сотрудником",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning,
+                        MessageBoxResult.No);
+
+                    if (answer != MessageBoxResult.Yes)
+                    {
+                        StatusMessage = "Сохранение отменено: изделие изменено другим сотрудником";
+                        return;
+                    }
+                }
 
                 // Получаем папку для изображений продукта
                 string imagesFolder = await Task.Run(() => _storageService.GetProductImagesFolder(product));
@@ -2449,14 +2494,18 @@ namespace TankManager.Core.ViewModels
                 string pricingPath = _storageService.ServerPricingFilePath;
 
                 // Сетевые операции (в том числе проверка доступности сервера) — вне UI-потока
+                string pricingConflict = null;
                 var result = await Task.Run(() =>
                 {
                     var sync = _storageService.SyncFromServer(skipImages: true);
                     var pricing = _storageService.IsServerAvailable
-                        ? PricingSettings.SyncWithServer(pricingPath, downloadOnly)
+                        ? PricingSettings.SyncWithServer(pricingPath, downloadOnly, out pricingConflict)
                         : null;
                     return Tuple.Create(sync, pricing);
                 });
+
+                if (pricingConflict != null)
+                    ShowSnackbar($"Расценки: {pricingConflict}", SnackbarKind.Warning, 10000);
 
                 var syncResult = result.Item1;
                 bool hasChanges = syncResult.NewProducts > 0 || syncResult.UpdatedProducts > 0;

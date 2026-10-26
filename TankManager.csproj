@@ -160,6 +160,7 @@
     <Compile Include="Core\Services\PartExtractor.cs" />
     <Compile Include="Core\Services\PartFinder.cs" />
     <Compile Include="Core\Services\ProductStorageService.cs" />
+    <Compile Include="Core\Services\SharedFileLock.cs" />
     <Compile Include="Core\Services\StandardPartPreviewService.cs" />
     <Compile Include="Core\Services\ThumbnailService.cs" />
     <Compile Include="Core\Services\UpdateService.cs" />

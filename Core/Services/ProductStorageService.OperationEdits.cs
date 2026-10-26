@@ -158,37 +158,45 @@ namespace TankManager.Core.Services
         {
             try
             {
-                var local = ReadOperationEdits(localFolder, out bool localOk);
-                var server = ReadOperationEdits(serverFolder, out bool serverOk);
-
-                var merged = new Dictionary<string, PartOperationEditsDto>(StringComparer.OrdinalIgnoreCase);
-                foreach (var entry in local.Concat(server).Where(e => !string.IsNullOrEmpty(e.Key)))
-                {
-                    if (!merged.TryGetValue(entry.Key, out var existing) || entry.ModifiedUtcTicks > existing.ModifiedUtcTicks)
-                        merged[entry.Key] = entry;
-                }
-
-                var result = merged.Values.OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase).ToList();
-
-                if (!localOk || !SameEdits(local, result))
-                    WriteOperationEdits(localFolder, result);
-
-                if (upload && !SameEdits(server, result))
-                {
-                    // Не перезаписываем файл на сервере, который не удалось прочитать (иначе потеряем чужие правки)
-                    if (!serverOk)
-                        return "не удалось прочитать правки операций на сервере";
-
-                    WriteOperationEdits(serverFolder, result);
-                }
-
-                return null;
+                // Файл на сервере правят и конструкторы, и технологи: между чтением и записью
+                // его не должен переписать другой компьютер
+                using (upload ? SharedFileLock.Acquire(Path.Combine(serverFolder, OperationEditsFileName)) : null)
+                    return SyncOperationEditsFolderCore(localFolder, serverFolder, upload);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"Ошибка синхронизации правок операций {Path.GetFileName(localFolder)}: {ex.Message}");
                 return ex.Message;
             }
+        }
+
+        private string SyncOperationEditsFolderCore(string localFolder, string serverFolder, bool upload)
+        {
+            var local = ReadOperationEdits(localFolder, out bool localOk);
+            var server = ReadOperationEdits(serverFolder, out bool serverOk);
+
+            var merged = new Dictionary<string, PartOperationEditsDto>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in local.Concat(server).Where(e => !string.IsNullOrEmpty(e.Key)))
+            {
+                if (!merged.TryGetValue(entry.Key, out var existing) || entry.ModifiedUtcTicks > existing.ModifiedUtcTicks)
+                    merged[entry.Key] = entry;
+            }
+
+            var result = merged.Values.OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase).ToList();
+
+            if (!localOk || !SameEdits(local, result))
+                WriteOperationEdits(localFolder, result);
+
+            if (upload && !SameEdits(server, result))
+            {
+                // Не перезаписываем файл на сервере, который не удалось прочитать (иначе потеряем чужие правки)
+                if (!serverOk)
+                    return "не удалось прочитать правки операций на сервере";
+
+                WriteOperationEdits(serverFolder, result);
+            }
+
+            return null;
         }
 
         private static bool SameEdits(List<PartOperationEditsDto> a, List<PartOperationEditsDto> b)

@@ -398,7 +398,8 @@ namespace TankManager.Core.Services
                 string fileName = Path.GetFileName(file);
                 string extension = Path.GetExtension(fileName);
                 if (string.Equals(extension, ".bak", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(extension, ".tmp", StringComparison.OrdinalIgnoreCase))
+                    string.Equals(extension, ".tmp", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(extension, SharedFileLock.Extension, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 // Правки операций не копируются целиком, а сливаются по деталям (SyncOperationEditsFolder)
@@ -407,11 +408,10 @@ namespace TankManager.Core.Services
 
                 string destFile = Path.Combine(destFolder, fileName);
 
-                // Резервная копия перед перезаписью product.json
-                if (string.Equals(fileName, ProductJsonFileName, StringComparison.OrdinalIgnoreCase) && File.Exists(destFile))
-                    File.Copy(destFile, destFile + ".bak", true);
-
-                File.Copy(file, destFile, true);
+                // Через временный файл: открывающий изделие во время синхронизации не прочитает недописанный файл.
+                // Перед перезаписью product.json прежняя версия сохраняется в .bak
+                bool isProductJson = string.Equals(fileName, ProductJsonFileName, StringComparison.OrdinalIgnoreCase);
+                AtomicFile.Copy(file, destFile, isProductJson ? destFile + ".bak" : null);
             }
 
             // Копируем подпапки (пропускаем images если skipImages)
@@ -584,6 +584,47 @@ namespace TankManager.Core.Services
         }
 
         /// <summary>
+        /// Проверяет, не сохранил ли кто-то изделие после того, как оно было открыто: в локальной копии
+        /// (её обновляет фоновая синхронизация) или на сервере лежит более поздняя версия.
+        /// Возвращает «кто, когда» для более поздней версии или null, если перезаписывать нечего
+        /// </summary>
+        public string FindNewerSavedVersion(Product product)
+        {
+            if (product == null || string.IsNullOrEmpty(product.Name))
+                return null;
+
+            // Версия, от которой изделие открыто (у ещё не сохранённого — 0)
+            long baseTicks = product.SavedUtc?.Ticks ?? 0;
+            ProductMeta newest = null;
+
+            var folders = new List<string> { ProductsDirectory };
+            if (!DownloadOnly && IsServerAvailable)
+                folders.Add(_serverStorageFolder);
+
+            foreach (var baseDirectory in folders)
+            {
+                try
+                {
+                    string folder = FindExistingProductFolder(product, baseDirectory);
+                    var meta = folder == null ? null : GetMeta(folder);
+                    if (meta != null && meta.SavedUtcTicks > baseTicks &&
+                        (newest == null || meta.SavedUtcTicks > newest.SavedUtcTicks))
+                        newest = meta;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Не удалось проверить сохранённую версию изделия в {baseDirectory}: {ex.Message}");
+                }
+            }
+
+            if (newest == null)
+                return null;
+
+            string when = new DateTime(newest.SavedUtcTicks, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+            return string.IsNullOrEmpty(newest.SavedBy) ? when : $"{newest.SavedBy}, {when}";
+        }
+
+        /// <summary>
         /// Сохраняет изделие в указанную директорию
         /// </summary>
         private string SaveToDirectory(Product product, string baseDirectory, string customName)
@@ -700,8 +741,16 @@ namespace TankManager.Core.Services
                 return null;
 
             var product = LoadFromFile(filePath, folderPath);
-            if (product != null)
-                ApplyOperationEdits(product, folderPath);
+            if (product == null)
+                return null;
+
+            ApplyOperationEdits(product, folderPath);
+
+            // Сводки материалов пересчитываем по деталям: в старых сохранениях в «Прочие»
+            // попадал материал покупных изделий. Без деталей остаются сохранённые списки.
+            // Только здесь, а не в FromDto: тот же разбор идёт и ради метаданных списка изделий
+            if (product.Details.Count > 0)
+                new MaterialAggregator(_logger).AggregateMaterials(product);
 
             return product;
         }
@@ -907,6 +956,7 @@ namespace TankManager.Core.Services
             public int DetailsCount;
             public DateTime SavedDate;
             public string SavedBy;
+            public long SavedUtcTicks;
         }
 
         /// <summary>
@@ -941,7 +991,8 @@ namespace TankManager.Core.Services
                 DetailsCount = product.Details.Count,
                 // Дата из файла, если её записали: при синхронизации дата изменения файла — время копирования
                 SavedDate = product.SavedUtc?.ToLocalTime() ?? info.LastWriteTime,
-                SavedBy = product.SavedByDisplay
+                SavedBy = product.SavedByDisplay,
+                SavedUtcTicks = product.SavedUtc?.Ticks ?? 0
             };
 
             lock (_metaCache)
@@ -997,10 +1048,40 @@ namespace TankManager.Core.Services
 
         private void RecordTombstone(string path, string folderName)
         {
-            var items = ReadTombstones(path);
-            items.RemoveAll(i => string.Equals(i.FolderName, folderName, StringComparison.OrdinalIgnoreCase));
-            items.Add(new TombstoneEntry { FolderName = folderName, DeletedUtcTicks = DateTime.UtcNow.Ticks, DeletedBy = CurrentUser.Login });
-            WriteTombstones(path, items);
+            // Список удалений общий: без блокировки одновременное удаление на двух компьютерах теряет запись
+            using (SharedFileLock.Acquire(path))
+            {
+                var items = ReadTombstones(path);
+                items.RemoveAll(i => string.Equals(i.FolderName, folderName, StringComparison.OrdinalIgnoreCase));
+                items.Add(new TombstoneEntry { FolderName = folderName, DeletedUtcTicks = DateTime.UtcNow.Ticks, DeletedBy = CurrentUser.Login });
+                WriteTombstones(path, items);
+            }
+        }
+
+        /// <summary>
+        /// Добавляет в items отложенные удаления (по папке побеждает более позднее). true — список изменился
+        /// </summary>
+        private static bool MergeTombstones(List<TombstoneEntry> items, IEnumerable<TombstoneEntry> pending)
+        {
+            bool changed = false;
+
+            foreach (var entry in pending)
+            {
+                var existing = items.FirstOrDefault(i => string.Equals(i.FolderName, entry.FolderName, StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    items.Add(entry);
+                    changed = true;
+                }
+                else if (entry.DeletedUtcTicks > existing.DeletedUtcTicks)
+                {
+                    existing.DeletedUtcTicks = entry.DeletedUtcTicks;
+                    existing.DeletedBy = entry.DeletedBy;
+                    changed = true;
+                }
+            }
+
+            return changed;
         }
 
         private static bool IsNewerThan(string filePath, DateTime utc)
@@ -1021,32 +1102,17 @@ namespace TankManager.Core.Services
             var items = ReadTombstones(serverPath);
             // В режиме просмотра удаления только применяются к локальной папке, сервер не меняется
             var pending = DownloadOnly ? new List<TombstoneEntry>() : ReadTombstones(pendingPath);
-            bool changed = false;
-
-            foreach (var entry in pending)
-            {
-                var existing = items.FirstOrDefault(i => string.Equals(i.FolderName, entry.FolderName, StringComparison.OrdinalIgnoreCase));
-                if (existing == null)
-                {
-                    items.Add(entry);
-                    changed = true;
-                }
-                else if (entry.DeletedUtcTicks > existing.DeletedUtcTicks)
-                {
-                    existing.DeletedUtcTicks = entry.DeletedUtcTicks;
-                    existing.DeletedBy = entry.DeletedBy;
-                    changed = true;
-                }
-            }
+            bool changed = MergeTombstones(items, pending);
 
             long cutoff = DateTime.UtcNow.AddDays(-TombstoneRetentionDays).Ticks;
-            var keep = new List<TombstoneEntry>();
+            // Записи, которые больше не нужны: устаревшие или изделие сохранили заново после удаления
+            var dropped = new List<TombstoneEntry>();
 
             foreach (var entry in items)
             {
                 if (!IsSafeFolderName(entry.FolderName) || entry.DeletedUtcTicks < cutoff)
                 {
-                    changed = true;
+                    dropped.Add(entry);
                     continue;
                 }
 
@@ -1058,7 +1124,7 @@ namespace TankManager.Core.Services
                 if (IsNewerThan(Path.Combine(serverFolder, ProductJsonFileName), deletedUtc) ||
                     IsNewerThan(Path.Combine(localFolder, ProductJsonFileName), deletedUtc))
                 {
-                    changed = true;
+                    dropped.Add(entry);
                     continue;
                 }
 
@@ -1074,11 +1140,30 @@ namespace TankManager.Core.Services
                 }
 
                 skip.Add(entry.FolderName);
-                keep.Add(entry);
             }
 
-            if (changed && !DownloadOnly)
-                WriteTombstones(serverPath, keep);
+            if ((changed || dropped.Count > 0) && !DownloadOnly)
+            {
+                try
+                {
+                    // Пока применялись удаления, другой компьютер мог дописать список — перечитываем под блокировкой
+                    using (SharedFileLock.Acquire(serverPath))
+                    {
+                        var current = ReadTombstones(serverPath);
+                        MergeTombstones(current, pending);
+                        current.RemoveAll(i => dropped.Any(d =>
+                            string.Equals(d.FolderName, i.FolderName, StringComparison.OrdinalIgnoreCase) &&
+                            d.DeletedUtcTicks >= i.DeletedUtcTicks));
+                        WriteTombstones(serverPath, current);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Отложенные удаления остаются в файле и будут выложены при следующей синхронизации
+                    result.Errors.Add($"Не удалось обновить список удалений на сервере: {ex.Message}");
+                    return skip;
+                }
+            }
 
             if (pending.Count > 0)
             {

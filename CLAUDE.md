@@ -68,8 +68,14 @@ syncs saved products to local/server storage.
   under `<exe dir>\products\<Name>_<Marking>\product.json` + `images\`. An
   optional shared server folder (set at runtime, stored in
   `storage_settings.json` next to the exe) is synced with the local copy.
-  Writes go through `AtomicFile` (temp file + replace) and all mutating storage
-  operations take `_ioLock`. Deleting "everywhere" records a tombstone
+  Writes go through `AtomicFile` (unique temp file + replace; sync copies use `AtomicFile.Copy`, which
+  keeps the source mtime) and all mutating storage operations take `_ioLock`. Shared server files that
+  are read-modified-written (`_deleted.json`, `_users.json`, `_pricing_settings.json`, `operations.json`)
+  are updated under `SharedFileLock` (`<file>.lock`, opened with `FileShare.None`, between machines;
+  never nest two acquires of the same file). `SaveProductAsync` asks before overwriting a version saved
+  by someone else after the product was opened (`FindNewerSavedVersion`, by `SavedUtcTicks`); pricing
+  edits carry `BaseModifiedUtcTicks`, and an offline edit is not uploaded over a newer server version
+  (kept as `pricing_settings.conflict_*.json`). Deleting "everywhere" records a tombstone
   (`_deleted.json` on the server, `_pending_deleted.json` locally while the server is
   unreachable) that `SyncFromServer` applies, so deleted products don't come back.
   Save/sync errors are not swallowed: local failures throw, server failures land in
